@@ -4,13 +4,17 @@
 
 Seed contract for review.
 
-This document defines how the second inference call connects the current problem space to the projected semantic space.
+This document defines how the second inference call connects the current relational problem space to the projected semantic space.
 
 ## 1. Terminology
 
 `Traversal` remains useful, but it is not the whole operation.
 
-The problem space presents a lens through which the semantic space is viewed. The runtime activates a bounded region through that lens. The second inference call then specifies how semantic units are to be collected from the activated region.
+The problem space presents a lens through which the semantic space is viewed.
+
+The runtime activates a bounded semantic region through that lens.
+
+The second inference call then specifies how semantic units are to be collected from the activated region.
 
 The proposed top-level term is:
 
@@ -24,7 +28,7 @@ A plan may contain one or more:
 TraversalPath
 ```
 
-A traversal path is the directed movement through represented semantic connections.
+A traversal path is directed movement through represented semantic connections.
 
 This preserves the project term `Semantic Traversal` without treating the entire inference process as one linear graph walk.
 
@@ -32,7 +36,8 @@ This preserves the project term `Semantic Traversal` without treating the entire
 
 Let:
 
-- \(P_t\) be the updated problem space;
+- \(P_t\) be the updated relational problem space;
+- \(\Lambda_t\) be its current attention lens;
 - \(u_t\) be the newest utterance;
 - \(M_\sigma\) be the immutable semantic projection snapshot for the turn;
 - \(W_t\) be the activated working projection;
@@ -41,56 +46,76 @@ Let:
 The second inference call operates as:
 
 \[
-T_t = I_2(P_t, u_t, W_t)
+T_t = I_2(P_t,u_t,W_t)
 \]
 
-The final executable plan must conform to the full frozen projection:
+The final executable plan must conform to:
 
 \[
-C(T_t, M_\sigma)
+C(T_t,M_\sigma)
 \]
 
-## 3. Exploration versus execution
+## 3. What guides semantic access
 
-The second inference call may begin from descriptive problem-space markers such as:
+The second inference call may begin from:
+
+- active problem regions;
+- anchor referents;
+- relations presently in question;
+- active constraints;
+- open tensions;
+- the current attention lens;
+- the newest utterance.
+
+Examples:
 
 ```text
-Capital
-Blood Meridian
-go vegan
-the calf
-earliest
-exact phrase
+region:
+    Capital and Blood Meridian chronology
+
+referents:
+    Capital
+    Blood Meridian
+
+constraint:
+    compare temporal anchors
+
+open tension:
+    chronology dimension unresolved
 ```
 
-It may use projection tools to bind those markers to:
+These problem-space records guide projection exploration.
+
+They are not executable corpus addresses.
+
+## 4. Exploration versus execution
+
+The second inference call uses projection tools to bind problem-space structure to:
 
 - canonical semantic objects;
 - canonical semantic units;
 - semantic regions;
-- identifiers;
+- identifier assignments;
 - occurrences;
 - temporal anchors;
 - available retrieval surfaces.
 
-The final executable plan must use resolved projected addresses wherever canonical addresses exist.
-
-In other words:
+The final executable plan uses resolved projected addresses wherever canonical addresses exist.
 
 ```text
-problem-space language
+problem-space region, relation, constraint, or tension
     guides exploration
 
 projection access
-    resolves addresses
+    resolves semantic addresses and paths
 
-final access plan
-    references represented nodes, edges, identifiers, and surfaces
+final semantic-access plan
+    references represented nodes, edges, surfaces, and outputs
 ```
 
 The runtime does not execute an ambiguous natural-language graph path.
 
-## 4. Canonical semantic addresses
+## 5. Canonical semantic addresses
 
 A semantic-access plan may address:
 
@@ -118,7 +143,7 @@ SemanticAddress
 
 The exact serialization remains open.
 
-## 5. Semantic regions
+## 6. Semantic regions
 
 A region is an addressable authored structural area inside a semantic object.
 
@@ -133,9 +158,11 @@ A heading region may contain one or more semantic units.
 
 A block address may resolve to one explicitly identified unit.
 
-A region is structural addressability, not a third epistemic ontology above objects and units.
+A semantic region is structural addressability.
 
-## 6. Plan topology
+It is not a third epistemic ontology above objects and units.
+
+## 7. Plan topology
 
 A semantic-access plan is a typed directed acyclic graph.
 
@@ -144,12 +171,12 @@ It may:
 - branch;
 - execute retrieval surfaces in parallel;
 - follow multiple objects;
-- rejoin at a comparison or grouping operation;
+- rejoin at a comparison, grouping, or ordering operation;
 - preserve separate provenance paths.
 
-A simple plan may still serialize as a linear path.
+A simple plan may serialize as a linear path.
 
-The graph form is required for cases such as:
+Graph form supports:
 
 ```text
 Capital ──────────────┐
@@ -157,7 +184,7 @@ Capital ──────────────┐
 Blood Meridian ───────┘
 ```
 
-## 7. Direction is explicit and fluid
+## 8. Direction is explicit and fluid
 
 Semantic connections may be traversed in any direction represented by the projection.
 
@@ -174,19 +201,15 @@ unit → temporal anchor
 anchor → anchored unit
 ```
 
-The second inference call chooses the required direction in the plan.
+The second inference call chooses the direction.
 
-The deterministic runtime executes that declared direction.
+The deterministic runtime executes it.
 
-The runtime does not force every query through inbound occurrences or any other single route.
+No single route is globally privileged.
 
-This should feel like canonical Obsidian navigation generalized into a typed semantic substrate.
+## 9. Two classes of operation
 
-## 8. Two classes of plan operation
-
-### 8.1 Connection operations
-
-These follow represented structure:
+### 9.1 Connection operations
 
 ```text
 follow containment
@@ -198,9 +221,7 @@ follow inherited identifier
 follow temporal anchor
 ```
 
-### 8.2 Retrieval-surface operations
-
-These discover, match, rank, count, or order materialized semantic records:
+### 9.2 Retrieval-surface operations
 
 ```text
 exact
@@ -212,7 +233,26 @@ temporal
 
 A plan may combine both classes.
 
-## 9. Configured execution bounds
+## 10. Problem-space bindings
+
+The plan records how its projected addresses relate back to the problem space.
+
+Examples:
+
+```text
+problem region → canonical object bindings
+problem relation → traversal paths
+active constraint → required operation
+open tension → requested output or unresolved plan objective
+```
+
+This provenance allows later inspection of why an address or path was selected.
+
+The plan does not mark the problem region resolved.
+
+Resolution remains a synthesis or later boundary-inference outcome.
+
+## 11. Configured execution bounds
 
 Configuration defines:
 
@@ -225,24 +265,22 @@ Configuration defines:
 - exact-count scope;
 - per-object or per-region caps.
 
-The model does not spend inference deciding ordinary initial depths and limits.
+The model does not spend inference selecting ordinary initial depths and limits.
 
-The runtime applies configured defaults automatically.
+The runtime applies configured defaults.
 
-During the second inference call, targeted continuation or expansion may be requested only when the visible region and telemetry show a reason to expand, and only within the configured hard maxima.
+The model may request targeted continuation within the configured hard maxima when projection telemetry shows a need.
 
 The accepted configuration snapshot is attached to the plan.
 
-## 10. Required and optional operations
+## 12. Required and optional operations
 
-Each plan operation may be labeled:
+Each plan operation may be:
 
 ```text
 required
 optional
 ```
-
-This is a yes/no design decision about supporting both labels; it is not a choice to make every step one universal category.
 
 ### Required
 
@@ -256,19 +294,21 @@ Examples:
 
 ### Optional
 
-Failure is recorded but does not automatically invalidate the primary evidence path.
+Failure is recorded but does not automatically invalidate the primary evidence route.
 
 Examples:
 
-- vector expansion for extra context;
+- vector expansion for supporting context;
 - secondary graph enrichment;
-- supporting lexical recall when a required exact path succeeded.
+- lexical recall supporting a successful exact route.
 
-Required or optional status does not determine semantic truth. It determines execution obligations.
+Required or optional status defines execution obligation.
 
-## 11. Requested output shape
+It does not determine semantic truth.
 
-The plan explicitly declares what execution must materialize.
+## 13. Requested output shape
+
+The plan declares what execution must materialize.
 
 Possible outputs include:
 
@@ -285,9 +325,32 @@ total exact count
 surface provenance
 ```
 
-The output declaration controls packet shape, not the final conclusion.
+The output declaration controls packet shape.
 
-## 12. Seed plan contract
+It does not prescribe the final answer.
+
+## 14. Open tensions and access objectives
+
+An open tension may guide a plan toward information needed for synthesis.
+
+Examples:
+
+```text
+unresolved referent
+    → retrieve candidate canonical bindings
+
+missing chronology dimension
+    → retrieve publication and reading relation surfaces
+
+contradictory prior framing
+    → collect evidence for both represented routes
+```
+
+The plan may preserve the tension as unresolved.
+
+It may not close the tension merely because one path was easier to activate.
+
+## 15. Seed plan contract
 
 ```text
 SemanticAccessPlan
@@ -296,6 +359,10 @@ SemanticAccessPlan
     problem_space_version
     focus_utterance_id
     configuration_snapshot_id
+    problem_region_bindings[]
+    relation_bindings[]
+    constraint_bindings[]
+    open_tension_bindings[]
     address_bindings[]
     traversal_paths[]
     surface_operations[]
@@ -311,6 +378,7 @@ TraversalPath
     start_addresses[]
     operations[]
     output_binding
+    problem_space_provenance[]
 ```
 
 ```text
@@ -327,9 +395,9 @@ PlanOperation
 
 Exact names remain provisional.
 
-## 13. Conformance
+## 16. Conformance
 
-Conformance validates only structural existence.
+Conformance validates structural existence.
 
 It checks that:
 
@@ -341,9 +409,14 @@ It checks that:
 - requested outputs can be materialized;
 - configuration bounds are respected.
 
-It does not judge whether retrieved prose semantically proves a generated proposition.
+It does not:
 
-## 14. Repair
+- judge problem-space coherence;
+- resolve open tensions;
+- decide whether prose proves a paraphrase;
+- decide whether evidence is semantically close enough.
+
+## 17. Repair
 
 Initial repair policy:
 
@@ -361,20 +434,26 @@ No deterministic component repairs natural-language meaning.
 
 A second invalid result becomes an explicit inference failure.
 
-## 15. Example — book chronology
+## 18. Example — book chronology
 
-Problem-space focus:
-
-```text
-Which did I start first, Capital or Blood Meridian?
-```
-
-Exploration resolves:
+Problem-space state:
 
 ```text
-Capital → canonical book object
-Blood Meridian → canonical book object
+region:
+    Capital and Blood Meridian chronology
+
+referents:
+    Capital
+    Blood Meridian
+
+constraint:
+    temporal comparison
+
+open tension:
+    comparison dimension may require binding
 ```
+
+Projection exploration resolves canonical objects and represented temporal paths.
 
 Final plan:
 
@@ -403,9 +482,9 @@ outputs:
 
 Synthesis performs the semantic comparison.
 
-## 16. Possible Rust encoding
+## 19. Possible Rust encoding
 
-This section is illustrative, not normative.
+Illustrative only:
 
 ```rust
 enum SemanticAddress {
@@ -436,32 +515,34 @@ enum PlanOperation {
 }
 ```
 
-The user's semantic distinction comes first:
+The semantic distinctions come first:
 
 ```text
-object
-≠ unit
-≠ region
+problem region
+≠ semantic object
+≠ semantic unit
+≠ semantic region
 ≠ identifier assignment
 ≠ occurrence
 ≠ anchor
 ```
 
-Rust's role is to prevent code from treating those addresses as interchangeable.
+Rust's role is to stop code from treating these as interchangeable.
 
-## 17. Acceptance conditions
+## 20. Acceptance conditions
 
-The traversal language is acceptable when:
+The semantic-access language is acceptable when:
 
-1. the top-level operation is a semantic-access plan;
-2. traversal paths remain explicit internal routes;
-3. final executable plans use canonical projected addresses;
-4. plans may branch and rejoin;
-5. direction is explicit and may be incoming or outgoing;
-6. all operations are typed;
-7. configured defaults are deterministic;
-8. the model does not choose routine initial bounds;
-9. required and optional execution obligations are distinct;
+1. the top-level object is a semantic-access plan;
+2. traversal paths remain explicit routes inside it;
+3. active problem regions and tensions have traceable bindings;
+4. final plans use canonical projected addresses;
+5. plans may branch and rejoin;
+6. direction may be incoming or outgoing;
+7. all operations are typed;
+8. configured defaults are deterministic;
+9. required and optional obligations remain distinct;
 10. output shape is declared;
-11. repair is bounded to one fresh inference call;
-12. no plan operation creates a post-retrieval semantic veto.
+11. open tensions may guide access without being silently resolved;
+12. repair is bounded to one fresh inference call;
+13. no operation creates a post-retrieval semantic or coherence veto.

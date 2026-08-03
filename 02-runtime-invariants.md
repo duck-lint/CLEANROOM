@@ -2,118 +2,234 @@
 
 These invariants protect the distinctions expressed in the kernel equations.
 
-They should be treated as architectural acceptance criteria, not implementation preferences.
+They are architectural acceptance criteria, not implementation preferences.
 
-## 1. Two semantic inference sites
+## 1. Two semantic roles, three model calls
 
-Only two runtime operations may interpret natural-language meaning:
+Natural-language meaning may be interpreted only through:
 
-1. inference, which deconstructs the utterance and constructs the traversal;
-2. synthesis, which interprets the returned semantic units and produces the answer.
+1. boundary inference;
+2. semantic-access inference;
+3. synthesis.
 
-No deterministic middle layer may become a third semantic model.
+The first two are separate calls performing the inference role.
 
-## 2. The thread is an evolving problem space
+No deterministic middle layer may become another semantic model.
 
-Each thread owns its own aggregate problem-space state.
+## 2. The thread is a relational problem gestalt
+
+Each thread owns one evolving problem-space state.
+
+That state contains:
+
+- problem regions;
+- relations among regions;
+- active constraints;
+- open tensions;
+- contribution and persistence history;
+- a current attention lens.
+
+It is not merely a transcript, topic list, or continually rewritten summary.
+
+## 3. Boundary contributions are perturbations
+
+The newest utterance contributes an explicit transformation of the existing problem space.
+
+Possible transformations include preserve, reinforce, extend, merge, split, connect, constrain, redirect, supersede, retire, open tension, and resolve tension.
+
+The deterministic runtime may apply those operations.
+
+It may not infer them independently.
+
+## 4. Attention bands are views, not containers
+
+Primary, secondary, tertiary, and background activation are different current intensities over one problem space.
+
+Moving a region between bands must not duplicate it.
+
+A background region remains structurally part of the problem gestalt until explicitly superseded or retired.
+
+## 5. Semantic continuity aggregates rather than piles up
+
+A follow-on question about an existing region should reinforce, refine, redirect, or extend that region rather than create an indefinitely growing duplicate.
+
+Deduplication of meaning is issued by boundary inference.
+
+It is not guessed by deterministic similarity heuristics.
+
+## 6. Coherence is qualitative and structural
+
+Problem-space coherence means preservation of identifiable relational structure through revision.
+
+It is not initially represented by a numeric score.
+
+It is not a truth measure, confidence value, automatic decay function, or ranking signal.
+
+## 7. Open tensions remain explicit
+
+Unresolved references, contradictions, missing distinctions, and recurrent unresolved questions remain represented as open tensions.
+
+The runtime must not smooth them into false resolution.
+
+An open tension in the problem space is not a negative claim about the corpus.
+
+## 8. Thread isolation is absolute
 
 - A fresh thread begins clean.
-- A continuing thread preserves its own state.
+- A continuing thread evolves only from its own state.
 - Different threads never share problem-space state.
-- The newest utterance may reshape, narrow, expand, or redirect the aggregate boundary.
-- Conversation continuity is supplied to synthesis as background, while the newest utterance remains the focus.
+- Product-level branch cloning remains outside the initial kernel.
 
-## 3. The projected semantic space is corpus-derived authority
+## 9. The immediately preceding turn is continuity, not evidence
+
+Synthesis receives the previous completed turn so a referential follow-up does not appear without local conversational context.
+
+That turn is labeled as conversational continuity.
+
+It does not become retrieval evidence merely by being present.
+
+## 10. The projected semantic space is corpus-derived authority
 
 The projected semantic space is derived from the structured semantic substrate.
 
-It defines what is addressable and traversable within the corpus accessible to the runtime.
+It defines what is addressable and traversable within the corpus available to the runtime.
 
 The runtime may not supplement a missing semantic relation by inventing one after retrieval.
 
-## 4. Traversal inference is bounded by the projection
+## 11. Projection activation is positive-only
 
-The inference model may compose only from identifiers, object and unit addresses, relations, occurrences, directions, anchors, retrieval surfaces, and valid transitions exposed in the projected semantic space.
+Activation means that a semantic region is presently loaded or visible.
 
-## 5. Conformance performs no inference
+It never means that unloaded space is irrelevant, absent, or evidentially empty.
 
-Structural conformance checks only whether the traversal exists within the projected semantic space.
+Failure to reach a region under a current budget authorizes no negative conclusion.
 
-It may reject absent identifiers, impossible identifier/object combinations, unavailable retrieval surfaces, missing canonical targets, invalid directions, absent relations, unresolved heading or block addresses, and unsupported transitions.
+## 12. Semantic-access inference is bounded by the projection
+
+The second inference call may compose only from identifiers, addresses, relations, occurrences, directions, anchors, retrieval surfaces, and transitions exposed by the projected semantic space.
+
+The problem-space lens guides access.
+
+It does not create corpus structure.
+
+## 13. Conformance performs no inference
+
+Structural conformance checks only whether the semantic-access plan exists within the projected semantic space.
+
+It may reject:
+
+- absent identifiers;
+- impossible identifier/object combinations;
+- unavailable retrieval surfaces;
+- missing canonical targets;
+- invalid directions;
+- absent relations;
+- unresolved heading or block addresses;
+- unsupported transitions;
+- configuration violations.
 
 It may not decide whether the user's meaning or the evidence's meaning is “close enough.”
 
-## 6. Execution performs no semantic adjudication
+## 14. Execution performs no semantic adjudication
 
-Once a traversal conforms, execution runs it.
+Once a plan conforms, execution runs it.
 
-A semantic unit returned by a valid traversal cannot be rejected because it fails a runtime-generated subject, predicate, proposition, paraphrase, or equivalence test.
+A semantic unit returned by a valid plan cannot be rejected because it fails a runtime-generated subject, predicate, proposition, paraphrase, equivalence test, or coherence test.
 
-## 7. No post-retrieval ontology
+## 15. No post-retrieval ontology
 
-After execution, the runtime may not introduce new semantic objects such as generated predicate residuals, runtime-owned subject roles, proposition-eligibility objects, inferred equivalence classes, or admission categories absent from the semantic projection or traversal.
+After execution, the runtime may not introduce generated semantic roles or admission categories absent from the projection or plan.
 
-## 8. Packet assembly preserves rather than reinterprets
+Diagnostic descriptions may not acquire veto authority.
 
-Packet assembly may deduplicate canonical identities, rank, apply deterministic bounds, preserve breadth-before-depth, attach provenance, attach anchors, and record execution limits.
+## 16. Problem-space coherence never gates retrieved evidence
 
-It may not add a new relevance threshold based on natural-language interpretation.
+Coherence belongs to the representation of the evolving conversational problem.
 
-## 9. Returned semantic units reach synthesis
+It may guide projection activation and semantic access.
 
-Every semantic unit returned by a valid traversal remains eligible for the synthesis packet unless removed by a declared non-semantic bound.
+It may not be reapplied after retrieval to decide whether evidence reaches synthesis.
 
-Any removal must be traceable to a declared mechanical rule.
+## 17. Packet assembly preserves rather than reinterprets
 
-## 10. Provenance is never erased
+Packet assembly may:
 
-The synthesis packet must preserve enough information to distinguish ownership, authorship, targets, traversal path, retrieval surface, temporal anchor, and execution limits.
+- deduplicate canonical identities;
+- rank by declared deterministic rules;
+- apply configured bounds;
+- preserve breadth;
+- attach provenance and anchors;
+- record execution limits.
 
-Unknown association remains unknown. It is never silently assigned.
+It may not add a natural-language relevance or coherence threshold.
 
-## 11. Object identity is not contextual participation
+## 18. Returned semantic units reach synthesis
 
-Intrinsic or inherited typing must remain distinct from contextual relation participation.
+Every semantic unit returned by a valid plan remains eligible for the synthesis packet unless removed by a declared non-semantic bound.
+
+Every removal must be traceable to a mechanical rule.
+
+## 19. Provenance is never erased
+
+The synthesis packet must preserve enough information to distinguish:
+
+- ownership;
+- authorship;
+- canonical targets;
+- access path;
+- retrieval surface;
+- temporal anchors;
+- execution limits.
+
+Unknown association remains unknown.
+
+## 20. Object identity is not contextual participation
+
+Intrinsic or inherited typing remains distinct from contextual relation participation.
 
 - `Capital` may be intrinsically typed as a `book`.
 - A dated journal unit may establish that `Capital` participated as `book_read_today`.
 - `Cleo` is not intrinsically a `journal_date`.
 - A dated journal unit may mention or link to `Cleo`.
 
-## 12. Top-down and bottom-up addressability are equally authoritative
+## 21. Top-down and bottom-up addressability are equally authoritative
 
-The projected space must support object-to-unit, unit-to-object, inherited identifiers, unit-authored references, inbound incidence, heading and block targets, temporal anchors, and valid traversal from either direction.
+The projected space must support object-to-unit, unit-to-object, inherited identifiers, outgoing occurrences, incoming occurrences, heading and block targets, and temporal relations from every represented direction.
 
-## 13. Coverage constrains claims, not evidence meaning
+## 22. Coverage constrains claims, not meaning
 
-Coverage may restrict corpus-wide absence claims, exhaustive counts, chronology claims when temporal execution failed, graph claims beyond executed depth, and claims from unavailable sources.
+Coverage may restrict corpus-wide absence, exhaustive count, chronology, graph depth, or unavailable-source claims.
 
-Coverage may not reject a retrieved unit for failing an inferred semantic formulation.
+It may not reject a retrieved unit for semantic inadequacy.
 
-## 14. Negative claims require measured exhaustive execution
+## 23. Negative claims require measured exhaustive execution
 
-A claim such as “there are no matches” requires a declared exhaustive exact traversal, structurally valid literals, full eligible-scope execution, and completed total-count measurement.
+A claim of no matches requires an explicit exhaustive plan, a supported exact surface, complete eligible scope, and completed total-count measurement.
 
-## 15. Repair returns to inference
+Activation, contextual probes, and problem-space gaps cannot substitute for exhaustive authority.
 
-When a traversal is structurally invalid, repair belongs to the inference model.
+## 24. Repair returns to inference
 
-No deterministic heuristic may repair natural-language meaning.
+When a plan is structurally invalid, repair belongs to a fresh inference call.
 
-## 16. Dynamic semantic content remains data-driven
+The runtime supplies exact structural violations.
 
-Static runtime types may define the shape of objects, units, identifiers, relations, traversals, and packets.
+No deterministic heuristic repairs natural-language meaning.
 
-They must not hard-code the corpus's actual semantic contents.
+## 25. Dynamic semantic content remains data-driven
 
-## 17. Absence of a represented connection is meaningful
+Static runtime types may define the shape of problem regions, boundaries, semantic objects, units, relations, plans, and packets.
 
-Within the closed projected space, a represented path may be traversed and an absent path may not be fabricated.
+They may not hard-code the corpus's actual semantic contents.
 
-“Cleo is not a journal date” is not answered by a semantic judge. The proposed type assignment or connection simply does not exist in the projection.
+## 26. Absence of a represented connection is meaningful
 
-## 18. Existing implementation terminology is non-authoritative
+Within the closed projected semantic space, a represented path may be traversed and an absent path may not be fabricated.
 
-No current class, file, diagnostic, or test is retained merely because it exists.
+That is structural absence, not post-retrieval semantic judgment.
 
-Every legacy component must later earn reuse by implementing the clean kernel without extra authority.
+## 27. Current implementation terminology is non-authoritative
+
+No existing class, diagnostic, file, or test is retained merely because it exists.
+
+Every legacy component must later earn a place under these invariants.

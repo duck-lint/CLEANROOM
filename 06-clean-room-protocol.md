@@ -4,7 +4,9 @@
 
 This protocol prevents the new runtime from being shaped by attempts to preserve the current implementation.
 
-The risk is not merely code reuse. It is vocabulary reuse: existing nouns can quietly force the new architecture to contain objects it does not need.
+The risk is not merely code reuse.
+
+Existing nouns can quietly force the new architecture to contain objects and authorities it does not need.
 
 ## 1. Clean context
 
@@ -15,16 +17,31 @@ The initial project workspace should contain only:
 - a tiny synthetic semantic-space fixture;
 - accepted language-neutral schemas.
 
-Do not initially include old source files, implementation plans, PR summaries, diagnostics, unit-test names, or component diagrams.
+Do not initially include:
+
+- old source files;
+- implementation plans;
+- PR summaries;
+- diagnostics;
+- legacy unit-test names;
+- legacy component diagrams.
 
 ## 2. Vocabulary discipline
 
-During clean design, prefer kernel terms:
+During clean design, prefer:
 
-- problem space;
-- boundary markers;
+- problem gestalt;
+- problem region;
+- boundary contribution;
+- perturbation;
+- relation;
+- constraint;
+- open tension;
+- attention lens;
 - semantic-space projection;
-- traversal;
+- activated projection;
+- semantic-access plan;
+- traversal path;
 - conformance;
 - execution;
 - retrieval result;
@@ -53,7 +70,7 @@ Every proposed component or rule must include:
 - an example requiring it;
 - a counterexample showing what fails without it;
 - its exact authority boundary;
-- proof that it does not duplicate inference or synthesis.
+- proof that it does not duplicate boundary inference, semantic-access inference, or synthesis.
 
 A proposal based on inference must identify the evidence supporting that inference.
 
@@ -72,15 +89,17 @@ define
 
 ## 6. One responsibility per stage
 
-- deconstruction updates boundary markers;
+- boundary inference describes how the problem gestalt changes;
+- deterministic folding applies the declared perturbation;
 - projection exposes semantic possibility;
-- traversal connects boundary to possibility;
+- activation presents a bounded positive view through the current attention lens;
+- semantic-access inference connects problem regions and open tensions to projected addresses;
 - conformance validates structural membership;
 - execution materializes units;
 - packet assembly preserves and bounds;
 - synthesis interprets.
 
-A stage that both validates structure and interprets meaning is suspect.
+A stage that performs more than one semantic role is suspect.
 
 ## 7. Mandatory end-to-end traceability
 
@@ -88,10 +107,17 @@ For every test turn, retain:
 
 - prior problem-space state;
 - newest utterance;
-- new boundary markers;
-- updated problem-space state;
+- immediately preceding completed turn;
+- boundary contribution;
+- explicit perturbation operations;
+- created, reinforced, merged, split, redirected, superseded, and retired regions;
+- open tensions before and after the update;
+- updated relational problem space;
+- current attention lens;
 - projection identity;
-- traversal;
+- activated projection and activation provenance;
+- expansion requests and telemetry;
+- semantic-access plan;
 - conformance result;
 - executed paths;
 - returned unit identities;
@@ -99,79 +125,137 @@ For every test turn, retain:
 - synthesis input;
 - answer.
 
-## 8. No invisible removals
+## 8. No invisible semantic consolidation
 
-Any semantic unit removed after retrieval must record unit identity, stage, exact deterministic rule, rule authority, and remaining invariant.
+When boundary inference merges, splits, supersedes, or retires a problem region, the operation must retain:
 
-“Insufficient semantic grounding” is not an acceptable mechanical reason.
+- source region identity;
+- resulting region identity;
+- source turn;
+- declared semantic reason;
+- preserved relations;
+- broken or retired relations.
 
-## 9. Projection-first debugging
+The deterministic runtime may apply the operation.
 
-When inference cannot construct a desired traversal, ask first:
+It may not generate the semantic reason.
+
+## 9. No invisible evidence removals
+
+Any semantic unit removed after retrieval must record:
+
+- unit identity;
+- stage;
+- exact deterministic rule;
+- rule authority;
+- remaining invariant.
+
+The following are not acceptable mechanical reasons:
+
+- insufficient semantic grounding;
+- low problem-space coherence;
+- proposition mismatch;
+- paraphrase mismatch.
+
+## 10. Projection-first debugging
+
+When semantic-access inference cannot construct a desired plan, ask first:
 
 - Is the needed semantic possibility present in the corpus?
 - Is it materialized?
 - Is it projected?
-- Is it addressable in both directions?
-- Can the inference model access it?
+- Is it addressable in every represented direction?
+- Is the relevant identifier coupled to every valid retrieval surface?
+- Can the attention lens activate or expand toward it?
 
-Do not compensate for a missing projection by adding post-retrieval heuristics.
+Do not compensate for a missing projection with post-retrieval heuristics.
 
-## 10. Fresh-run hygiene
+## 11. Problem-space-first debugging
 
-A fresh experimental baseline requires a new suite identity, new thread identities, empty thread state, a recorded projection identity, and no replacement of reports without replacement of experimental identity.
+When conversational continuity fails, ask:
+
+- Did boundary inference preserve or redirect the correct problem region?
+- Was a follow-on contribution merged instead of duplicated?
+- Was the prior turn supplied as local continuity?
+- Was an unresolved reference represented as an open tension?
+- Did a correction supersede the old framing rather than silently coexist with it?
+- Did the current attention lens expose the intended region?
+
+Do not compensate with transcript dumping or automatic numerical decay.
+
+## 12. Fresh-run hygiene
+
+A fresh experimental baseline requires:
+
+- a new suite identity;
+- new thread identities;
+- empty thread state;
+- a recorded projection identity;
+- no replacement of reports without replacement of experimental identity.
 
 A report directory is not conversation state.
 
-## 11. Branch discipline
+## 13. Branch discipline
 
 Do not merge legacy runtime feature branches into the clean branch.
 
 When old code is examined, do so through a bounded compatibility review rather than by copying files wholesale.
 
-## 12. Review gates
+## 14. Review gates
 
 ### Gate A — Kernel accepted
 
 Equations and invariants are stable.
 
-### Gate B — Projection accepted
+### Gate B — Problem-space contract accepted
+
+Boundary contributions, relational regions, open tensions, persistence, and the attention lens are explicit.
+
+### Gate C — Projection accepted
 
 The semantic object/unit/occurrence model is exhaustively represented.
 
-### Gate C — Traversal accepted
+### Gate D — Activation accepted
+
+The problem-space lens produces a bounded positive view without negative inference.
+
+### Gate E — Semantic-access plan accepted
 
 Inference output refers to projected addresses and connections.
 
-### Gate D — Conformance accepted
+### Gate F — Conformance accepted
 
 Invalid structure is rejected without semantic interpretation.
 
-### Gate E — Execution accepted
+### Gate G — Execution accepted
 
 Returned units preserve identity and reach packet assembly.
 
-### Gate F — Synthesis accepted
+### Gate H — Synthesis accepted
 
-The model receives continuity, focus, traversal, retrieval, and limits.
+The model receives continuity, focus, problem-space context, retrieval, and limits.
 
-### Gate G — Legacy compatibility accepted
+### Gate I — Legacy compatibility accepted
 
 Only then may existing artifacts or operators be reused.
 
-## 13. Stop conditions
+## 15. Stop conditions
 
 Stop implementation and return to design if:
 
+- focus bands are implemented as unrelated topic containers;
+- the deterministic runtime infers semantic merge, split, or supersession;
+- a numeric coherence score is introduced without demonstrated necessity;
+- coherence is used to rank or admit retrieved evidence;
+- an open tension is converted into a corpus absence claim;
 - a new semantic role is added between execution and synthesis;
-- a runtime heuristic is proposed to decide paraphrase equivalence;
-- an old diagnostic becomes a required object without kernel justification;
+- a runtime heuristic decides paraphrase equivalence;
 - a validly retrieved unit is removed for a non-mechanical reason;
 - a needed path is absent from the projection and code is proposed instead of projection work;
 - intrinsic typing and contextual participation are blurred;
-- the newest utterance and aggregate problem-space context are conflated.
+- the newest utterance and background problem-space context are conflated.
 
-## 14. Migration posture
+## 16. Migration posture
 
 The goal is not to recreate every old feature.
 
