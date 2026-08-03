@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - codex/kernel-contract-scaffold
+  pull_request:
+    branches:
+      - master
 
 permissions:
   contents: write
@@ -15,6 +18,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: codex/kernel-contract-scaffold
       - name: Materialize bounded scaffold
         shell: bash
         run: |
