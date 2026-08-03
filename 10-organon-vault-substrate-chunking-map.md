@@ -1,11 +1,11 @@
-# Organon → Vault → Semantic Substrate → Chunking Map
+# Organon → Vault → Semantic Substrate → Unit-Materialization Map
 
 ## Status and provenance
 
 **Action state:** Drafted for operator review.  
 **Source basis:** the supplied Organon, full vault tree, representative mini-vault, semantic identifier list, chunk-representation example, and accepted clean-room kernel documents.
 
-This document specifies the constitutive mapping from the Organon into the authored vault and from the vault into the semantic space available to traversal inference.
+This document specifies the constitutive mapping from the Organon into the authored vault and from the vault into the semantic space available to semantic-access inference.
 
 It does not derive architecture from the legacy runtime.
 
@@ -25,13 +25,13 @@ Semantic substrate
     materializes canonical semantic objects, semantic units,
     identifiers, occurrences, anchors, and connections
 
-Chunking
+Semantic-unit materialization
     converts authored internal structure into independently
     addressable semantic units without replacing its meaning
 
 Semantic-space projection
-    exposes the resulting object/unit/identifier/relation space
-    to traversal inference and structural conformance
+    exposes the resulting object/region/unit/identifier/relation space
+    to semantic-access inference and structural conformance
 ```
 
 The runtime does not manufacture an ontology after retrieval. The ontology available to the runtime is the projected form of the authored substrate.
@@ -230,10 +230,10 @@ Examples include many dream-motif objects and some entity objects. They remain a
 Therefore:
 
 ```text
-object existence ≠ chunk existence
+object existence ≠ semantic-unit existence
 ```
 
-The inventory must enumerate canonical objects independently of whether the chunker produced body units.
+The projection inventory must enumerate canonical objects independently of whether unit materialization produced body units.
 
 ## 6. From authored Markdown structure to semantic units
 
@@ -259,9 +259,9 @@ A deterministic unit identity must preserve at least:
 
 ```text
 parent object UUID
-heading path
-block ordinal within the heading region
-split ordinal, when an oversized authored block is divided
+heading or region address
+block ordinal within the authored region
+explicit block identifier, when present
 ```
 
 Conceptually:
@@ -269,9 +269,9 @@ Conceptually:
 ```text
 unit_address =
     object_uuid
-    + heading_path
+    + authored_region_address
     + authored_block_ordinal
-    + split_ordinal
+    + explicit_block_id, when present
 ```
 
 The exact hash or serialized form is an implementation decision. The required invariants are:
@@ -312,24 +312,28 @@ Other compound Markdown blocks should be treated as authored structures:
 
 They should not be flattened into undifferentiated prose before unit creation.
 
-### 6.4 Oversized blocks
+### 6.4 Oversized semantic units and transport segments
 
-The user-supplied chunking note leaves token-level splitting as a technical decision constrained by authored semantics.
+Provider, tokenizer, and embedding limits are technical constraints rather than authored semantic boundaries.
 
-The clean requirement is:
+An oversized authored semantic unit remains one canonical semantic unit. When a technical operation cannot accept it whole, the runtime may derive ordered transport segments:
 
 ```text
-never split across a heading boundary
-prefer authored sub-boundaries
-preserve complete Markdown constructs
-split at sentence or clause boundaries only when necessary
-retain common authored-block ancestry
-assign deterministic split ordinals
+semantic unit U
+    → transport segment U.1
+    → transport segment U.2
 ```
 
-Each resulting split is a semantic unit, but its address records that it arose from one authored block.
+A transport segment must:
 
-No fixed token threshold may erase authored structure.
+- retain the parent semantic-unit identity;
+- preserve source-span provenance;
+- carry a deterministic segment ordinal;
+- preserve complete reconstruction order;
+- avoid breaking complete Markdown constructs where possible;
+- remain non-canonical as an independently authored semantic unit.
+
+A token limit therefore cannot silently create new semantic units or alter authored ontology.
 
 ## 7. Top-down inheritance
 
@@ -345,9 +349,8 @@ The unit adds local address and content:
 
 ```text
 I(u) = I(O)
-     + heading path
+     + heading or region address
      + block ordinal
-     + split ordinal
      + local link occurrences
      + local block identity
      + local text
@@ -442,7 +445,7 @@ A frontmatter link creates an object-level typed occurrence:
 ```text
 journal object
 → field occurrence(book_read_today)
-→ Darwin book object
+→ Darwin source-material object
 ```
 
 Because units inherit object identifiers, the relation is visible in the context of every journal unit while remaining sourced at the parent object and field path.
@@ -452,7 +455,7 @@ Because units inherit object identifiers, the relation is visible in the context
 The projection must expose reverse incidence:
 
 ```text
-Darwin book object
+Darwin source-material object
 → inbound book_read_today occurrence
 → dated journal object
 → journal units
@@ -462,7 +465,7 @@ This is the bottom-up route needed for questions such as:
 
 ```text
 When did I read Darwin?
-Which book appears in this dated journal context?
+Which canonical source-material object appears in this dated journal context?
 ```
 
 Stored reverse edges are optional. Reverse addressability is required.
@@ -473,13 +476,13 @@ A heading or block link adds a target below object level:
 
 ```text
 source unit
-→ [[Capital#Chapter 2]]
+→ [[Marx, Karl — Capital#Chapter 2]]
 → heading address / contained unit address(es)
 ```
 
 ```text
 source unit
-→ [[Capital#^block-id]]
+→ [[Marx, Karl — Capital#^block-id]]
 → one canonical unit
 ```
 
@@ -492,9 +495,10 @@ This is a core ontological boundary.
 ### 9.1 Intrinsic or inherited typing
 
 ```text
-Capital object
+Marx, Karl — Capital source-material object
+    note_type: source_material
     format: book
-    note_type: source_material or book_notes
+    creator: Karl Marx
 ```
 
 ```text
@@ -510,7 +514,7 @@ These identifiers belong to the objects and are inherited by their units.
 ```text
 dated journal object
     journal_entry_date: 2026-05-19
-    book_read_today: [[Darwin book]]
+    book_read_today: [[Darwin, Charles — Origin of Species]]
 ```
 
 The relation means the book participates as `book_read_today` in that dated journal context.
@@ -518,8 +522,8 @@ The relation means the book participates as `book_read_today` in that dated jour
 It does not mean:
 
 ```text
-Darwin book is a journal_entry
-Darwin book carries journal_entry_date intrinsically
+Darwin source-material object is a journal_entry
+Darwin source-material object carries journal_entry_date intrinsically
 ```
 
 Similarly:
@@ -531,7 +535,7 @@ dated journal unit
 
 can place Cleo in a dated context without making Cleo a date-typed object.
 
-The projected semantic space must encode both the object’s intrinsic identifiers and the contextual relation occurrence. Structural conformance can then determine whether a proposed traversal path exists by membership alone.
+The projected semantic space must encode both the object’s intrinsic identifiers and the contextual relation occurrence. Structural conformance can then determine whether a proposed semantic-access path exists by membership alone.
 
 ## 10. Canonical worked mappings
 
@@ -553,7 +557,7 @@ object J
     temporal anchor: 2026-05-19
     field occurrence O1:
         field: book_read_today
-        target: canonical Darwin book object B
+        target: canonical Darwin source-material object B
 
 units J.u1 ... J.un
     inherit J identifiers
@@ -563,7 +567,7 @@ units J.u1 ... J.un
 Reverse projection:
 
 ```text
-book object B
+source-material object B
     inbound occurrence O1
     contextual source J
     contextual date 2026-05-19
@@ -654,76 +658,79 @@ preserving content
 breaking scope
 ```
 
-Any body unit in that note inherits the full bridge schema. A traversal can retrieve the bridge by source/target register, method, preserved structure, broken structure, or cash-out field without reconstructing the rule from prose.
+Any body unit in that note inherits the full bridge schema. A semantic-access plan can retrieve the bridge by source/target register, method, preserved structure, broken structure, or cash-out field without reconstructing the rule from prose.
 
 ## 11. From semantic substrate to semantic-space projection
 
 Let the complete materialized substrate be:
 
 ```text
-Σ = (O, U, I, R, A, S)
+Σ = (O, G, U, I, R, A, S)
 ```
 
 where:
 
 - `O` = canonical semantic objects;
+- `G` = canonical authored semantic regions;
 - `U` = canonical semantic units;
 - `I` = identifier assignments and descriptors;
 - `R` = canonical relation and occurrence records;
 - `A` = temporal and internal addresses;
 - `S` = retrieval surfaces and their visibility.
 
-The projected semantic space is a deterministic runtime-accessible representation:
+The projected semantic space for one frozen turn is a deterministic runtime-accessible representation:
 
 ```text
-M = project(Σ)
+M_σ = project(Σ, corpus_snapshot, schema_version)
 ```
 
-`M` must expose both:
+`M_σ` must expose both:
 
 ### 11.1 Possibility grammar
 
 ```text
-which object and unit kinds exist
+which object, region, and unit kinds exist
 which identifiers may apply
 which relations and directions exist
 which internal addresses exist
 which retrieval surfaces can inspect which components
-which traversal transitions are valid
+which semantic-access transitions are valid
 ```
 
 ### 11.2 Canonical actuality
 
 ```text
 which objects actually exist
-which units belong to them
+which regions and units belong to them
 which identifiers they actually carry
 which occurrences actually connect them
 which headings and blocks are addressable
 which temporal anchors actually exist
 ```
 
-A traversal plan is conforming when all of its referenced addresses and transitions are members of this projection.
+A semantic-access plan is conforming when all of its referenced addresses and transitions are members of this projection.
 
-No component needs to “answer” whether Cleo is a date. The invalid assignment or connection is absent from `M`.
+No component needs to “answer” whether Cleo is a date. The invalid assignment or connection is absent from `M_σ`.
 
-## 12. Chunk serialization requirements
+## 12. Semantic-unit serialization requirements
 
 Each unit made available to retrieval and synthesis should preserve at least:
 
 ```text
 unit identity
 parent object UUID
+parent semantic-region address
 parent object path and title surfaces
 note_type and admitted inherited identifiers
 heading path
 block ordinal
-split ordinal
+explicit block identifier, when present
 raw authored Markdown block
 normalized searchable representation
 canonical outbound occurrences
 frontmatter relation provenance inherited from object
 local temporal anchor or inherited object anchor
+transport-segment descriptors, when technically required
 projection snapshot identity
 ```
 
@@ -757,9 +764,11 @@ A change to an authored block invalidates that block’s unit serialization and 
 
 A wikilink or linked frontmatter-field change updates outbound and inbound incidence.
 
-### Chunking policy
+### Unit-materialization and transport policy
 
-A policy change that alters block or split boundaries requires a projection version change and deterministic unit regeneration.
+A policy change that alters authored block boundaries or canonical unit identity requires a projection version change and deterministic unit regeneration.
+
+A transport-segmentation policy change requires new segment descriptors and projection identity when those descriptors are projected, but it does not by itself create new canonical semantic units.
 
 ## 14. Boundaries this mapping forbids
 
@@ -785,7 +794,7 @@ The new runtime should be built around this sequence:
 
 2. project the complete accessible semantic space;
 
-3. let inference connect the thread problem space to paths in that projection;
+3. let semantic-access inference connect the thread problem space to paths in that projection;
 
 4. structurally confirm that the proposed paths exist;
 
@@ -796,17 +805,16 @@ The new runtime should be built around this sequence:
 7. let synthesis interpret the result.
 ```
 
-The chunker is therefore not a generic preprocessing utility. It is the materialization boundary at which authored internal structure becomes the addressable unit layer of the semantic substrate.
+Semantic-unit materialization is therefore not a generic preprocessing utility. It is the boundary at which authored internal structure becomes the addressable unit layer of the semantic substrate. Technical segmentation occurs later and remains subordinate to canonical unit identity.
 
 ## 16. Operator-review points
 
-The supplied materials support the complete mapping above. These remaining decisions should be resolved explicitly during schema design:
+The supplied materials and accepted clean-room contracts support the complete mapping above. These remaining decisions should be resolved explicitly during schema design:
 
-1. Whether heading targets identify one heading-region record, one generated heading unit, or a deterministic set of contained paragraph units.
-2. Whether quote-plus-commentary adjacency is one authored unit or two linked units.
-3. The final oversized-block splitting rule and stability guarantees.
-4. The explicit relation connecting book-note objects to source-material objects for the same work, if such a relation is desired.
-5. The complete admitted-field registry and each field’s applicability, inheritance, relation, and temporal affordances.
-6. The admission policy for `VAULT DESIGN`, attachments, canvases, PDFs, and inbox material.
+1. Whether quote-plus-commentary adjacency is one authored semantic unit or two related semantic units.
+2. The explicit relation connecting book-note objects to source-material objects for the same work, if such a relation is desired.
+3. The complete admitted-field registry and each field’s applicability, inheritance, relation, and temporal affordances.
+4. The admission policy for `VAULT DESIGN`, attachments, canvases, PDFs, and inbox material.
+5. The exact transport-segmentation algorithm and reconstruction guarantees, which must remain non-semantic.
 
-These decisions belong in the semantic projection and chunking contracts. They must not be deferred to post-retrieval interpretation.
+These decisions belong in the semantic projection and unit-materialization contracts. They must not be deferred to post-retrieval interpretation.
