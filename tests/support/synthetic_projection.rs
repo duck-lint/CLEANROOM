@@ -6,7 +6,9 @@
 use semantic_traversal_core::{
     OccurrenceId, SemanticObjectId, SemanticRegionAddress, SemanticUnitId, TemporalAnchorId,
     TransportSegmentId,
-    model::{AddressKind, Direction, RecordProvenance, RetrievalSurfaceKind, SemanticAddress},
+    model::{
+        AddressKind, Direction, RecordProvenance, RetrievalSurfaceKind, SemanticAddress, SourceSpan,
+    },
     projection::SemanticSpaceProjection,
     projection::{
         AuthoredBlockType, BlockTargetMapping, CoverageSemantics, IdentifierAssignment,
@@ -14,7 +16,7 @@ use semantic_traversal_core::{
         IdentifierValue, IdentifierValueShape, OccurrencePresentation, OccurrenceRecord,
         OccurrenceSource, ProjectionValidationStatus, RetrievalSurfaceDescriptor,
         SemanticObjectClassDescriptor, SemanticObjectRecord, SemanticRegionRecord,
-        SemanticUnitContent, SemanticUnitRecord, SourceKind, SourceSpan, StructuralTransition,
+        SemanticUnitContent, SemanticUnitRecord, SourceKind, StructuralTransition,
         StructuralTransitionOperation, SurfaceMatchMode, TemporalAffordance, TemporalAnchorRecord,
         TemporalValue, TransportSegmentRecord,
     },

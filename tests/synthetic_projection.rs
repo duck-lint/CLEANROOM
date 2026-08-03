@@ -89,7 +89,7 @@ fn fixed_projection_identity_and_exact_fixture_inventory_are_stable() {
             .find(|descriptor| descriptor.identifier_name == assignment_name)
             .unwrap();
         assert!(matches!(
-            descriptor.semantic_role,
+            &descriptor.semantic_role,
             IdentifierRole::CanonicalNaming | IdentifierRole::ObjectClass
         ));
     }
