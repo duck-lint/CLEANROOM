@@ -66,7 +66,7 @@
   "additionalProperties": false,
   "definitions": {
     "ActivationBand": {
-      "description": "Current activation band assigned to a problem region.\n\nA band changes visibility and foregrounding only. It does not duplicate the region, change its lifecycle, or become a relevance score.",
+      "description": "Current activation band assigned to a problem region.\n\nA band changes visibility and foregrounding only. It does not duplicate the region or change its identity, applicability, lifecycle, or semantic strength. It is categorical and never a numeric attention or relevance score.",
       "oneOf": [
         {
           "description": "Immediate operational focus.",
@@ -163,7 +163,7 @@
       "additionalProperties": false
     },
     "AttentionLens": {
-      "description": "Current attention bands over one relational problem-space state.\n\nThese vectors are views over shared region identities, not independent topic stores. The lens may guide access but cannot alter semantic identity, score truth, or admit evidence.",
+      "description": "Current attention bands over one relational problem-space state.\n\nThese vectors are views over shared region identities, not independent topic stores. Activation changes neither identity, constraint applicability, lifecycle, nor semantic strength. In a valid future folded state, every operational region occupies exactly one band and this lens agrees with its [`ProblemRegion::activation_band`]. An unresolved region may occupy any band, and an active region may occupy background activation. The lens may guide access but cannot score attention, persistence, confidence, decay, coherence, or truth, and cannot admit evidence.",
       "type": "object",
       "required": [
         "background_region_ids",
@@ -1602,12 +1602,21 @@
       "description": "One active or historically retained problem-space constraint.\n\nIt records a declared requirement such as chronology, exclusion, or exact wording. It does not execute or independently interpret the constraint.",
       "type": "object",
       "required": [
+        "applicability",
         "constraint_id",
         "expression",
         "lifecycle",
         "source_contribution_id"
       ],
       "properties": {
+        "applicability": {
+          "description": "Canonical declaration of where this constraint applies.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ProblemConstraintApplicability"
+            }
+          ]
+        },
         "constraint_id": {
           "description": "Stable constraint identity within the thread.",
           "type": "string"
@@ -1630,6 +1639,51 @@
         }
       },
       "additionalProperties": false
+    },
+    "ProblemConstraintApplicability": {
+      "description": "Canonical applicability authored for one problem-space constraint.\n\nIn the future fold, [`ProblemConstraintApplicability::WholeProblemSpace`] applies to every operational region and never appears in [`ProblemRegion::local_constraint_ids`]. [`ProblemConstraintApplicability::Regions`] explicitly targets one or several regions; vector order grants no priority. Active regional constraints may target only operational regions: active, background, and unresolved persistence states are operational, while superseded and retired states are not.\n\nDuplicate, empty, or unresolved target sets are invalid future fold input. Shared applicability remains one canonical constraint, whose identity is included in every targeted operational region's derived active-incidence index. Superseding or retiring a region never transfers, narrows, or retires constraints automatically: boundary inference must explicitly replace or retire affected constraints, and every replacement fully declares its own applicability. The fold must not inherit applicability by convenience. Historical superseded or retired constraints retain their authored applicability for audit. These are fold invariants, not Serde validation.",
+      "oneOf": [
+        {
+          "description": "Applies to all operational regions.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "whole_problem_space"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Applies exactly to the declared regional identities.",
+          "type": "object",
+          "required": [
+            "kind",
+            "region_ids"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "regions"
+              ]
+            },
+            "region_ids": {
+              "description": "Target regions; ordering carries no precedence or priority.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "ProblemReferent": {
       "description": "Referent retained inside a problem region.\n\nIt helps preserve relational continuity but is not a canonical corpus binding until semantic-access inference resolves one.",
@@ -1685,7 +1739,7 @@
           }
         },
         "local_constraint_ids": {
-          "description": "Constraint identities local to this region.",
+          "description": "Derived active regional-incidence index, rebuilt by the future fold.\n\nThis contains only active regional constraints explicitly targeting this operational region. Canonical applicability lives on [`ProblemConstraint::applicability`]; whole-problem-space, superseded, and retired constraints are absent here.",
           "type": "array",
           "items": {
             "type": "string"
@@ -2148,7 +2202,7 @@
           }
         },
         "contribution_history": {
-          "description": "Contribution and persistence history needed for reconstruction.",
+          "description": "Compact derived audit summary; the accepted log is the replay source.",
           "type": "array",
           "items": {
             "$ref": "#/definitions/ContributionHistoryRecord"

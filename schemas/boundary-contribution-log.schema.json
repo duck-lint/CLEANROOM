@@ -1,85 +1,59 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "BoundaryContribution",
-  "description": "Append-only declaration of how one utterance perturbs prior problem state.\n\nIt carries typed operations and preservation or release declarations. This record does not apply operations, infer semantic equivalence, enforce bounds, or produce a new `ProblemSpaceState`.\n\nThe future deterministic fold has this normative phase order: (0) preflight envelope and declared-identity uniqueness; (1) region operations; (2) relation operations; (3) constraint operations; (4) tension operations; (5) attention operations; (6) preservation/release declaration validation; (7) rebuild derived incidence indexes and the attention lens; (8) validate final referential and lifecycle closure; (9) enforce configured bounds; and (10) atomically commit state, history, accepted-log entry, and version increment. Operations within each category execute in declared vector order. The fold does not sort, semantically consolidate, or reinterpret them. Later phases may reference newly declared regions. Working-copy incompleteness never permits partial commit; preservation and release declarations are audit declarations, not a second mutation mechanism. Contradictory terminal operations and configured-bound excess are rejected, not reconciled or silently removed. This contract declares no executor in this PR.",
+  "title": "BoundaryContributionLog",
+  "description": "Ordered log of boundary contributions accepted for exactly one thread.\n\nThis is the authoritative replay input, separate from both the source transcript and [`ProblemSpaceState::contribution_history`]. A fresh thread begins at state version zero with an empty log. The first accepted entry has sequence one; sequences are contiguous and unique, while vector order is authoritative replay order. Contribution, source-turn, and source-utterance identities cannot be accepted twice within the thread.\n\nThe log stores neither a transcript copy nor timestamps, storage paths, provider metadata, or state snapshots. These are future runtime invariants, not validations implemented by this representation.",
   "type": "object",
   "required": [
-    "attention_operations",
-    "constraint_operations",
-    "contribution_id",
-    "preservation_declarations",
-    "region_operations",
-    "relation_operations",
-    "release_declarations",
-    "source_turn_id",
-    "source_utterance_id",
-    "tension_operations"
+    "entries",
+    "thread_id"
   ],
   "properties": {
-    "attention_operations": {
-      "description": "Declared attentional redirects over existing region identities.",
+    "entries": {
+      "description": "Accepted contributions in authoritative replay order.",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/AttentionOperation"
+        "$ref": "#/definitions/AcceptedBoundaryContribution"
       }
     },
-    "constraint_operations": {
-      "description": "Declared constraint perturbations.",
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/ConstraintOperation"
-      }
-    },
-    "contribution_id": {
-      "description": "Stable contribution identity.",
+    "thread_id": {
+      "description": "Identity of the one thread to which every entry belongs.",
       "type": "string"
-    },
-    "preservation_declarations": {
-      "description": "Structure explicitly preserved by the contribution.",
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/PreservationDeclaration"
-      }
-    },
-    "region_operations": {
-      "description": "Declared region perturbations.",
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/RegionOperation"
-      }
-    },
-    "relation_operations": {
-      "description": "Declared relation perturbations.",
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/RelationOperation"
-      }
-    },
-    "release_declarations": {
-      "description": "Structure explicitly released, superseded, or retired.",
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/ReleaseDeclaration"
-      }
-    },
-    "source_turn_id": {
-      "description": "Source turn identity.",
-      "type": "string"
-    },
-    "source_utterance_id": {
-      "description": "Source utterance identity.",
-      "type": "string"
-    },
-    "tension_operations": {
-      "description": "Declared tension perturbations.",
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/TensionOperation"
-      }
     }
   },
   "additionalProperties": false,
   "definitions": {
+    "AcceptedBoundaryContribution": {
+      "description": "One boundary contribution accepted for future deterministic replay.\n\n`prior_state_version` is the version before application. Every successful future fold appends exactly one entry and increments the state version once. A failed contribution appends nothing, mutates no history, and does not increment the version; no partial state may become observable.",
+      "type": "object",
+      "required": [
+        "contribution",
+        "prior_state_version",
+        "sequence"
+      ],
+      "properties": {
+        "contribution": {
+          "description": "Complete accepted declaration retained as authoritative replay input.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/BoundaryContribution"
+            }
+          ]
+        },
+        "prior_state_version": {
+          "description": "State version observed immediately before successful application.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "sequence": {
+          "description": "Contiguous one-based position in the thread's accepted sequence.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
     "ActivationBand": {
       "description": "Current activation band assigned to a problem region.\n\nA band changes visibility and foregrounding only. It does not duplicate the region or change its identity, applicability, lifecycle, or semantic strength. It is categorical and never a numeric attention or relevance score.",
       "oneOf": [
@@ -132,6 +106,86 @@
         "region_id": {
           "description": "Region whose activation band is declared.",
           "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "BoundaryContribution": {
+      "description": "Append-only declaration of how one utterance perturbs prior problem state.\n\nIt carries typed operations and preservation or release declarations. This record does not apply operations, infer semantic equivalence, enforce bounds, or produce a new `ProblemSpaceState`.\n\nThe future deterministic fold has this normative phase order: (0) preflight envelope and declared-identity uniqueness; (1) region operations; (2) relation operations; (3) constraint operations; (4) tension operations; (5) attention operations; (6) preservation/release declaration validation; (7) rebuild derived incidence indexes and the attention lens; (8) validate final referential and lifecycle closure; (9) enforce configured bounds; and (10) atomically commit state, history, accepted-log entry, and version increment. Operations within each category execute in declared vector order. The fold does not sort, semantically consolidate, or reinterpret them. Later phases may reference newly declared regions. Working-copy incompleteness never permits partial commit; preservation and release declarations are audit declarations, not a second mutation mechanism. Contradictory terminal operations and configured-bound excess are rejected, not reconciled or silently removed. This contract declares no executor in this PR.",
+      "type": "object",
+      "required": [
+        "attention_operations",
+        "constraint_operations",
+        "contribution_id",
+        "preservation_declarations",
+        "region_operations",
+        "relation_operations",
+        "release_declarations",
+        "source_turn_id",
+        "source_utterance_id",
+        "tension_operations"
+      ],
+      "properties": {
+        "attention_operations": {
+          "description": "Declared attentional redirects over existing region identities.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AttentionOperation"
+          }
+        },
+        "constraint_operations": {
+          "description": "Declared constraint perturbations.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConstraintOperation"
+          }
+        },
+        "contribution_id": {
+          "description": "Stable contribution identity.",
+          "type": "string"
+        },
+        "preservation_declarations": {
+          "description": "Structure explicitly preserved by the contribution.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PreservationDeclaration"
+          }
+        },
+        "region_operations": {
+          "description": "Declared region perturbations.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RegionOperation"
+          }
+        },
+        "relation_operations": {
+          "description": "Declared relation perturbations.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RelationOperation"
+          }
+        },
+        "release_declarations": {
+          "description": "Structure explicitly released, superseded, or retired.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReleaseDeclaration"
+          }
+        },
+        "source_turn_id": {
+          "description": "Source turn identity.",
+          "type": "string"
+        },
+        "source_utterance_id": {
+          "description": "Source utterance identity.",
+          "type": "string"
+        },
+        "tension_operations": {
+          "description": "Declared tension perturbations.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TensionOperation"
+          }
         }
       },
       "additionalProperties": false

@@ -307,7 +307,7 @@
       "additionalProperties": false
     },
     "ActivationBand": {
-      "description": "Current activation band assigned to a problem region.\n\nA band changes visibility and foregrounding only. It does not duplicate the region, change its lifecycle, or become a relevance score.",
+      "description": "Current activation band assigned to a problem region.\n\nA band changes visibility and foregrounding only. It does not duplicate the region or change its identity, applicability, lifecycle, or semantic strength. It is categorical and never a numeric attention or relevance score.",
       "oneOf": [
         {
           "description": "Immediate operational focus.",

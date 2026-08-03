@@ -564,6 +564,114 @@ The kernel requires only:
 - a fresh thread begins clean;
 - a continuing thread evolves only from its own history.
 
+## Accepted deterministic-fold contract closure
+
+This section closes the representation and authority boundaries required before
+the deterministic fold is implemented. It is normative for the future fold,
+but it does not define an executor.
+
+### Constraint applicability and derived incidence
+
+Every constraint canonically declares one of two applicability forms:
+
+- `WholeProblemSpace` applies to all operational regions. It never appears in a
+  region's `local_constraint_ids`.
+- `Regions { region_ids }` explicitly targets one or several regions. List
+  order carries no precedence or priority.
+
+Active, background, and unresolved region persistence states are operational.
+Superseded and retired states are not. An active regional constraint may target
+only operational regions. Duplicate, empty, or unresolved regional target sets
+are invalid fold input.
+
+`ProblemConstraint.applicability` is the canonical source.
+`ProblemRegion.local_constraint_ids` is only a derived active
+regional-incidence index. The future fold rebuilds it so that an active regional
+constraint appears in every operational region it explicitly targets. A shared
+regional constraint remains one canonical record. Whole-problem-space,
+superseded, and retired constraints are absent from every regional index.
+
+Superseding or retiring a region does not automatically transfer, narrow, or
+retire its constraints. Boundary inference must explicitly replace or retire
+affected constraints. A replacement constraint declares its complete
+applicability; the fold never inherits applicability by convenience. Historical
+superseded or retired constraints retain their authored applicability for audit.
+
+### Accepted contribution log and replay metadata
+
+`BoundaryContributionLog` belongs to exactly one thread and holds ordered
+`AcceptedBoundaryContribution` entries. The source transcript is a separate
+artifact: the log contains no transcript copy, timestamp, storage path, provider
+metadata, or state snapshot. `ProblemSpaceState.contribution_history` remains a
+compact derived audit summary and is not the replay source.
+
+A fresh thread begins with `ProblemSpaceState.version == 0` and an empty accepted
+log. The first accepted entry has sequence `1`. Sequence is contiguous and
+unique, but vector order itself is the authoritative replay order. Each entry's
+`prior_state_version` is the state version before application. Every successful
+fold increments the version exactly once. A failed contribution is not appended
+and does not increment the version. Within one thread, a contribution ID,
+source-turn ID, or source-utterance ID cannot be accepted twice.
+
+### Fixed fold phase order
+
+The future fold executes these phases exactly:
+
+```text
+0. Preflight envelope and declared-identity uniqueness
+1. Region operations
+2. Relation operations
+3. Constraint operations
+4. Tension operations
+5. Attention operations
+6. Preservation/release declaration validation
+7. Rebuild derived incidence indexes and the attention lens
+8. Validate final referential and lifecycle closure
+9. Enforce configured bounds
+10. Atomically commit state, history, accepted log entry, and version increment
+```
+
+Operations within each category vector execute in declared vector order. The
+fold does not sort, semantically consolidate, or reinterpret operations. Newly
+declared regions may be referenced by later phases. Intermediate working-copy
+incompleteness does not authorize a partial commit. Preservation and release
+declarations are audit declarations, not a second mutation mechanism.
+Contradictory terminal operations are rejected rather than semantically
+reconciled. Excess over a configured bound is rejected rather than resolved by
+silent removal.
+
+### Atomicity
+
+```text
+valid complete contribution
+→ new state
+  + contribution-history update
+  + accepted-log entry
+  + exactly one state-version increment
+
+any violation
+→ unchanged prior state
+  + no history mutation
+  + no accepted-log entry
+  + no state-version increment
+```
+
+No partial state may become observable.
+
+### Attention orthogonality
+
+Attention is a view over one state. Activation changes neither identity,
+constraint applicability, lifecycle, nor semantic strength. In a valid future
+folded state, each operational region occupies exactly one attention band, and
+`ProblemRegion.activation_band` agrees with `AttentionLens` after rebuilding.
+An unresolved region may occupy any attention band; an active region may occupy
+background activation. No numeric attention, persistence, confidence, decay,
+or coherence score is introduced.
+
+Execution, semantic validation, incidence rebuilding, attention rebuilding,
+bounds configuration, and replay remain explicitly deferred to conceptual PR
+3B.
+
 ## 19. Examples
 
 ### 19.1 Calf continuation
