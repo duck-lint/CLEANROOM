@@ -9,9 +9,9 @@ The system contains two semantic roles:
 1. **inference**, performed through two fresh calls:
    - boundary inference;
    - semantic-access inference;
-2. **synthesis**, which interprets what semantic units semantic access returns.
+2. **synthesis**, which interprets the semantic units returned by execution.
 
-Everything between semantic-access inference and synthesis is structural conformance, deterministic execution, measured coverage, and provenance-preserving packet construction.
+Everything between semantic-access inference and synthesis is structural conformance, deterministic execution, measured coverage, and provenance-preserving packet construction. One additional bounded semantic-access repair call may occur after conformance failure.
 
 ## Terms
 
@@ -243,6 +243,8 @@ R_t = E(T_t, M_\sigma)
 
 Execution materializes the semantic units addressed by the plan.
 
+Technical provider limits may require ordered transport segments, but those segments remain subordinate to one canonical semantic-unit identity and never become independent evidence units.
+
 The retrieval result preserves:
 
 - canonical object identity;
@@ -255,7 +257,8 @@ The retrieval result preserves:
 - retrieval-surface provenance;
 - path provenance;
 - execution status;
-- deterministic bounds.
+- deterministic bounds;
+- transport-segment provenance, when used.
 
 Execution does not decide whether a returned unit is coherent with a runtime-generated paraphrase.
 

@@ -4,18 +4,44 @@
 
 The semantic substrate contains canonical semantic objects and canonical semantic units.
 
-A semantic object is not merely a file. A semantic unit is not merely a text fragment.
+A semantic object is not merely a Markdown file. A semantic unit is not merely a text fragment or database row.
 
-They are addressable identities within an explicitly structured semantic space.
+They are canonical, addressable identities materialized from the authored vault and exposed through the projected semantic space.
 
 ## 2. Semantic objects
 
-A semantic object is a canonical corpus entity represented by a uuid.
+A semantic object is a canonical corpus identity:
 
-Example:
+- **individuated by a stable UUID**;
+- **materialized through** its topology, admitted identifiers, authored structure, and occurrences;
+- **represented in the vault** by a Markdown note or another explicitly admitted source object.
+
+The UUID is the canonical individuation anchor. It is not, by itself, the whole semantic object.
+
+Formally, an authored note may be observed as:
 
 ```text
-Marx, Karl — Capital.md (the actual book in .md format)
+N = (path, filename, frontmatter, Markdown body)
+```
+
+and materialized as:
+
+```text
+O = object(
+    uuid,
+    topology,
+    admitted identifiers,
+    authored structure,
+    occurrences
+)
+```
+
+### Example — two distinct objects sharing the surface word `Capital`
+
+```text
+Marx, Karl — Capital.md
+    role: the vault's canonical source-material representation
+          of Marx's work Capital
     uuid: 019fc58d-42aa-7919-95f8-a69b609aadff
     note_type: source_material
     tags:
@@ -26,179 +52,311 @@ Marx, Karl — Capital.md (the actual book in .md format)
     publication_year: 1867
 ```
 
-and
+and:
 
 ```text
-Capital.md (a lexical interpretation of the word "capital" as authored by the vault owner)
+Capital.md
+    role: the vault owner's canonical lexicon object
+          for the concept or word "capital"
     uuid: 019fc58d-8634-7f2d-ae44-65003742c0fb
     note_type: lexicon_entry
 ```
 
-Their identity may include:
+These are not one object with two filenames. They are separately individuated semantic objects that may share one textual identifier.
 
-- topologically represented .md note title/vault filepath names;
-- uuid;
-- admitted frontmatter;
-- wikilins;
-- ie. `**/capital.md`, `**/Marx, Karl — Capital.md`, `book`, `source_material`, `Capital`, `Karl Marx`, `1867`, and `lexicon_entry` are searchable intrinsic semantic object identifiers with retrievable surfaces.
+An object's searchable or traversable identifiers may include:
 
-## 3. Semantic unit
+- UUID;
+- canonical path and filename surfaces;
+- title and aliases;
+- admitted frontmatter values;
+- topology;
+- object type;
+- format;
+- creator;
+- publication year;
+- authored links and inbound occurrences.
 
-A semantic unit is a independently searchable/retrievable chunkID derived from uuid's.
+Examples such as `Capital`, `Marx, Karl — Capital`, `book`, `source_material`, `Karl Marx`, `1867`, and `lexicon_entry` are identifier surfaces associated with canonical objects. They are not interchangeable with canonical identity.
 
-Its identity may include:
+## 3. Semantic units
 
-- parent uuid association;
-- section path;
-- heading identity;
-- paragraph ordinal;
-- split ordinal;
+A semantic unit is a canonical, independently addressable authored unit belonging to one semantic object.
+
+A unit identifier or `chunk_id` addresses the semantic unit. It is not identical to the semantic unit's complete meaning or content.
+
+A semantic-unit identity must preserve enough structure to distinguish it deterministically within a projection snapshot, including as applicable:
+
+- parent object UUID;
+- heading or section path;
+- authored block ordinal;
 - block identifier;
-- unit text;
-- inherited object identifiers (frontmatter);
-- unit-level occurrences and anchors;
-- tables;
-- codeblocks.
+- unit-local text;
+- unit-local occurrences and anchors.
 
-## 4. Top-down structure
+Conceptually:
 
-The object supplies context to its units:
+```text
+unit_address =
+    parent_object_uuid
+    + authored_region_address
+    + authored_block_ordinal
+```
+
+The exact serialized or hashed form is an implementation decision.
+
+A semantic unit may materialize authored structures such as:
+
+- paragraph;
+- list;
+- block quote;
+- table;
+- code block;
+- equation block;
+- callout;
+- embedded media reference.
+
+## 4. Semantic regions
+
+A semantic region is an addressable authored structural area within a semantic object, usually arising from a heading path.
 
 ```text
 semantic object
-    contains → semantic units
+    contains → semantic regions
+
+semantic region
+    contains → zero or more semantic units
+```
+
+A region is not a third epistemic object class competing with semantic objects and units. It is structural addressability inside an object.
+
+A heading region may contain several semantic units.
+
+A block target may resolve to one explicitly addressed unit.
+
+## 5. Top-down structure
+
+The semantic object supplies context to its units:
+
+```text
+semantic object
+    contains → semantic regions and units
     identifiers/frontmatter → inherited by units
     topology → inherited by units
-    admitted frontmatter (identifiers) → visible on units
+    authored structure → locates units
 ```
 
 Top-down inheritance must preserve provenance.
 
-## 5. Bottom-up structure
+An inherited identifier remains sourced at the parent object or frontmatter field; it does not become a newly authored unit-level claim.
 
-The unit points back into the object and may make the object reachable from another context:
+## 6. Bottom-up structure
+
+Every semantic unit points back to its canonical object and authored region:
 
 ```text
 semantic unit
     belongs_to → semantic object
-    occurrence → semantic object
-    occurrence → semantic unit
-    temporal anchor → contextualized relation
+    situated_in → semantic region
 ```
 
-A dated journal unit may contain an authored link to `[[Marx, Karl — Capital]]`.
-
-That occurrence creates a canonical connection from the contextual unit back to the `Marx, Karl — Capital` object, and from the `Marx, Karl — Capital` object out to the date of the journal entry's semantic object (represented by a uuid).
-
-## 6. Lateral relations
-
-The substrate must represent relations across objects and units:
+A unit may also create addressable occurrences:
 
 ```text
-object → unit
-unit → object
-object → object
-unit → object
-unit → unit
-object or unit → temporal anchor
-target object or unit → inbound contextual occurrence
+semantic unit
+    outgoing occurrence → semantic object
+    outgoing occurrence → semantic region
+    outgoing occurrence → semantic unit
 ```
 
-A relation is not merely string resemblance. It must be materialized as an addressable occurrence, anchor, inherited identifier, or other admitted corpus structure.
-
-## 7. Canonical links
-
-### Semantic Object target
+The target must expose reverse incidence:
 
 ```text
-[[uuid associated note]]
+semantic object, region, or unit
+    incoming occurrence → source semantic unit or object field
 ```
 
-This is an authored occurrence targeting the a semantic object.
+## 7. Canonical authored links
 
-The occurrence should preserve source unit, target object, provenance surface, and occurrence identity.
+Obsidian wikilinks are authored using note names, paths, aliases, headings, or block identifiers. Ingest resolves those authored targets to canonical semantic addresses.
 
-### Semantic Unit target
+The user does not need to author UUID syntax in the vault.
+
+### Object target
 
 ```text
-[[uuid associated note#markdown heading]]
+[[Marx, Karl — Capital]]
 ```
 
-This must resolve to a canonical semantic-unit address represented in the projected space.
+Materialized occurrence:
 
-The runtime may not silently degrade the target to the parent note.
+```text
+source object or unit
+→ authored target: Marx, Karl — Capital
+→ resolved target UUID
+→ canonical source-material object
+```
 
-If a heading maps to more than one physical fragment, ingest or projection must represent the address deterministically rather than leaving runtime code to guess.
+The occurrence preserves:
+
+- source object;
+- source unit or frontmatter field;
+- authored target text;
+- display alias, when present;
+- resolved canonical target;
+- occurrence identity;
+- authored direction;
+- source location and provenance surface.
+
+### Heading-region target
+
+```text
+[[Marx, Karl — Capital#Chapter 2]]
+```
+
+This resolves to a canonical semantic-region address inside the target object.
+
+The region may contain one or more semantic units. The runtime may not silently degrade the link to the parent object or arbitrarily choose one contained paragraph.
 
 ### Block target
 
 ```text
-[[Capital#^block-id]]
+[[Marx, Karl — Capital#^block-id]]
 ```
 
-This must resolve to one canonical semantic unit.
+This resolves to one canonical block-addressed semantic unit.
 
 ### Embed
 
-Embeds preserve target identity while recording presentation mode. They do not create a different semantic object.
+An embed preserves canonical target identity while recording presentation mode. It does not create a second semantic object.
 
-## 8. Reverse incidence
+## 8. Reverse incidence and temporal context
 
-A canonical target must be discoverable from both directions:
+A dated journal unit or journal object may contain an authored link to `[[Marx, Karl — Capital]]`.
+
+The guaranteed canonical path is:
 
 ```text
-source unit → authored occurrence → Capital
-Capital → inbound occurrence → source unit
+Capital source-material object
+→ incoming occurrence
+→ dated journal object or unit
+→ temporal anchor
 ```
 
-Stored reverse edges are optional. Reverse addressability is not.
+This makes the book object discoverable from the contextual date without making that date an intrinsic identifier of the book.
+
+An implementation may materialize indexed shortcuts for performance, but shortcut edges must preserve and remain reducible to the authoritative occurrence path.
 
 ## 9. Intrinsic typing versus contextual participation
 
 These are separate axes.
 
-### Intrinsic or inherited type
+### Intrinsic or inherited typing
 
 ```text
-Capital
-    note_type: book
+Marx, Karl — Capital
+    note_type: source_material
+    format: book
+    creator: Karl Marx
+```
+
+```text
+Cleo
+    note_type: entity
+    entity_type: cat
 ```
 
 ### Contextual participation
 
 ```text
-dated journal unit
-    links to Capital
-    temporal anchor: 2026-07-02
-    contextual role: book_read_today
+dated journal object or unit
+    journal_entry_date: 2026-07-02
+    book_read_today: [[Marx, Karl — Capital]]
 ```
 
-`book_read_today` is not necessarily an intrinsic type of `Capital`.
+The book participates as `book_read_today` in that dated journal context.
 
-It is a relation instantiated by the dated contextual unit and its canonical occurrence.
+This does not mean:
 
-Likewise, Cleo is not a `journal_date`, but a dated journal unit may establish a dated contextual relation involving Cleo.
+```text
+Capital is intrinsically a journal entry
+Capital intrinsically carries journal_entry_date
+```
 
-## 10. Semantic-unit identifiers
+Likewise, Cleo is not a `journal_entry_date`, but a dated journal unit may mention or link to Cleo.
 
-Identifiers may arise from parent-object inheritance, unit-local admitted metadata, section or heading identity, paragraph or split ordinal, block identity, temporal anchors, canonical authored occurrences, graph relation incidence, and source topology.
+## 10. Identifier roles
 
-The projection must state:
+Identifiers may arise from:
 
-- which identifier exists;
+- canonical individuation;
+- object class;
+- topology;
+- Organon placement;
+- register typing;
+- title, alias, and attribution surfaces;
+- temporal anchors;
+- contextual relation fields;
+- unit-local structure;
+- canonical authored occurrences.
+
+The projection must state for every admitted identifier:
+
+- its value shape;
 - what object or unit may carry it;
 - whether it is intrinsic, inherited, local, or relational;
+- where its provenance originates;
 - which retrieval surfaces may inspect it;
 - which relations or transitions it enables.
 
-## 11. Identity preservation during retrieval
+Every structurally valid identifier-to-surface affordance must be projected rather than added through case-specific runtime patches.
 
-Every retrieved unit must retain unit identity, parent object identity, inherited identifiers, unit-local identifiers, occurrences, anchor identity, relation provenance, and traversal provenance.
+## 11. Semantic units versus transport segments
 
-Retrieval may not flatten all of this into anonymous text.
+A tokenizer, embedding model, or provider context limit must not redefine authored semantic identity.
 
-## 12. No runtime replacement ontology
+If one semantic unit is too large for a technical operation, it may be transmitted or embedded through non-semantic transport segments:
 
-If a valid traversal reaches a unit, the authoritative facts are that the unit exists, belongs to its object, carries materialized identifiers and relations, and was reached through represented connections.
+```text
+semantic unit U
+    → transport segment U.1
+    → transport segment U.2
+```
 
-Whether the unit answers the current question is synthesis work.
+Transport segments:
+
+- retain the same parent semantic-unit identity;
+- carry deterministic segment ordinals;
+- preserve complete reconstruction order;
+- are not independently promoted to canonical semantic units;
+- do not create new ontology or authored boundaries.
+
+A true new semantic unit arises from authored structure or an explicitly accepted materialization rule, not merely from a token ceiling.
+
+## 12. Identity preservation during retrieval
+
+Every retrieved unit must retain:
+
+- canonical unit identity;
+- parent object identity;
+- region address;
+- inherited identifiers and their provenance;
+- unit-local identifiers;
+- authored occurrences;
+- temporal anchors;
+- access-path provenance;
+- retrieval-surface provenance.
+
+Retrieval may not flatten this into anonymous text.
+
+## 13. No runtime replacement ontology
+
+If a conforming semantic-access plan reaches a unit, the authoritative structural facts are that the unit:
+
+- exists;
+- belongs to its object;
+- is situated in an authored region;
+- carries materialized identifiers and occurrences;
+- was reached through represented semantic connections.
+
+Whether that unit answers the current problem is synthesis work.

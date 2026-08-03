@@ -4,7 +4,7 @@ These invariants protect the distinctions expressed in the kernel equations.
 
 They are architectural acceptance criteria, not implementation preferences.
 
-## 1. Two semantic roles, three model calls
+## 1. Two semantic roles across three primary model calls
 
 Natural-language meaning may be interpreted only through:
 
@@ -12,7 +12,7 @@ Natural-language meaning may be interpreted only through:
 2. semantic-access inference;
 3. synthesis.
 
-The first two are separate calls performing the inference role.
+The first two are separate calls performing the inference role. One additional bounded semantic-access repair call may occur after structural conformance failure.
 
 No deterministic middle layer may become another semantic model.
 
@@ -94,7 +94,7 @@ The projected semantic space is derived from the structured semantic substrate.
 
 It defines what is addressable and traversable within the corpus available to the runtime.
 
-The runtime may not supplement a missing semantic relation by inventing one after retrieval.
+The runtime may not invent or hallucinate a nonexistent semantic relation during semantic access, execution, or post-retrieval packet construction.
 
 ## 11. Projection activation is positive-only
 
@@ -127,6 +127,8 @@ It may reject:
 - unresolved heading or block addresses;
 - unsupported transitions;
 - configuration violations.
+
+It may record exact structural violations for diagnostics and bounded repair.
 
 It may not decide whether the user's meaning or the evidence's meaning is “close enough.”
 
@@ -187,9 +189,9 @@ Unknown association remains unknown.
 
 Intrinsic or inherited typing remains distinct from contextual relation participation.
 
-- `Capital` may be intrinsically typed as a `book`.
-- A dated journal unit may establish that `Capital` participated as `book_read_today`.
-- `Cleo` is not intrinsically a `journal_date`.
+- `Marx, Karl — Capital` may be intrinsically typed as `source_material` with `format: book`.
+- A dated journal object or unit may establish that this canonical source-material object participated as `book_read_today`.
+- `Cleo` is not intrinsically a `journal_entry_date`.
 - A dated journal unit may mention or link to `Cleo`.
 
 ## 21. Top-down and bottom-up addressability are equally authoritative
@@ -227,9 +229,3 @@ They may not hard-code the corpus's actual semantic contents.
 Within the closed projected semantic space, a represented path may be traversed and an absent path may not be fabricated.
 
 That is structural absence, not post-retrieval semantic judgment.
-
-## 27. Current implementation terminology is non-authoritative
-
-No existing class, diagnostic, file, or test is retained merely because it exists.
-
-Every legacy component must later earn a place under these invariants.

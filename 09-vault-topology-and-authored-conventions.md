@@ -235,7 +235,7 @@ book_read_today:
   - "[[Darwin, Charles — Origin of Species]]"
 ```
 
-This relation originates in the dated journal object. It does not retype the target book object as a journal date.
+This relation originates in the dated journal object. It does not retype the target source-material object as a journal entry or make the journal date intrinsic to that object.
 
 Other Journal subregions organize durable contextual objects rather than daily entries: career material, lists, mental-health records, random reference material, and dream motifs. Their path supplies contextual topology, while their note-level identifiers determine the objects’ declared type and register where populated.
 
@@ -388,7 +388,7 @@ Because semantic units inherit object identifiers, `note_type: journal_entry` is
 
 ### 4.3 Path is topological context, not a substitute for type
 
-The path records authored placement within the Organon-shaped vault. It can support traversal such as:
+The path records authored placement within the Organon-shaped vault. It can support semantic access such as:
 
 ```text
 Layer 2
@@ -409,7 +409,7 @@ The supplied identifier list describes:
 
 They are not canonical identity anchors.
 
-An alias may help the inference model connect a problem-space marker to a canonical object. The traversal must still bind to the object’s canonical identity before execution.
+An alias may help semantic-access inference connect a problem-region referent to a canonical object. The final semantic-access plan must still bind to the object’s canonical UUID before execution.
 
 ### 4.5 Intrinsic fields and relational fields are distinct
 
@@ -460,7 +460,7 @@ A unit’s heading path is part of its semantic address.
 
 ### 5.2 Blank-line-separated prose establishes authored unit boundaries
 
-The supplied chunk representation explicitly maps three paragraphs under one heading path to three chunks/semantic units:
+The supplied chunk representation explicitly maps three authored paragraphs under one heading path to three semantic units:
 
 ```text
 X > Y > chunk 1
@@ -494,7 +494,7 @@ Representative notes contain:
 - emphasized spans;
 - wikilinks.
 
-The chunker must not flatten these structures before unit materialization. A list, table, code fence, display equation, or block quote must remain structurally intact unless an explicit oversized-unit policy applies.
+Semantic-unit materialization must not flatten these structures. A list, table, code fence, display equation, or block quote remains one authored semantic unit unless the accepted authored-boundary rules establish otherwise. Technical provider limits may create ordered transport segments, not additional canonical semantic units.
 
 **Open requirement:** The supplied material does not completely determine whether an adjacent quotation and its immediately following commentary should materialize as one coupled unit or as two separately addressable units. This should be settled with representative acceptance cases rather than an arbitrary token rule.
 
@@ -522,7 +522,7 @@ The semantic projection must therefore index objects independently of chunk coun
 ### 6.1 Object links
 
 ```text
-[[Capital]]
+[[Marx, Karl — Capital]]
 [[Cleo]]
 [[music_festival]]
 ```
@@ -549,19 +549,15 @@ The display text differs from the canonical target. The occurrence must preserve
 The vault can author targets such as:
 
 ```text
-[[Capital#Chapter 2]]
-[[Capital#^block-id]]
+[[Marx, Karl — Capital#Chapter 2]]
+[[Marx, Karl — Capital#^block-id]]
 ```
 
-These are not merely links to `Capital.md`. They include an internal target address.
+These are not merely links to the parent Markdown note. They include an internal target address.
 
-**Open requirement:** A heading may contain multiple ordinal semantic units. The clean projection must explicitly choose and represent one of the following rather than blur them:
+A heading target resolves to a canonical semantic region containing zero or more child regions and one or more semantic units. A block ID resolves directly to one canonical semantic unit.
 
-1. a heading address resolves to a canonical heading-region object containing one or more unit addresses; or
-2. the authored heading itself is assigned a canonical unit identity distinct from its paragraph units; or
-3. an accepted deterministic rule maps the heading target to one unit.
-
-A block ID can resolve directly to one unit. A bare heading link cannot be silently collapsed to the whole parent object.
+The runtime may not silently collapse a heading target to the whole parent object or arbitrarily choose one contained paragraph.
 
 ### 6.4 Frontmatter link occurrences
 
@@ -575,7 +571,7 @@ journal object
     book_read_today: [[Darwin, Charles — Origin of Species]]
 ```
 
-materializes a relation whose source is the dated journal object and whose target is the canonical book object. The target book does not inherit `journal_entry_date` as an intrinsic identifier. It participates in a dated contextual relation.
+materializes a relation whose source is the dated journal object and whose target is the canonical source-material object. The target does not inherit `journal_entry_date` as an intrinsic identifier. It participates in a dated contextual relation.
 
 ## 7. Representative object anatomies
 
@@ -594,7 +590,7 @@ intrinsic/contextual identifiers:
     pillar: dynamic_coherence
 
 relational fields:
-    book_read_today → Darwin book object
+    book_read_today → Darwin source-material object
     dream_motif → music_festival motif object
 
 internal regions:

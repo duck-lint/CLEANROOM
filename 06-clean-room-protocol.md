@@ -195,11 +195,13 @@ A fresh experimental baseline requires:
 
 A report directory is not conversation state.
 
-## 13. Branch discipline
+## 13. Repository and import discipline
 
-Do not merge legacy runtime feature branches into the clean branch.
+`duck-lint/CLEANROOM` remains independent from the legacy runtime repository during clean implementation.
 
-When old code is examined, do so through a bounded compatibility review rather than by copying files wholesale.
+Do not import legacy runtime source, orchestration, diagnostics, or tests into `CLEANROOM` merely to accelerate development.
+
+When old artifacts are examined, do so through a bounded compatibility review. Reuse is accepted only when a specific artifact implements a clean responsibility without excess authority and crosses an explicit package, process, or protocol boundary.
 
 ## 14. Review gates
 
@@ -237,7 +239,7 @@ The model receives continuity, focus, problem-space context, retrieval, and limi
 
 ### Gate I — Legacy compatibility accepted
 
-Only then may existing artifacts or operators be reused.
+Only then may specific existing artifacts, substrate producers, adapters, or operators be reused across an explicit boundary.
 
 ## 15. Stop conditions
 
@@ -255,10 +257,14 @@ Stop implementation and return to design if:
 - intrinsic typing and contextual participation are blurred;
 - the newest utterance and background problem-space context are conflated.
 
-## 16. Migration posture
+## 16. Legacy terminology and migration posture
+
+Current classes, diagnostics, files, tests, and component names are not design authorities.
+
+A legacy term may describe observed behavior during compatibility review, but it does not earn a place in the clean kernel merely because it already exists.
 
 The goal is not to recreate every old feature.
 
 The goal is to implement the clean kernel.
 
-Legacy behavior is preserved only when it satisfies the new contracts.
+Legacy behavior or code is preserved only when it satisfies the new contracts without additional semantic authority.
