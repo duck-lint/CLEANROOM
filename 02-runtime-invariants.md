@@ -29,7 +29,7 @@ The projected semantic space is derived from the structured semantic substrate.
 
 It defines what is addressable and traversable within the corpus accessible to the runtime.
 
-The runtime may not supplement a missing semantic relation by inventing one after retrieval.
+The runtime may not invent or hallucinate non-existent semantic relations for retrieval or for rejecting post retrieval semantic units.
 
 ## 4. Traversal inference is bounded by the projection
 
@@ -39,7 +39,7 @@ The inference model may compose only from identifiers, object and unit addresses
 
 Structural conformance checks only whether the traversal exists within the projected semantic space.
 
-It may reject absent identifiers, impossible identifier/object combinations, unavailable retrieval surfaces, missing canonical targets, invalid directions, absent relations, unresolved heading or block addresses, and unsupported transitions.
+It may reject absent identifiers, impossible identifier/object combinations, unavailable retrieval surfaces, missing canonical targets, invalid directions, absent relations, unresolved heading or block addresses, and unsupported transitions. It may record these on failure for debugging.
 
 It may not decide whether the user's meaning or the evidence's meaning is “close enough.”
 
@@ -111,9 +111,3 @@ They must not hard-code the corpus's actual semantic contents.
 Within the closed projected space, a represented path may be traversed and an absent path may not be fabricated.
 
 “Cleo is not a journal date” is not answered by a semantic judge. The proposed type assignment or connection simply does not exist in the projection.
-
-## 18. Existing implementation terminology is non-authoritative
-
-No current class, file, diagnostic, or test is retained merely because it exists.
-
-Every legacy component must later earn reuse by implementing the clean kernel without extra authority.

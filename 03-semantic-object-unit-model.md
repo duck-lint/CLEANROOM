@@ -8,49 +8,57 @@ A semantic object is not merely a file. A semantic unit is not merely a text fra
 
 They are addressable identities within an explicitly structured semantic space.
 
-## 2. Semantic object
+## 2. Semantic objects
 
-A semantic object is a canonical corpus entity represented by a note or equivalent source object.
-
-Its identity may include:
-
-- stable object identifier;
-- source UUID;
-- canonical path;
-- canonical title;
-- object type identifiers;
-- admitted frontmatter;
-- topology;
-- authored relations;
-- addressable internal structure.
+A semantic object is a canonical corpus entity represented by a uuid.
 
 Example:
 
 ```text
-Capital.md
-    canonical object identity: Capital
-    note_type: book
-    contains: semantic units
+Marx, Karl — Capital.md (the actual book in .md format)
+    uuid: 019fc58d-42aa-7919-95f8-a69b609aadff
+    note_type: source_material
+    tags:
+      - book
+    title: Capital
+    format: book
+    creator: Karl Marx
+    publication_year: 1867
 ```
 
-`book` is an intrinsic or inherited object identifier.
+and
+
+```text
+Capital.md (a lexical interpretation of the word "capital" as authored by the vault owner)
+    uuid: 019fc58d-8634-7f2d-ae44-65003742c0fb
+    note_type: lexicon_entry
+```
+
+Their identity may include:
+
+- topologically represented .md note title/vault filepath names;
+- uuid;
+- admitted frontmatter;
+- wikilins;
+- ie. `**/capital.md`, `**/Marx, Karl — Capital.md`, `book`, `source_material`, `Capital`, `Karl Marx`, `1867`, and `lexicon_entry` are searchable intrinsic semantic object identifiers with retrievable surfaces.
 
 ## 3. Semantic unit
 
-A semantic unit is a canonical, independently addressable unit belonging to a semantic object.
+A semantic unit is a independently searchable/retrievable chunkID derived from uuid's.
 
 Its identity may include:
 
-- stable unit identifier;
-- parent object identifier;
+- parent uuid association;
 - section path;
 - heading identity;
 - paragraph ordinal;
 - split ordinal;
 - block identifier;
 - unit text;
-- inherited object identifiers;
-- unit-level occurrences and anchors.
+- inherited object identifiers (frontmatter);
+- unit-level occurrences and anchors;
+- tables;
+- codeblocks.
 
 ## 4. Top-down structure
 
@@ -59,9 +67,9 @@ The object supplies context to its units:
 ```text
 semantic object
     contains → semantic units
-    identifiers → inherited by units
+    identifiers/frontmatter → inherited by units
     topology → inherited by units
-    admitted frontmatter → visible on units
+    admitted frontmatter (identifiers) → visible on units
 ```
 
 Top-down inheritance must preserve provenance.
@@ -73,14 +81,14 @@ The unit points back into the object and may make the object reachable from anot
 ```text
 semantic unit
     belongs_to → semantic object
-    occurrence → canonical object
-    occurrence → canonical unit
+    occurrence → semantic object
+    occurrence → semantic unit
     temporal anchor → contextualized relation
 ```
 
-A dated journal unit may contain an authored link to `[[Capital]]`.
+A dated journal unit may contain an authored link to `[[Marx, Karl — Capital]]`.
 
-That occurrence creates a canonical connection from the contextual unit back to the `Capital` object.
+That occurrence creates a canonical connection from the contextual unit back to the `Marx, Karl — Capital` object, and from the `Marx, Karl — Capital` object out to the date of the journal entry's semantic object (represented by a uuid).
 
 ## 6. Lateral relations
 
@@ -100,20 +108,20 @@ A relation is not merely string resemblance. It must be materialized as an addre
 
 ## 7. Canonical links
 
-### Object target
+### Semantic Object target
 
 ```text
-[[Capital]]
+[[uuid associated note]]
 ```
 
-This is an authored occurrence targeting the canonical `Capital` semantic object.
+This is an authored occurrence targeting the a semantic object.
 
-The occurrence should preserve source object, source unit, target object, authored direction, link text, provenance surface, and occurrence identity.
+The occurrence should preserve source unit, target object, provenance surface, and occurrence identity.
 
-### Heading target
+### Semantic Unit target
 
 ```text
-[[Capital#Chapter 2]]
+[[uuid associated note#markdown heading]]
 ```
 
 This must resolve to a canonical semantic-unit address represented in the projected space.
