@@ -2,7 +2,7 @@
 
 ## Recommendation
 
-Rust is a strong candidate for the clean deterministic runtime, and likely the best default choice if the clean contracts are frozen before implementation begins.
+Rust is a strong candidate for the clean deterministic runtime, and likely the best default choice if the language-neutral contracts are frozen before implementation begins.
 
 The reason is not raw speed.
 
@@ -10,9 +10,18 @@ The reason is that Rust can make the distinctions in the kernel difficult to blu
 
 ```text
 ProblemSpaceState
-UtteranceBoundary
+ProblemRegion
+ProblemRelation
+OpenTension
+AttentionLens
+BoundaryContribution
 SemanticSpaceProjection
-TraversalPlan
+ActivatedProjection
+SemanticObject
+SemanticRegion
+SemanticUnit
+TransportSegment
+SemanticAccessPlan
 ConformanceResult
 RetrievalResult
 ExecutionLimits
@@ -25,7 +34,17 @@ These can be distinct types rather than loosely related dictionaries passed thro
 
 ### Explicit state shapes
 
-Structs and enums can represent valid traversal variants, canonical addresses, relation directions, retrieval requests, structural violations, execution outcomes, and synthesis-packet contents.
+Structs and enums can represent:
+
+- problem-space perturbation operations;
+- attention-band transitions;
+- canonical object, region, and unit addresses;
+- occurrence direction;
+- retrieval requests;
+- required and optional execution obligations;
+- structural violations;
+- execution outcomes;
+- synthesis-packet contents.
 
 Pattern matching encourages every variant to be handled explicitly.
 
@@ -34,21 +53,47 @@ Pattern matching encourages every variant to be handled explicitly.
 Recoverable failures can be represented as typed results:
 
 ```text
-Result<ConformingTraversal, ConformanceViolations>
+Result<ProblemSpaceState, BoundaryFoldViolation>
+Result<ConformingAccessPlan, ConformanceViolations>
 Result<RetrievalResult, ExecutionFailure>
 ```
 
-This supports the distinction between invalid traversal, unavailable surface, successful zero matches, partial execution, and provider failure.
+This supports the distinction between:
+
+- invalid boundary operation;
+- invalid semantic-access plan;
+- unavailable retrieval surface;
+- successful zero matches;
+- partial execution;
+- provider failure.
 
 ### Serialization contracts
 
 Serde can serialize and deserialize strongly typed runtime objects.
 
-A JSON Schema generator can expose LLM-facing contracts for inference output, persisted thread state, semantic projection exchange, diagnostics, and synthesis packets.
+A JSON Schema generator can expose LLM-facing contracts for:
+
+- boundary-inference output;
+- persisted problem-space state;
+- semantic-access output;
+- semantic projection exchange;
+- structural violations;
+- diagnostics;
+- synthesis packets.
 
 ### Deterministic core
 
-Rust is well suited to canonical identity, hashing, graph traversal, temporal ordering, deduplication, ranking, bounded packet assembly, SQLite access, HTTP provider calls, and replayable state transitions.
+Rust is well suited to:
+
+- canonical identity and hashing;
+- replayable problem-space folds;
+- graph and occurrence traversal;
+- temporal ordering;
+- deterministic deduplication;
+- bounded packet assembly;
+- SQLite access;
+- provider HTTP calls;
+- projection snapshot validation.
 
 ## What Rust would not solve
 
@@ -70,19 +115,38 @@ Rust therefore increases the cost of conceptual mistakes as much as it increases
 
 The corpus's actual semantic possibilities remain data.
 
-Rust types should define the shape of objects, units, identifiers, relations, occurrences, surfaces, traversals, and packets.
+Rust types should define the shape of:
 
-They should not hard-code actual corpus objects, headings, links, or dates.
+- problem-space records;
+- semantic objects, regions, and units;
+- identifiers;
+- relations and occurrences;
+- retrieval surfaces;
+- semantic-access plans;
+- retrieval and synthesis packets.
 
-The clean distinction is:
+They should not hard-code actual corpus objects, headings, links, dates, or Organon identifier values.
 
 ```text
 Rust type system
-    defines the shape of epistemic records
+    defines the shape and authority of runtime records
 
 SemanticSpaceProjection
-    contains corpus-specific records
+    contains corpus-specific schema and instances
 ```
+
+## Semantic units versus transport segments
+
+Rust should encode the distinction directly:
+
+```text
+SemanticUnitId
+TransportSegmentId
+```
+
+A provider or embedding limit may divide one unit into transport segments without creating additional canonical semantic units.
+
+The type system should make accidental promotion of a transport segment into an independently authored semantic unit difficult.
 
 ## Pydantic analogy
 
@@ -93,25 +157,27 @@ Pydantic model
     ↔ Rust structs/enums + Serde + JSON Schema
 
 model instance validation
-    ↔ deserialization plus explicit conformance
+    ↔ deserialization plus explicit validation
 
 dynamic corpus schema and instances
     ↔ SemanticSpaceProjection data
 ```
 
-Traversal conformance is more than JSON shape validation. A traversal may be valid JSON while referencing an absent identifier, object, relation, target, or surface.
+Structural conformance is more than JSON shape validation. A plan may be valid JSON while referencing an absent identifier, object, region, unit, relation, target, direction, or surface.
 
-That membership validation remains a pure runtime operation against the projection.
+That membership validation remains a pure runtime operation against the frozen projection snapshot.
 
-## Suggested initial shape
+## Suggested initial package shape
 
 Begin with one Rust package and strict modules:
 
 ```text
 model
+problem_space
 projection
-thread
-inference
+activation
+boundary_inference
+semantic_access
 conformance
 execution
 packet
@@ -122,26 +188,46 @@ cli
 
 Split modules into crates only after the boundaries survive real implementation.
 
-## Provider boundary
+## Provider boundaries
 
-Both LLM roles should sit behind narrow interfaces:
+The three primary model calls should sit behind narrow interfaces:
 
 ```text
-InferenceProvider
+BoundaryInferenceProvider
+SemanticAccessInferenceProvider
 SynthesisProvider
 ```
 
+The bounded repair call may reuse the semantic-access provider interface with a distinct request type.
+
 Provider-specific request formats must not leak into kernel types.
+
+## Corpus boundary
+
+`CLEANROOM` is an independent repository.
+
+The real corpus should enter through a versioned, read-only substrate or projection exchange contract.
+
+Legacy runtime orchestration must not become the route by which the new kernel accesses corpus facts.
 
 ## Obsidian boundary
 
 The Obsidian plugin remains TypeScript and communicates through a versioned protocol.
 
+Authored wikilinks remain Obsidian-facing syntax. Canonical UUID and region/unit resolution remain substrate and projection responsibilities.
+
 ## Python's remaining role
 
-Python may remain useful for offline evaluation, corpus inspection, migration scripts, notebooks, and report generation.
+Python may remain useful for:
 
-Avoid a hybrid production kernel in which Python and Rust each own different versions of the traversal schema or projection authority.
+- offline evaluation;
+- corpus inspection;
+- migration scripts;
+- notebooks;
+- report generation;
+- compatibility analysis.
+
+Avoid a hybrid production kernel in which Python and Rust each own different versions of problem-space state, semantic-access schemas, or projection authority.
 
 There should be one runtime authority.
 
@@ -150,15 +236,11 @@ There should be one runtime authority.
 Choose Rust when:
 
 - the clean contracts have been accepted;
-- the runtime is being rebuilt greenfield;
+- the runtime is being built greenfield;
 - explicit type distinctions are more valuable than fastest possible prototyping;
 - slower initial iteration is acceptable in exchange for stronger structural discipline.
 
-Choose Python when:
-
-- the contracts are still changing daily;
-- the immediate purpose is disposable prototyping;
-- runtime types are not stable enough to justify compilation boundaries.
+Choose Python for disposable prototypes while contracts remain unstable, but do not let a prototype become a second production authority.
 
 ## Current recommendation
 
@@ -167,6 +249,6 @@ Use a two-step decision:
 1. freeze the language-neutral kernel and machine-readable schemas;
 2. implement the accepted runtime in Rust.
 
-Do not begin by porting the old Python runtime.
+Do not port the old Python runtime.
 
-First implement the kernel against a tiny synthetic `SemanticSpaceProjection`. Then connect real corpus artifacts through a new adapter.
+First implement the kernel against a tiny synthetic `SemanticSpaceProjection`. Then connect real corpus artifacts through a new versioned adapter boundary.
