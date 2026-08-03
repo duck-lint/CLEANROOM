@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AttentionLens",
+  "description": "Current attention bands over one relational problem-space state.\n\nThese vectors are views over shared region identities, not independent topic stores. The lens may guide access but cannot alter semantic identity, score truth, or admit evidence.",
+  "type": "object",
+  "required": [
+    "background_region_ids",
+    "primary_region_ids",
+    "secondary_region_ids",
+    "tertiary_region_ids"
+  ],
+  "properties": {
+    "background_region_ids": {
+      "description": "Region identities currently in background activation.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "primary_region_ids": {
+      "description": "Region identities currently in primary activation.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "secondary_region_ids": {
+      "description": "Region identities currently in secondary activation.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tertiary_region_ids": {
+      "description": "Region identities currently in tertiary activation.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

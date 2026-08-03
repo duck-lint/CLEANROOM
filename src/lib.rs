@@ -1,14 +1,32 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Strongly typed, serializable contracts for the CLEANROOM kernel.
+//!
+//! This crate defines identities and exchange shapes only. It does not perform
+//! inference, folding, projection construction or activation, semantic access,
+//! conformance evaluation, retrieval, packet assembly, or synthesis.
+#![forbid(unsafe_code)]
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod activation;
+pub mod conformance;
+pub mod execution;
+pub mod model;
+pub mod packet;
+pub mod problem_space;
+pub mod projection;
+pub mod semantic_access;
+pub mod synthesis;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use activation::ActivatedProjection;
+pub use conformance::ConformanceResult;
+pub use execution::RetrievalResult;
+pub use model::{
+    OccurrenceId, SemanticObjectId, SemanticRegionAddress, SemanticUnitId, TemporalAnchorId,
+    TransportSegmentId,
+};
+pub use packet::ExecutionLimits;
+pub use problem_space::{
+    AttentionLens, BoundaryContribution, OpenTension, ProblemRegion, ProblemRelation,
+    ProblemSpaceState,
+};
+pub use projection::SemanticSpaceProjection;
+pub use semantic_access::SemanticAccessPlan;
+pub use synthesis::SynthesisInput;

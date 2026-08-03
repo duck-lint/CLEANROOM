@@ -1,0 +1,315 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExecutionLimits",
+  "description": "Measured execution and coverage facts for one retrieval result.\n\nIt reports completed and failed obligations, coverage measurements, and applied deterministic bounds. It constrains later claim scope but cannot reinterpret evidence, score relevance, or decide what the evidence means.",
+  "type": "object",
+  "required": [
+    "applied_bounds",
+    "completed_operation_count",
+    "coverage_facts",
+    "failed_optional_operation_ids",
+    "failed_required_operation_ids",
+    "plan_id",
+    "requested_operation_count"
+  ],
+  "properties": {
+    "applied_bounds": {
+      "description": "Deterministic bounds applied during execution or packet preparation.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/AppliedExecutionBound"
+      }
+    },
+    "completed_operation_count": {
+      "description": "Number of operations completed, including completed zero-match results.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "coverage_facts": {
+      "description": "Measured coverage facts.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CoverageFact"
+      }
+    },
+    "failed_optional_operation_ids": {
+      "description": "Optional operations that did not complete.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "failed_required_operation_ids": {
+      "description": "Required operations that did not complete.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "plan_id": {
+      "description": "Semantic-access plan whose execution was measured.",
+      "type": "string"
+    },
+    "requested_operation_count": {
+      "description": "Number of plan operations requested.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "AppliedExecutionBound": {
+      "description": "One deterministic execution or packet bound and its measured effect.\n\nIt records configuration and truncation facts only. It cannot encode a semantic removal reason.",
+      "type": "object",
+      "required": [
+        "bound_name",
+        "configured_limit",
+        "observed_value",
+        "truncated"
+      ],
+      "properties": {
+        "bound_name": {
+          "description": "Stable configured bound name.",
+          "type": "string"
+        },
+        "configured_limit": {
+          "description": "Configured maximum value.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "observed_value": {
+          "description": "Observed pre-bound count or depth.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "truncated": {
+          "description": "Whether the bound mechanically truncated output.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CoverageFact": {
+      "description": "One measured execution or coverage fact.\n\nVariants distinguish exhaustive counts, completed paths, depth, caps, unavailable surfaces, and temporal scope. They cannot reject a returned unit or become a semantic relevance judgment.",
+      "oneOf": [
+        {
+          "description": "Exhaustive exact execution completed over the named eligible scope.",
+          "type": "object",
+          "required": [
+            "eligible_scope",
+            "kind",
+            "surface_id",
+            "total_matches"
+          ],
+          "properties": {
+            "eligible_scope": {
+              "description": "Stable scope description or binding identity.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "exhaustive_exact_completed"
+              ]
+            },
+            "surface_id": {
+              "description": "Concrete exact surface identity.",
+              "type": "string"
+            },
+            "total_matches": {
+              "description": "Exact total matches in the completed eligible scope.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One operation completed with its obligation preserved.",
+          "type": "object",
+          "required": [
+            "kind",
+            "operation_id",
+            "requirement"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "operation_completed"
+              ]
+            },
+            "operation_id": {
+              "description": "Plan operation identity.",
+              "type": "string"
+            },
+            "requirement": {
+              "description": "Required or optional obligation.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Requirement"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Graph or structural expansion reached the measured depth.",
+          "type": "object",
+          "required": [
+            "depth",
+            "kind",
+            "path_id"
+          ],
+          "properties": {
+            "depth": {
+              "description": "Maximum completed depth.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "graph_depth_reached"
+              ]
+            },
+            "path_id": {
+              "description": "Traversal path identity.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Candidate processing stopped at a configured cap.",
+          "type": "object",
+          "required": [
+            "cap",
+            "kind",
+            "operation_id"
+          ],
+          "properties": {
+            "cap": {
+              "description": "Configured cap.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "candidate_cap_applied"
+              ]
+            },
+            "operation_id": {
+              "description": "Plan operation identity.",
+              "type": "string"
+            },
+            "total_candidates": {
+              "description": "Total known candidates when the surface reported it.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "A named retrieval surface was unavailable.",
+          "type": "object",
+          "required": [
+            "affected_operation_ids",
+            "kind",
+            "surface_id"
+          ],
+          "properties": {
+            "affected_operation_ids": {
+              "description": "Operations affected by the unavailability.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "surface_unavailable"
+              ]
+            },
+            "surface_id": {
+              "description": "Concrete unavailable surface identity.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Temporal execution completed over a represented range.",
+          "type": "object",
+          "required": [
+            "inspected_anchor_count",
+            "kind"
+          ],
+          "properties": {
+            "end": {
+              "description": "Inclusive upper bound when specified.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "inspected_anchor_count": {
+              "description": "Count of anchors inspected.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "temporal_range_covered"
+              ]
+            },
+            "start": {
+              "description": "Inclusive lower bound when specified.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Requirement": {
+      "description": "Execution obligation attached to a plan operation or requested output.\n\nIt states whether failure affects support for the requested route. It does not determine truth or semantic adequacy.",
+      "oneOf": [
+        {
+          "description": "Failure must be reported as affecting the requested route.",
+          "type": "string",
+          "enum": [
+            "required"
+          ]
+        },
+        {
+          "description": "Failure is recorded but need not invalidate the primary route.",
+          "type": "string",
+          "enum": [
+            "optional"
+          ]
+        }
+      ]
+    }
+  }
+}

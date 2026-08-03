@@ -2,5 +2,14 @@
 name = "semantic-traversal-core"
 version = "0.1.0"
 edition = "2024"
+description = "Typed clean-room kernel contracts for semantic traversal"
+license = "UNLICENSED"
 
 [dependencies]
+schemars = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.0", features = ["serde"] }
+
+[dev-dependencies]
+static_assertions = "1.1"

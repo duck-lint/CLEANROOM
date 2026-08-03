@@ -1,0 +1,180 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ProblemRegion",
+  "description": "One individuated relational region within a problem space.\n\nA region is more than a topic label: it retains referents, local structural links, constraints, tensions, contribution provenance, persistence, and activation. It cannot autonomously merge, split, supersede, or retire.",
+  "type": "object",
+  "required": [
+    "activation_band",
+    "anchor_referents",
+    "local_constraint_ids",
+    "open_tension_ids",
+    "persistence_state",
+    "region_id",
+    "relation_ids",
+    "source_contribution_ids"
+  ],
+  "properties": {
+    "activation_band": {
+      "description": "Current activation band in the single attention lens.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ActivationBand"
+        }
+      ]
+    },
+    "anchor_referents": {
+      "description": "Referents that help preserve the region's continuity.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ProblemReferent"
+      }
+    },
+    "local_constraint_ids": {
+      "description": "Constraint identities local to this region.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "open_tension_ids": {
+      "description": "Open-tension identities attached to this region.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "persistence_state": {
+      "description": "Operational persistence state distinct from attentional activation.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/RegionPersistenceState"
+        }
+      ]
+    },
+    "region_id": {
+      "description": "Stable identity of this problem region within the thread.",
+      "type": "string"
+    },
+    "relation_ids": {
+      "description": "Relation identities incident to this region.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "source_contribution_ids": {
+      "description": "Boundary contributions that created or transformed this region.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "supersedes_region_id": {
+      "description": "Prior region directly superseded by this region, when declared.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ActivationBand": {
+      "description": "Current activation band assigned to a problem region.\n\nA band changes visibility and foregrounding only. It does not duplicate the region, change its lifecycle, or become a relevance score.",
+      "oneOf": [
+        {
+          "description": "Immediate operational focus.",
+          "type": "string",
+          "enum": [
+            "primary"
+          ]
+        },
+        {
+          "description": "Live adjacent structure that materially informs primary focus.",
+          "type": "string",
+          "enum": [
+            "secondary"
+          ]
+        },
+        {
+          "description": "Lower-priority connected structure available for continuation.",
+          "type": "string",
+          "enum": [
+            "tertiary"
+          ]
+        },
+        {
+          "description": "Retained continuity outside the current foreground.",
+          "type": "string",
+          "enum": [
+            "background"
+          ]
+        }
+      ]
+    },
+    "ProblemReferent": {
+      "description": "Referent retained inside a problem region.\n\nIt helps preserve relational continuity but is not a canonical corpus binding until semantic-access inference resolves one.",
+      "type": "object",
+      "required": [
+        "expression",
+        "referent_id",
+        "source_contribution_id"
+      ],
+      "properties": {
+        "expression": {
+          "description": "Surface expression or compact label retained by boundary inference.",
+          "type": "string"
+        },
+        "referent_id": {
+          "description": "Thread-local referent identity.",
+          "type": "string"
+        },
+        "source_contribution_id": {
+          "description": "Source contribution that introduced or most recently revised it.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RegionPersistenceState": {
+      "description": "Persistence and lifecycle state of a problem region.\n\nIt records operational history, not truth, confidence, relevance, or an automatic decay score.",
+      "oneOf": [
+        {
+          "description": "Operationally active within the current problem representation.",
+          "type": "string",
+          "enum": [
+            "active"
+          ]
+        },
+        {
+          "description": "Retained as background continuity.",
+          "type": "string",
+          "enum": [
+            "background"
+          ]
+        },
+        {
+          "description": "Explicitly unresolved while remaining part of the state.",
+          "type": "string",
+          "enum": [
+            "unresolved"
+          ]
+        },
+        {
+          "description": "Preserved in history but replaced by a declared framing.",
+          "type": "string",
+          "enum": [
+            "superseded"
+          ]
+        },
+        {
+          "description": "No longer part of the current operational problem state.",
+          "type": "string",
+          "enum": [
+            "retired"
+          ]
+        }
+      ]
+    }
+  }
+}

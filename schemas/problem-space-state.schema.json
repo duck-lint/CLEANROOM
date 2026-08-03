@@ -1,0 +1,925 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ProblemSpaceState",
+  "description": "One thread-local relational problem-space state.\n\nIt preserves regions, relations, constraints, open tensions, contribution history, and one attention lens over the same state. It may be consumed by later stages but cannot infer its own updates or authorize corpus claims.",
+  "type": "object",
+  "required": [
+    "attention_lens",
+    "constraints",
+    "contribution_history",
+    "open_tensions",
+    "regions",
+    "relations",
+    "source_turn_range",
+    "thread_id",
+    "version"
+  ],
+  "properties": {
+    "attention_lens": {
+      "description": "Current activation bands over the one relational state.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/AttentionLens"
+        }
+      ]
+    },
+    "constraints": {
+      "description": "Active or historically retained problem constraints.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ProblemConstraint"
+      }
+    },
+    "contribution_history": {
+      "description": "Contribution and persistence history needed for reconstruction.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ContributionHistoryRecord"
+      }
+    },
+    "open_tensions": {
+      "description": "Explicit unresolved tensions and their lifecycle state.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/OpenTension"
+      }
+    },
+    "regions": {
+      "description": "Individuated problem regions in the current relational state.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ProblemRegion"
+      }
+    },
+    "relations": {
+      "description": "Relations among current or historically retained problem regions.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ProblemRelation"
+      }
+    },
+    "source_turn_range": {
+      "description": "Inclusive source-turn range represented by this state.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/SourceTurnRange"
+        }
+      ]
+    },
+    "thread_id": {
+      "description": "Runtime thread identity whose state is isolated from every other thread.",
+      "type": "string"
+    },
+    "version": {
+      "description": "Monotonic state version after accepted deterministic folding.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ActivationBand": {
+      "description": "Current activation band assigned to a problem region.\n\nA band changes visibility and foregrounding only. It does not duplicate the region, change its lifecycle, or become a relevance score.",
+      "oneOf": [
+        {
+          "description": "Immediate operational focus.",
+          "type": "string",
+          "enum": [
+            "primary"
+          ]
+        },
+        {
+          "description": "Live adjacent structure that materially informs primary focus.",
+          "type": "string",
+          "enum": [
+            "secondary"
+          ]
+        },
+        {
+          "description": "Lower-priority connected structure available for continuation.",
+          "type": "string",
+          "enum": [
+            "tertiary"
+          ]
+        },
+        {
+          "description": "Retained continuity outside the current foreground.",
+          "type": "string",
+          "enum": [
+            "background"
+          ]
+        }
+      ]
+    },
+    "AttentionLens": {
+      "description": "Current attention bands over one relational problem-space state.\n\nThese vectors are views over shared region identities, not independent topic stores. The lens may guide access but cannot alter semantic identity, score truth, or admit evidence.",
+      "type": "object",
+      "required": [
+        "background_region_ids",
+        "primary_region_ids",
+        "secondary_region_ids",
+        "tertiary_region_ids"
+      ],
+      "properties": {
+        "background_region_ids": {
+          "description": "Region identities currently in background activation.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "primary_region_ids": {
+          "description": "Region identities currently in primary activation.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "secondary_region_ids": {
+          "description": "Region identities currently in secondary activation.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tertiary_region_ids": {
+          "description": "Region identities currently in tertiary activation.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "BoundaryOperationKind": {
+      "description": "Coarse categories of boundary perturbation retained in history.\n\nThese categories summarize declared operations for audit only. They do not authorize a fold or erase operation-specific provenance.",
+      "oneOf": [
+        {
+          "description": "Region creation.",
+          "type": "string",
+          "enum": [
+            "create"
+          ]
+        },
+        {
+          "description": "Explicit preservation.",
+          "type": "string",
+          "enum": [
+            "preserve"
+          ]
+        },
+        {
+          "description": "Reinforcement or recurrence.",
+          "type": "string",
+          "enum": [
+            "reinforce"
+          ]
+        },
+        {
+          "description": "Region extension.",
+          "type": "string",
+          "enum": [
+            "extend"
+          ]
+        },
+        {
+          "description": "Region merge.",
+          "type": "string",
+          "enum": [
+            "merge"
+          ]
+        },
+        {
+          "description": "Region split.",
+          "type": "string",
+          "enum": [
+            "split"
+          ]
+        },
+        {
+          "description": "Relation connection or disconnection.",
+          "type": "string",
+          "enum": [
+            "relate"
+          ]
+        },
+        {
+          "description": "Constraint change.",
+          "type": "string",
+          "enum": [
+            "constrain"
+          ]
+        },
+        {
+          "description": "Tension lifecycle change.",
+          "type": "string",
+          "enum": [
+            "tension"
+          ]
+        },
+        {
+          "description": "Attention redirection.",
+          "type": "string",
+          "enum": [
+            "redirect_attention"
+          ]
+        },
+        {
+          "description": "Supersession.",
+          "type": "string",
+          "enum": [
+            "supersede"
+          ]
+        },
+        {
+          "description": "Retirement or release.",
+          "type": "string",
+          "enum": [
+            "retire"
+          ]
+        }
+      ]
+    },
+    "ContributionHistoryRecord": {
+      "description": "Contribution and persistence history record retained by the state.\n\nIt supports reconstruction and recurrence tracking. It is not a confidence, coherence, or relevance score.",
+      "type": "object",
+      "required": [
+        "contribution_id",
+        "source_turn_id",
+        "transformations"
+      ],
+      "properties": {
+        "contribution_id": {
+          "description": "Boundary contribution identity.",
+          "type": "string"
+        },
+        "source_turn_id": {
+          "description": "Source turn identity.",
+          "type": "string"
+        },
+        "transformations": {
+          "description": "Declared transformation categories represented by the contribution.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BoundaryOperationKind"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpenTension": {
+      "description": "One explicit unresolved tension in the problem representation.\n\nIt preserves ambiguity, contradiction, or a missing relation without false resolution. It does not imply that the corpus lacks an answer and cannot close itself.",
+      "type": "object",
+      "required": [
+        "candidate_bindings",
+        "lifecycle",
+        "region_id",
+        "source_turn_id",
+        "tension_id",
+        "tension_type"
+      ],
+      "properties": {
+        "candidate_bindings": {
+          "description": "Candidate bindings or interpretations preserved without selection.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lifecycle": {
+          "description": "Current lifecycle of the tension.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/TensionLifecycle"
+            }
+          ]
+        },
+        "region_id": {
+          "description": "Containing problem-region identity.",
+          "type": "string"
+        },
+        "source_turn_id": {
+          "description": "Source turn that introduced the tension.",
+          "type": "string"
+        },
+        "tension_id": {
+          "description": "Stable tension identity within the thread.",
+          "type": "string"
+        },
+        "tension_type": {
+          "description": "Declared tension category.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/OpenTensionType"
+            }
+          ]
+        },
+        "unresolved_expression": {
+          "description": "Source expression retained when useful for later interpretation.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpenTensionType": {
+      "description": "Declared categories of unresolved problem-space tension.\n\nA category preserves the kind of unresolved structure without choosing a candidate interpretation or making a corpus-absence claim.",
+      "oneOf": [
+        {
+          "description": "A referent remains unresolved.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "unresolved_reference"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Two represented commitments or framings conflict.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "contradiction"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "A requested comparison dimension remains unspecified.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "missing_comparison_dimension"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Multiple framings remain live.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "competing_framing"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "A recurrent question remains unresolved across contributions.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "recurrent_unresolved_question"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "The current problem representation lacks a required connection.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "required_connection_missing"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Named tension declared by boundary inference.",
+          "type": "object",
+          "required": [
+            "kind",
+            "name"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "declared"
+              ]
+            },
+            "name": {
+              "description": "Declared tension name.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ProblemConstraint": {
+      "description": "One active or historically retained problem-space constraint.\n\nIt records a declared requirement such as chronology, exclusion, or exact wording. It does not execute or independently interpret the constraint.",
+      "type": "object",
+      "required": [
+        "constraint_id",
+        "expression",
+        "lifecycle",
+        "source_contribution_id"
+      ],
+      "properties": {
+        "constraint_id": {
+          "description": "Stable constraint identity within the thread.",
+          "type": "string"
+        },
+        "expression": {
+          "description": "Human-readable declared constraint expression.",
+          "type": "string"
+        },
+        "lifecycle": {
+          "description": "Current lifecycle of the constraint record.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/RecordLifecycle"
+            }
+          ]
+        },
+        "source_contribution_id": {
+          "description": "Boundary contribution that introduced the constraint.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProblemReferent": {
+      "description": "Referent retained inside a problem region.\n\nIt helps preserve relational continuity but is not a canonical corpus binding until semantic-access inference resolves one.",
+      "type": "object",
+      "required": [
+        "expression",
+        "referent_id",
+        "source_contribution_id"
+      ],
+      "properties": {
+        "expression": {
+          "description": "Surface expression or compact label retained by boundary inference.",
+          "type": "string"
+        },
+        "referent_id": {
+          "description": "Thread-local referent identity.",
+          "type": "string"
+        },
+        "source_contribution_id": {
+          "description": "Source contribution that introduced or most recently revised it.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProblemRegion": {
+      "description": "One individuated relational region within a problem space.\n\nA region is more than a topic label: it retains referents, local structural links, constraints, tensions, contribution provenance, persistence, and activation. It cannot autonomously merge, split, supersede, or retire.",
+      "type": "object",
+      "required": [
+        "activation_band",
+        "anchor_referents",
+        "local_constraint_ids",
+        "open_tension_ids",
+        "persistence_state",
+        "region_id",
+        "relation_ids",
+        "source_contribution_ids"
+      ],
+      "properties": {
+        "activation_band": {
+          "description": "Current activation band in the single attention lens.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ActivationBand"
+            }
+          ]
+        },
+        "anchor_referents": {
+          "description": "Referents that help preserve the region's continuity.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProblemReferent"
+          }
+        },
+        "local_constraint_ids": {
+          "description": "Constraint identities local to this region.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "open_tension_ids": {
+          "description": "Open-tension identities attached to this region.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "persistence_state": {
+          "description": "Operational persistence state distinct from attentional activation.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/RegionPersistenceState"
+            }
+          ]
+        },
+        "region_id": {
+          "description": "Stable identity of this problem region within the thread.",
+          "type": "string"
+        },
+        "relation_ids": {
+          "description": "Relation identities incident to this region.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source_contribution_ids": {
+          "description": "Boundary contributions that created or transformed this region.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "supersedes_region_id": {
+          "description": "Prior region directly superseded by this region, when declared.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProblemRelation": {
+      "description": "One represented relation among problem regions.\n\nIt records a declared relational connection and provenance. It may guide later projection access but is not itself a corpus address or executable traversal edge.",
+      "type": "object",
+      "required": [
+        "lifecycle",
+        "relation_id",
+        "relation_type",
+        "source_contribution_id",
+        "source_region_id"
+      ],
+      "properties": {
+        "lifecycle": {
+          "description": "Current lifecycle of the represented relation.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/RecordLifecycle"
+            }
+          ]
+        },
+        "relation_id": {
+          "description": "Stable relation identity within the thread.",
+          "type": "string"
+        },
+        "relation_type": {
+          "description": "Declared relation category.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ProblemRelationType"
+            }
+          ]
+        },
+        "source_contribution_id": {
+          "description": "Boundary contribution that declared this relation.",
+          "type": "string"
+        },
+        "source_region_id": {
+          "description": "Source problem-region identity.",
+          "type": "string"
+        },
+        "target_region_id": {
+          "description": "Optional target region when the relation is binary.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProblemRelationType": {
+      "description": "Declared categories of problem-space relation.\n\nCategories describe the inferred thread representation only. They do not create corpus relations or authorize traversal.",
+      "oneOf": [
+        {
+          "description": "One region continues another.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "continuation"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One region depends on another.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "dependency"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Regions participate in a comparison.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "comparison"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One region corrects a prior framing.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "correction"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One region refines another.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "refinement"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "The relation is itself a causal question.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "causal_question"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Regions are linked by a temporal question or ordering.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "temporal"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Regions share a retained referent.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "shared_referent"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Regions share an active constraint.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "shared_constraint"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "A named relation declared by inference but not hard-coded as corpus data.",
+          "type": "object",
+          "required": [
+            "kind",
+            "name"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "declared"
+              ]
+            },
+            "name": {
+              "description": "Declared relation name.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "RecordLifecycle": {
+      "description": "Lifecycle shared by relation and constraint records.\n\nIt records whether a declared record is operationally current or retained historically. It grants no semantic decision authority.",
+      "oneOf": [
+        {
+          "description": "Currently active in the relational state.",
+          "type": "string",
+          "enum": [
+            "active"
+          ]
+        },
+        {
+          "description": "Preserved in history after replacement.",
+          "type": "string",
+          "enum": [
+            "superseded"
+          ]
+        },
+        {
+          "description": "Explicitly retired from the operational state.",
+          "type": "string",
+          "enum": [
+            "retired"
+          ]
+        }
+      ]
+    },
+    "RegionPersistenceState": {
+      "description": "Persistence and lifecycle state of a problem region.\n\nIt records operational history, not truth, confidence, relevance, or an automatic decay score.",
+      "oneOf": [
+        {
+          "description": "Operationally active within the current problem representation.",
+          "type": "string",
+          "enum": [
+            "active"
+          ]
+        },
+        {
+          "description": "Retained as background continuity.",
+          "type": "string",
+          "enum": [
+            "background"
+          ]
+        },
+        {
+          "description": "Explicitly unresolved while remaining part of the state.",
+          "type": "string",
+          "enum": [
+            "unresolved"
+          ]
+        },
+        {
+          "description": "Preserved in history but replaced by a declared framing.",
+          "type": "string",
+          "enum": [
+            "superseded"
+          ]
+        },
+        {
+          "description": "No longer part of the current operational problem state.",
+          "type": "string",
+          "enum": [
+            "retired"
+          ]
+        }
+      ]
+    },
+    "SourceTurnRange": {
+      "description": "Inclusive turn range represented in one problem-space state.\n\nThe range is bookkeeping for reconstruction, not a transcript substitute or corpus-evidence boundary.",
+      "type": "object",
+      "required": [
+        "first_turn_id",
+        "last_turn_id"
+      ],
+      "properties": {
+        "first_turn_id": {
+          "description": "First source-turn identity included in the reconstructed state.",
+          "type": "string"
+        },
+        "last_turn_id": {
+          "description": "Most recent source-turn identity included in the reconstructed state.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TensionLifecycle": {
+      "description": "Lifecycle of an open-tension record.\n\nIt records thread history only. A deterministic component may not change the lifecycle without an accepted declaration.",
+      "oneOf": [
+        {
+          "description": "Still unresolved and operational.",
+          "type": "string",
+          "enum": [
+            "open"
+          ]
+        },
+        {
+          "description": "Declared resolved by boundary inference.",
+          "type": "string",
+          "enum": [
+            "resolved"
+          ]
+        },
+        {
+          "description": "Replaced by another framing or tension.",
+          "type": "string",
+          "enum": [
+            "superseded"
+          ]
+        },
+        {
+          "description": "Explicitly abandoned.",
+          "type": "string",
+          "enum": [
+            "abandoned"
+          ]
+        }
+      ]
+    }
+  }
+}
