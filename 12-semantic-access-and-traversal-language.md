@@ -71,11 +71,11 @@ Examples:
 
 ```text
 region:
-    Capital and Blood Meridian chronology
+    Capital and Blood Meridian source-material chronology
 
 referents:
-    Capital
-    Blood Meridian
+    Marx, Karl — Capital
+    McCarthy, Cormac — Blood Meridian
 
 constraint:
     compare temporal anchors
@@ -150,8 +150,8 @@ A region is an addressable authored structural area inside a semantic object.
 Examples:
 
 ```text
-Capital#Chapter 2
-Capital#^block-id
+Marx, Karl — Capital#Chapter 2
+Marx, Karl — Capital#^block-id
 ```
 
 A heading region may contain one or more semantic units.
@@ -179,9 +179,9 @@ A simple plan may serialize as a linear path.
 Graph form supports:
 
 ```text
-Capital ──────────────┐
-                      ├→ contextual occurrences → dated units → chronology
-Blood Meridian ───────┘
+Marx, Karl — Capital ───────────────┐
+                                      ├→ contextual occurrences → dated units → chronology
+McCarthy, Cormac — Blood Meridian ───┘
 ```
 
 ## 8. Direction is explicit and fluid
@@ -440,11 +440,11 @@ Problem-space state:
 
 ```text
 region:
-    Capital and Blood Meridian chronology
+    Capital and Blood Meridian source-material chronology
 
 referents:
-    Capital
-    Blood Meridian
+    Marx, Karl — Capital
+    McCarthy, Cormac — Blood Meridian
 
 constraint:
     temporal comparison
@@ -459,13 +459,13 @@ Final plan:
 
 ```text
 path A:
-    Capital
+    canonical UUID for Marx, Karl — Capital
     → incoming canonical occurrences
     → source semantic units
     → temporal anchors
 
 path B:
-    Blood Meridian
+    canonical UUID for McCarthy, Cormac — Blood Meridian
     → incoming canonical occurrences
     → source semantic units
     → temporal anchors
