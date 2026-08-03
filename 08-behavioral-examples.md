@@ -13,13 +13,33 @@ When did I go vegan?
 ### Expected stages
 
 ```text
-P0: empty
-B1: current subject, vegan transition, temporal focus
-P1: aggregate contains those markers
-T1: retrieve vegan-related semantic units with temporal anchors
-C(T1, M): valid
-R1: dated semantic units, including the first-day entry
-Synthesis: receives all returned units and answers
+P0:
+    empty relational problem space
+
+B1:
+    create region: vegan transition
+    relation: current subject → transition
+    constraint: temporal answer requested
+    attention: primary
+
+P1:
+    one bounded problem region with temporal orientation
+
+W1:
+    positively activated semantic region around vegan-related units,
+    contextual occurrences, and temporal anchors
+
+T1:
+    collect vegan-related semantic units with temporal anchors
+
+C(T1, Mσ):
+    valid
+
+R1:
+    dated semantic units, including the first-day entry
+
+Synthesis:
+    receives all returned units and answers
 ```
 
 No prior thread state is present.
@@ -33,15 +53,19 @@ date: April 16
 text: today is officially day #1 of going vegan
 ```
 
-If this unit was returned by a conforming traversal, it reaches synthesis.
+If this unit was returned by a conforming plan, it reaches synthesis.
 
-The runtime does not require it to match a generated phrase such as `transition to veganism`.
+The runtime does not require it to match a generated phrase such as:
+
+```text
+transition to veganism
+```
 
 That equivalence is synthesis work.
 
 ## 3. Invalid Cleo/date path
 
-### Proposed traversal
+### Proposed path
 
 ```text
 object: Cleo
@@ -63,7 +87,7 @@ dated journal unit
 
 The direct assignment or path is structurally invalid because it is absent from the projection.
 
-A different traversal through dated contextual units may be valid.
+A different path through dated contextual units may be valid.
 
 ## 4. Capital intrinsic type
 
@@ -72,7 +96,7 @@ Capital
     object_type: book
 ```
 
-A traversal using `book` to address Capital is structurally possible.
+A semantic-access plan using `book` to address Capital is structurally possible.
 
 ## 5. Capital contextual participation
 
@@ -82,7 +106,7 @@ journal unit J1
     authored link: [[Capital]]
 ```
 
-This supports a traversal from dated journal unit to canonical occurrence to Capital.
+This supports access from the dated journal unit through the authored occurrence to Capital, or from Capital through its incoming occurrence to the dated journal unit.
 
 It may establish the contextual relation `book_read_today`.
 
@@ -99,10 +123,10 @@ Expected projection:
 ```text
 source unit
 → authored heading occurrence
-→ canonical semantic-unit address in Capital
+→ canonical semantic region in Capital
 ```
 
-Execution must preserve the target unit identity.
+Execution must preserve the region or unit identity resolved by the authored target.
 
 ## 7. Two-book chronology
 
@@ -112,12 +136,12 @@ Execution must preserve the target unit identity.
 Which did I start first, Capital or Blood Meridian?
 ```
 
-Expected traversal:
+Expected semantic-access structure:
 
 ```text
-dated contextual units
-→ canonical occurrences
-→ Capital or Blood Meridian
+Capital ──────────────┐
+                      ├→ contextual dated occurrences → chronology
+Blood Meridian ───────┘
 ```
 
 Execution returns dated units while preserving which canonical target each unit references.
@@ -144,16 +168,35 @@ Returned units still reach synthesis.
 Does the exact phrase X occur anywhere?
 ```
 
-A valid exhaustive traversal requires an explicit literal, supported exact mode, complete eligible scope, and completed total count.
+A valid exhaustive plan requires:
 
-Zero matches after completed execution is different from invalid traversal, unavailable surface, or incomplete execution.
+- an explicit literal;
+- supported exact mode;
+- complete eligible scope;
+- completed total count.
 
-## 10. Multi-turn continuation
+Zero matches after completed execution is different from:
+
+- invalid plan;
+- unavailable surface;
+- incomplete execution;
+- a problem-space gap;
+- failure to activate a region.
+
+## 10. Multi-turn continuation as coherent redirection
 
 ### Turn 1
 
 ```text
 What did the calf eat?
+```
+
+Problem region:
+
+```text
+calf diet
+    referent: calf
+    relation: consumed food
 ```
 
 ### Turn 2
@@ -162,11 +205,144 @@ What did the calf eat?
 When did that change?
 ```
 
-Turn 2 uses the existing problem-space state to resolve “that.”
+Boundary contribution:
 
-A new thread would not inherit the calf reference.
+```text
+preserve:
+    calf referent
 
-## 11. Mechanically bounded packet
+reinforce:
+    calf diet region
+
+redirect:
+    relation from consumed food
+    to temporal transition in diet
+
+resolve:
+    "that" → calf diet
+
+attention:
+    temporal transition → primary
+    prior diet description → supporting relation
+```
+
+The second turn does not create a duplicate `calf diet` topic.
+
+It transforms the same identifiable problem region.
+
+A new thread would not inherit the reference.
+
+## 11. Explicit correction and supersession
+
+### Turn 1
+
+```text
+Which did I start first, Capital or Blood Meridian?
+```
+
+### Turn 2
+
+```text
+No, I meant which was published first.
+```
+
+Expected boundary contribution:
+
+```text
+supersede:
+    reading chronology
+
+preserve:
+    Capital
+    Blood Meridian
+    comparative relation
+
+replace constraint:
+    publication chronology
+```
+
+The old reading chronology remains in history but is no longer an active competing interpretation.
+
+## 12. Open tension without false resolution
+
+### Input
+
+```text
+Was Capital before Blood Meridian?
+```
+
+If `before` could mean reading chronology or publication chronology and the thread does not resolve the dimension, boundary inference may create:
+
+```text
+open tension:
+    chronology dimension unresolved
+```
+
+The runtime does not choose one by lexical heuristic.
+
+The tension may guide clarification or projection exploration.
+
+It does not imply that no answer exists in the corpus.
+
+## 13. Recurrent unresolved region
+
+A conversation repeatedly returns to the same unresolved implementation question.
+
+Expected behavior:
+
+```text
+one persistent problem region
++
+several source contributions
++
+recurrent status
++
+one still-open tension
+```
+
+Not:
+
+```text
+five near-duplicate topic markers
+```
+
+Recurrence is preserved as history rather than erased by deduplication.
+
+## 14. Attention bands as one lens
+
+A problem region may move:
+
+```text
+primary
+→ secondary
+→ background
+→ primary
+```
+
+The system retains one region identity.
+
+It does not copy the region into four stores.
+
+## 15. Positive-only activation
+
+A working projection activates:
+
+```text
+Capital
+Blood Meridian
+their dated contextual occurrences
+temporal surfaces
+```
+
+Material outside that working view is merely not loaded under the current lens and budget.
+
+Its absence from the activated view cannot authorize:
+
+```text
+there is no relevant evidence elsewhere
+```
+
+## 16. Mechanically bounded packet
 
 If execution returns 500 units and the synthesis packet permits 50:
 
@@ -174,12 +350,39 @@ If execution returns 500 units and the synthesis packet permits 50:
 - 50 are selected by a declared deterministic rule;
 - every removed unit records the mechanical reason;
 - packet limits are visible to synthesis;
-- no unit is removed because it failed a generated semantic proposition.
+- no unit is removed because it failed a generated proposition or coherence test.
 
-## 12. Provider failure
+## 17. Previous turn as conversational continuity
 
-If inference fails, no traversal is fabricated.
+### Previous turn
 
-If synthesis fails, the retrieval result remains persisted.
+```text
+User: What did the calf eat?
+Assistant: It first drank milk and later ate hay.
+```
+
+### Current utterance
+
+```text
+When did that change?
+```
+
+Synthesis receives the previous turn as labeled conversational continuity.
+
+It does not treat the previous assistant answer as corpus evidence.
+
+## 18. Provider failure
+
+If boundary inference fails:
+
+- no problem-space transformation is fabricated.
+
+If semantic-access inference fails:
+
+- no executable plan is fabricated.
+
+If synthesis fails:
+
+- the retrieval result remains persisted.
 
 Provider failure must never be represented as a semantic conclusion.

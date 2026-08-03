@@ -17,18 +17,25 @@ Existing code is consulted only after the new contracts and tests are accepted.
 5. Add only the clean-room documents and Organon.
 6. Freeze legacy development while the clean contracts are being derived.
 
-Deliverable: a clean branch with repository history but no ambient implementation assumptions.
+Deliverable:
+
+- a clean branch with repository history but no ambient implementation assumptions.
 
 ## Phase 1 — Freeze language-neutral contracts
 
 Define data contracts without choosing implementation modules.
 
-Required contracts:
+Required seed contracts:
 
 - `ProblemSpaceState`
-- `UtteranceBoundary`
+- `ProblemRegion`
+- `ProblemRelation`
+- `OpenTension`
+- `AttentionLens`
+- `BoundaryContribution`
 - `SemanticSpaceProjection`
-- `TraversalPlan`
+- `ActivatedProjection`
+- `SemanticAccessPlan`
 - `ConformanceResult`
 - `RetrievalResult`
 - `ExecutionLimits`
@@ -37,9 +44,22 @@ Required contracts:
 
 Names may change before acceptance.
 
-Each contract must state fields, authority, lifecycle, permitted transformations, forbidden transformations, persistence requirements, and deterministic identity.
+Each contract must state:
 
-Deliverable: human-readable specification, machine-readable schema, synthetic examples, and invalid examples.
+- fields;
+- authority;
+- lifecycle;
+- permitted transformations;
+- forbidden transformations;
+- persistence requirements;
+- deterministic identity.
+
+Deliverable:
+
+- human-readable specification;
+- machine-readable schema;
+- synthetic examples;
+- invalid examples.
 
 ## Phase 2 — Build a tiny synthetic semantic space
 
@@ -51,59 +71,151 @@ Before touching the real corpus, create a minimal projection containing:
 - one heading-target link;
 - one person or animal object;
 - one invalid identifier/object combination;
-- exact, lexical, graph, and temporal capabilities.
+- exact, lexical, graph, vector, and temporal capabilities.
 
-The fixture should demonstrate top-down inheritance, bottom-up occurrence traversal, heading-specific unit addressability, contextual relation participation, and invalid structural paths.
+The fixture should demonstrate:
 
-Deliverable: deterministic `SemanticSpaceProjection` fixture and validation tests, with no LLM calls.
+- top-down inheritance;
+- bottom-up occurrence traversal;
+- incoming and outgoing navigation;
+- heading-specific unit addressability;
+- contextual relation participation;
+- invalid structural paths.
 
-## Phase 3 — Implement problem-space state
+Deliverable:
+
+- deterministic `SemanticSpaceProjection` fixture;
+- validation tests;
+- no LLM calls.
+
+## Phase 3 — Implement boundary inference and problem-space state
 
 Implement:
 
 \[
-B_t = D(P_{t-1}, u_t)
+B_t = D(P_{t-1},u_t,v_{t-1})
 \]
 
 and:
 
 \[
-P_t = U(P_{t-1}, B_t)
+P_t = U(P_{t-1},B_t)
 \]
 
-Initially use a fake inference provider with deterministic responses.
+Initially use a fake boundary-inference provider with deterministic responses.
 
-Prove fresh-thread cleanliness, continuing-thread state, focus shifts, thread-local reference resolution, restart recovery, and cross-thread isolation.
+Represent the problem space as a relational gestalt containing:
 
-Deliverable: persisted and replayable problem-space state.
+- regions;
+- relations;
+- constraints;
+- open tensions;
+- contribution history;
+- attention lens.
 
-## Phase 4 — Implement traversal inference contract
+Prove:
+
+- fresh-thread cleanliness;
+- continuing-thread state;
+- explicit perturbation operations;
+- semantic continuation without duplicate accumulation;
+- merge, split, redirect, supersede, and retire behavior;
+- qualitative persistence without numerical confidence;
+- explicit unresolved tensions;
+- restart recovery;
+- cross-thread isolation.
+
+The deterministic fold must apply declared transformations without inferring semantic similarity.
+
+Deliverable:
+
+- persisted, replayable, reconstructible problem-space state.
+
+## Phase 4 — Implement projection activation
 
 Implement:
 
 \[
-T_t = I(P_t, u_t, M)
+W_t^{(0)}
+=
+A_{\mathrm{cfg}}(M_\sigma,P_t,u_t,\Lambda_t)
 \]
 
-Start with a fake inference backend.
+Start with deterministic activation against the synthetic projection.
 
-The traversal plan must reference typed addresses from the projection rather than ambiguous free-form strings wherever a canonical address exists.
+Prove:
 
-Deliverable: traversal schema, fake-provider tests, and provider-neutral inference interface.
+- activation is positive-only;
+- primary, secondary, tertiary, and background are activation bands over one state;
+- every activated node records which problem region, relation, constraint, or open tension exposed it;
+- all structurally valid identifier-to-surface affordances are available;
+- high-degree regions use summaries and continuation handles;
+- configured defaults apply without model micromanagement;
+- absence from the working projection authorizes no negative claim.
 
-## Phase 5 — Implement structural conformance
+Deliverable:
+
+- bounded `ActivatedProjection` contract and deterministic activation tests.
+
+## Phase 5 — Implement semantic-access inference
 
 Implement:
 
 \[
-C(T_t, M)
+T_t = I_2(P_t,u_t,W_t)
+\]
+
+Use a separate fake provider from the boundary-inference provider.
+
+Allow the second inference session to request typed expansion:
+
+\[
+W_t^{(k+1)}
+=
+\operatorname{expand}(M_\sigma,W_t^{(k)},q_k,\beta)
+\]
+
+The final plan must reference projected canonical addresses wherever they exist.
+
+Prove:
+
+- problem regions bind to canonical semantic addresses;
+- open tensions become explicit access objectives;
+- plans may branch and rejoin;
+- incoming and outgoing directions remain available;
+- routine bounds come from configuration;
+- required and optional execution obligations remain distinct;
+- the plan does not resolve the problem or judge evidence.
+
+Deliverable:
+
+- `SemanticAccessPlan` schema;
+- fake-provider tests;
+- provider-neutral semantic-access interface.
+
+## Phase 6 — Implement structural conformance
+
+Implement:
+
+\[
+C(T_t,M_\sigma)
 \]
 
 as a pure deterministic function.
 
-It should return a valid traversal or exact structural violations.
+It returns:
 
-It must not rank evidence, infer aliases, judge paraphrases, create semantic roles, or repair meaning.
+- a valid plan;
+- or exact structural violations.
+
+It must not:
+
+- rank evidence;
+- infer aliases;
+- judge paraphrases;
+- generate semantic roles;
+- calculate problem-space coherence;
+- repair meaning.
 
 Prove invalid cases such as:
 
@@ -112,16 +224,20 @@ Prove invalid cases such as:
 - unsupported heading target;
 - unavailable surface;
 - invalid relation direction;
-- absent transition.
+- absent transition;
+- requested bound beyond configuration.
 
-Deliverable: conformance test suite and optional one-repair interface back to inference.
+Deliverable:
 
-## Phase 6 — Implement execution adapters
+- conformance suite;
+- one-repair interface back to a fresh semantic-access inference call.
+
+## Phase 7 — Implement execution adapters
 
 Implement:
 
 \[
-R_t = E(T_t, M)
+R_t = E(T_t,M_\sigma)
 \]
 
 Start with in-memory fixture executors.
@@ -136,37 +252,77 @@ Then add one real surface at a time:
 
 Every result must hydrate to canonical semantic units and retain full provenance.
 
-No result may be filtered by a generated semantic proposition.
+No result may be filtered by:
 
-Deliverable: retrieval result contract, per-surface tests, and canonical hydration tests.
+- a generated semantic proposition;
+- a paraphrase comparison;
+- a problem-space coherence test.
 
-## Phase 7 — Implement packet assembly and coverage
+Deliverable:
 
-Packet assembly may deduplicate by canonical identity, rank, cap, preserve breadth, attach provenance, and record execution limits.
+- retrieval result contract;
+- per-surface tests;
+- canonical hydration tests.
+
+## Phase 8 — Implement packet assembly and coverage
+
+Packet assembly may:
+
+- deduplicate canonical identity;
+- rank by declared mechanical rules;
+- apply configured bounds;
+- preserve breadth;
+- attach provenance;
+- record execution limits.
 
 Coverage derives only from measured execution.
 
-Prove exhaustive negative authority, total-count readiness, graph-depth limits, unavailable-surface reporting, candidate-cap reporting, and absence of semantic veto after execution.
+Prove:
 
-Deliverable: deterministic synthesis packet and execution-limit contract.
+- exact exhaustive negative authority;
+- total-count readiness;
+- graph-depth limits;
+- unavailable-surface reporting;
+- candidate-cap reporting;
+- absence of semantic veto after execution.
 
-## Phase 8 — Implement synthesis interface
+Deliverable:
+
+- deterministic synthesis packet;
+- execution-limit contract.
+
+## Phase 9 — Implement synthesis interface
 
 Implement:
 
 \[
-A_t = S(P_t, u_t, T_t, R_t, L_t)
+A_t
+=
+S(P_t,u_t,v_{t-1},T_t,R_t,L_t)
 \]
 
 Start with a recording backend that proves the exact packet visible to synthesis.
 
 Then add the real frontier provider.
 
-Prove that the newest utterance is the focus, aggregate problem-space state is background, returned semantic units are visible, provenance and execution limits are visible, and no answer-bearing unit disappears.
+Prove:
 
-Deliverable: provider-neutral synthesis interface and end-to-end synthetic tests.
+- the newest utterance remains the focus;
+- the immediately preceding turn supplies local continuity;
+- the relational problem space supplies bounded background;
+- previous conversation text is not mislabeled as retrieval evidence;
+- returned semantic units are visible;
+- provenance and execution limits are visible;
+- open tensions remain distinguishable from corpus absence;
+- no answer-bearing unit disappears.
 
-## Phase 9 — Connect to the real semantic substrate
+Deliverable:
+
+- provider-neutral synthesis interface;
+- recorded input fixtures;
+- end-to-end synthetic tests.
+
+## Phase 10 — Connect to the real semantic substrate
 
 Only after the clean kernel passes the synthetic suite:
 
@@ -176,9 +332,12 @@ Only after the clean kernel passes the synthetic suite:
 4. add missing object/unit/occurrence addressability;
 5. do not import legacy runtime orchestration.
 
-Deliverable: real-corpus projection adapter and validation report.
+Deliverable:
 
-## Phase 10 — Evaluate legacy reuse
+- real-corpus projection adapter;
+- projection validation report.
+
+## Phase 11 — Evaluate legacy reuse
 
 Now inspect the old repository.
 
@@ -192,25 +351,48 @@ For each component, classify it as:
 
 No component is preserved for familiarity or sunk cost.
 
-## Phase 11 — Private UAT
+## Phase 12 — Private UAT
 
 Use a new suite identity for every fresh experimental baseline.
 
 Inspect:
 
 ```text
-problem-space state
-→ traversal
+prior problem space
+→ boundary perturbation
+→ updated relational gestalt
+→ current attention lens
+→ activated semantic projection
+→ semantic-access plan
 → conformance
 → retrieved canonical units
 → synthesis packet
 → answer
 ```
 
+Test at least:
+
+- semantic continuation without duplicate accumulation;
+- explicit correction and supersession;
+- recurrent unresolved tension;
+- multi-turn referent resolution;
+- projection expansion;
+- positive-only activation;
+- exact count and exact absence;
+- multi-object chronology;
+- thread isolation;
+- restart recovery.
+
 Timing is operational telemetry, not acceptance.
 
-## Phase 12 — Replacement decision
+## Phase 13 — Replacement decision
 
-Accept the clean runtime only when its conceptual contracts are stable, its synthetic suite passes, the real projection is exhaustive enough, private UAT confirms the architecture, and no legacy semantic veto has reappeared.
+Accept the clean runtime only when:
+
+- its conceptual contracts are stable;
+- its synthetic suite passes;
+- the real projection is sufficiently exhaustive;
+- private UAT confirms the architecture;
+- no legacy semantic veto or coherence gate has reappeared.
 
 Then merge the clean branch as an intentional replacement while preserving repository history.

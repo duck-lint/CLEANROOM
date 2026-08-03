@@ -10,103 +10,37 @@ This document defines the thread-local problem space without assuming any existi
 
 Each conversation thread is a continuously morphing problem space.
 
-The runtime does not treat the thread as:
+More precisely:
+
+> The problem space is a bounded relational gestalt that preserves continuity by reorganizing under each new utterance.
+
+It is not:
 
 - a flat transcript;
 - one continually rewritten summary;
-- a stack of independent topics;
-- an ever-growing pile of semantically duplicate markers.
+- a stack of unrelated topics;
+- an ever-growing pile of semantically duplicate markers;
+- a numeric vector of confidence or relevance scores.
 
-Instead, each turn contributes a typed boundary update. The runtime preserves those contributions and derives a bounded current view from them.
+## 2. Three distinct thread artifacts
 
-## 2. Two fresh inference calls per turn
+The thread maintains three different forms of state.
 
-Each turn contains two distinct inference calls.
-
-### Inference call 1 — boundary deconstruction
-
-\[
-B_t = D(P_{t-1}, u_t)
-\]
-
-The first inference call receives:
-
-- the prior problem-space state \(P_{t-1}\);
-- the newest user utterance \(u_t\);
-- the immediately preceding completed turn as continuity context.
-
-It emits a turn-local boundary contribution \(B_t\).
-
-This call is responsible for interpreting:
-
-- the current focus;
-- continued or newly introduced referents;
-- relevant relations;
-- temporal, comparative, exact, or exhaustive orientation;
-- constraints and exclusions;
-- unresolved references;
-- focus changes;
-- semantic consolidation;
-- supersession or retirement.
-
-It does not inspect the semantic-space projection and does not construct the final semantic-access plan.
-
-### Deterministic fold
-
-\[
-P_t = U(P_{t-1}, B_t)
-\]
-
-The runtime deterministically applies the contribution to produce the updated problem-space state.
-
-### Inference call 2 — semantic access
-
-The second inference call receives the accepted \(P_t\), the newest utterance, and tool access to the projected semantic space.
-
-It uses the problem space as a lens over the semantic projection and emits the final executable semantic-access plan.
-
-The two calls are separate so that each inference operation can specialize:
-
-```text
-call 1
-    interpret how the thread's problem space changed
-
-call 2
-    connect that problem space to the semantic space
-```
-
-## 3. Source artifacts, contributions, and active view
-
-The thread state has three distinct layers.
-
-### 3.1 Source transcript
+### 2.1 Source transcript
 
 The transcript preserves the actual user and assistant surface utterances.
 
 It is immutable historical evidence of what occurred.
 
-### 3.2 Boundary contributions
+### 2.2 Boundary contributions
 
-Each \(B_t\) is an append-only inference artifact linked to its source turn.
+Each turn produces an append-only boundary contribution linked to its source utterance.
 
-A contribution may add or modify:
+A contribution describes how the newest utterance perturbs the prior problem space.
 
-- focus regions;
-- referents;
-- relations;
-- constraints;
-- unresolved references;
-- evidentiary orientation;
-- status transitions;
-- consolidation instructions.
+### 2.3 Derived active problem space
 
-Historical contributions are never silently rewritten.
-
-### 3.3 Derived active problem space
-
-\(P_t\) is the current bounded operational view derived from the contribution history.
-
-It is reconstructible from:
+The current problem space is the bounded relational state derived from:
 
 ```text
 source turns
@@ -116,175 +50,471 @@ accepted boundary contributions
 deterministic fold rules
 ```
 
-The active view is not treated as a new source of truth independent of that history.
+It is reconstructible.
 
-## 4. Focus topology
+It is not an independent source of truth detached from its history.
 
-The current problem space supports a bounded hierarchy:
+## 3. Two fresh inference calls per turn
 
-```text
-primary focus
-secondary focus
-tertiary focus
-background aggregate
-```
+### Call 1 — boundary inference
 
-### Primary focus
+\[
+B_t = D(P_{t-1},u_t,v_{t-1})
+\]
 
-The immediate problem being acted on.
+The first inference call receives:
 
-### Secondary focus
+- prior problem-space state \(P_{t-1}\);
+- newest utterance \(u_t\);
+- immediately preceding completed turn \(v_{t-1}\).
 
-A live adjacent problem region that materially informs the primary focus.
+It emits a turn-local boundary contribution \(B_t\).
 
-### Tertiary focus
+This call interprets:
 
-A live but lower-priority branch that remains available for continuation.
+- what problem region is currently in focus;
+- what regions continue from prior turns;
+- what referents remain active;
+- what relations changed;
+- what constraints were introduced;
+- what ambiguity or contradiction remains open;
+- what prior framing was corrected;
+- how attention should be redirected;
+- whether a contribution reinforces, extends, merges, splits, supersedes, or retires existing structure.
 
-### Background aggregate
+It does not inspect the semantic-space projection and does not construct the semantic-access plan.
 
-Relevant continuity that no longer belongs in the active top three but remains useful to the thread.
+### Deterministic fold
 
-This lets a conversation blossom without flattening every turn into one topic or keeping every past topic equally active.
+\[
+P_t = U(P_{t-1},B_t)
+\]
 
-## 5. Natural aggregation and deduplication
+The runtime validates and applies the declared transformation.
 
-Semantically continuous contributions should aggregate rather than pile up.
+### Call 2 — semantic-access inference
+
+The second inference call receives:
+
+- accepted \(P_t\);
+- newest utterance \(u_t\);
+- an activated view of the projected semantic space.
+
+It connects the problem gestalt to represented semantic addresses and emits the final executable semantic-access plan.
+
+## 4. Conceptual state structure
+
+The problem space may be represented abstractly as:
+
+\[
+P_t =
+(
+\mathcal{G}_t,
+\mathcal{E}_t,
+\mathcal{C}_t,
+\mathcal{O}_t,
+\mathcal{H}_t,
+\Lambda_t
+)
+\]
+
+Where:
+
+### \(\mathcal{G}_t\) — problem regions
+
+Individuated relational gestalts currently belonging to the thread's operational problem space.
+
+A region is not merely a topic label.
+
+It may contain:
+
+- anchor referents;
+- active distinctions;
+- relations presently in question;
+- local constraints;
+- unresolved tensions;
+- source contributions;
+- lifecycle state.
+
+### \(\mathcal{E}_t\) — problem-space relations
+
+Connections among regions, such as:
+
+- continuation;
+- dependency;
+- comparison;
+- correction;
+- refinement;
+- causal question;
+- temporal relation;
+- shared referent;
+- shared constraint.
+
+### \(\mathcal{C}_t\) — active constraints
 
 Examples:
 
-- a follow-on question about the same object;
-- a reformulation of the same comparison;
-- a new constraint on an existing problem;
-- a reference to a relation already active;
-- a semantically close continuation that narrows rather than creates a new region.
+- exact phrase required;
+- temporal ordering requested;
+- compare these objects;
+- exclude a prior interpretation;
+- answer from corpus evidence;
+- distinguish publication from reading chronology.
 
-The first inference call may emit operations such as:
+### \(\mathcal{O}_t\) — open tensions
+
+Examples:
+
+- unresolved reference;
+- contradiction;
+- missing comparison dimension;
+- competing framing;
+- recurrent unresolved question;
+- required connection not yet established.
+
+### \(\mathcal{H}_t\) — history and persistence
+
+Records:
+
+- source contributions;
+- prior transformations;
+- reinforcement;
+- recurrence;
+- reframing;
+- supersession;
+- retirement.
+
+### \(\Lambda_t\) — attention lens
+
+Represents current activation over the relational problem space.
+
+The tuple is conceptual.
+
+The implementation may normalize these records across tables or types.
+
+## 5. Boundary contribution as perturbation
+
+For conceptual emphasis:
+
+\[
+B_t \equiv \Delta_t
+\]
+
+The boundary contribution may issue operations such as:
 
 ```text
-add marker
-update marker
-merge into existing marker
-move focus tier
-supersede marker
-retire marker
-resolve reference
+create region
+preserve region
+reinforce region
+extend region
+merge regions
+split region
+connect regions
+disconnect relation
+add constraint
+replace constraint
+open tension
+resolve tension
+redirect attention
+supersede framing
+retire region
 ```
 
-The runtime applies those operations deterministically.
+Every semantic transformation originates in boundary inference.
 
-The runtime does not independently infer semantic similarity.
+The deterministic fold applies it.
 
-Semantic consolidation remains inside the allowed inference site.
+## 6. Coherence
 
-## 6. Bounded aggregation
+A problem region is coherent insofar as it preserves an identifiable relational structure while incorporating new contributions.
 
-Each focus tier and the background aggregate have configurable upper bounds.
+Coherence does not mean remaining unchanged.
 
-The bounds exist to prevent indefinite accumulation.
-
-When a limit is reached, the first inference call must explicitly choose among:
-
-- merge semantically overlapping markers;
-- consolidate a region into a more general boundary marker;
-- demote a marker;
-- supersede a marker;
-- retire a marker;
-- preserve it as unresolved.
-
-The runtime must not silently drop a marker because a count was exceeded.
-
-No numeric relevance score is required.
-
-## 7. Marker lifecycle
-
-A marker may occupy one of these states:
+Examples of coherent transformation:
 
 ```text
-primary
-secondary
-tertiary
+calf diet
+→ temporal change in calf diet
+```
+
+```text
+book chronology
+→ corrected from reading chronology
+→ publication chronology
+```
+
+```text
+implementation concern
+→ recurring concern
+→ refined constraint
+```
+
+A correction may preserve referents while replacing the relation or comparison dimension.
+
+A contradiction may be represented as an open tension rather than erased.
+
+## 7. Coherence non-goals
+
+Problem-space coherence is not initially:
+
+- a numeric score;
+- a confidence probability;
+- an embedding similarity threshold;
+- an automatic decay rate;
+- a truth measure;
+- a retrieval ranking signal;
+- an evidence-admission criterion.
+
+The state history itself records whether a region was reinforced, recurrent, reframed, superseded, or retired.
+
+## 8. Attention lens
+
+The attention lens exposes:
+
+```text
+primary activation
+secondary activation
+tertiary activation
+background activation
+```
+
+These are not four containers.
+
+They are activation bands over the same relational state.
+
+### Primary activation
+
+The immediate problem region being acted on.
+
+### Secondary activation
+
+A live adjacent region that materially informs the primary region.
+
+### Tertiary activation
+
+A lower-priority connected region that remains available for continuation.
+
+### Background activation
+
+Relevant continuity that remains structurally part of the problem gestalt without occupying the current foreground.
+
+A region retains one identity while moving among bands.
+
+## 9. Natural aggregation and deduplication
+
+Semantically continuous contributions aggregate rather than pile up.
+
+A follow-on utterance may:
+
+- reinforce an existing region;
+- extend it with a relation;
+- redirect its focus;
+- replace one constraint;
+- connect it to another region;
+- create a new source occurrence in its history.
+
+The first inference call determines whether this is continuity.
+
+The runtime does not perform semantic merging from vector distance or lexical similarity alone.
+
+Deduplication preserves:
+
+- recurrence count or source history;
+- corrections;
+- relation changes;
+- unresolved tension.
+
+It does not flatten all repetition into one anonymous summary.
+
+## 10. Stable and reorganizing structure
+
+### Persisting structure
+
+Examples:
+
+- canonical referents;
+- explicit user corrections;
+- active distinctions;
+- recurring constraints;
+- unresolved tensions;
+- relations reinforced across turns.
+
+### Reorganizing structure
+
+Examples:
+
+- transient wording;
+- discarded framing;
+- completed local question;
+- redundant paraphrase;
+- stale activation;
+- explicitly corrected interpretation.
+
+The boundary contribution states what is preserved and what is released.
+
+## 11. Lifecycle
+
+A problem region may be:
+
+```text
+active
 background
 unresolved
 superseded
 retired
 ```
 
-These states integrate focus management and lifecycle management.
+Activation band and lifecycle are related but distinct.
 
-### Active states
+Examples:
 
-- primary;
-- secondary;
-- tertiary;
-- background;
-- unresolved.
-
-### Historical states
-
-- superseded;
-- retired.
+- a background region remains active in the gestalt;
+- a superseded region remains in history but is no longer operational;
+- a retired region is no longer part of the current problem gestalt;
+- an unresolved region may be primary, secondary, tertiary, or background.
 
 No automatic numerical decay is used initially.
 
-A marker changes state only through an explicit boundary contribution.
+## 12. Open tensions
 
-## 8. Unresolved references
+Open tensions remain attached to:
 
-Unresolved references remain attached to:
-
-- their source turn;
-- candidate problem regions;
-- the expressions that require resolution.
+- their containing region;
+- source turn;
+- relevant referents;
+- candidate interpretations;
+- the missing or contradictory relation.
 
 They persist until:
 
 - resolved;
-- explicitly abandoned;
 - superseded;
-- or their containing problem region is retired.
+- explicitly abandoned;
+- or their containing region is retired.
 
-The runtime does not resolve references by lexical guessing.
+A problem-space gap means:
 
-Resolution is performed by the first inference call using the prior problem-space state and recent conversational continuity.
+```text
+the current problem representation lacks a required connection
+```
 
-## 9. Continuity presented to synthesis
+It does not mean:
+
+```text
+the corpus contains no answer
+```
+
+## 13. Recurrence
+
+A problem may recur across turns without being duplicated.
+
+The state should preserve:
+
+```text
+one region identity
+multiple source contributions
+recurrent status
+still-open tension
+```
+
+Recurrence is useful structural history.
+
+It must not be erased merely because duplicate topical labels were merged.
+
+## 14. Boundedness
+
+The problem space has configurable upper bounds on:
+
+- active regions;
+- relations;
+- open tensions;
+- background regions;
+- retained source excerpts;
+- contribution material included in model context.
+
+When a bound is approached, boundary inference must explicitly choose among:
+
+- merge;
+- consolidate;
+- demote;
+- supersede;
+- retire;
+- preserve as unresolved.
+
+The runtime must not silently drop a semantic region because a count was exceeded.
+
+## 15. Continuity presented to synthesis
 
 Synthesis receives:
 
-1. the updated problem-space state \(P_t\);
-2. the newest user utterance \(u_t\) as the current focus;
-3. the immediately preceding completed turn:
-   - previous user utterance;
-   - previous assistant answer;
-4. the semantic-access plan;
-5. the retrieval packet;
+1. updated \(P_t\);
+2. newest utterance \(u_t\) as current focus;
+3. immediately preceding completed turn \(v_{t-1}\);
+4. semantic-access plan;
+5. retrieval packet;
 6. execution limits.
 
-The immediately preceding turn is included so a referential utterance does not appear out of the blue.
+The previous turn prevents a referential continuation from appearing out of the blue.
 
-It is labeled as conversational continuity, not retrieval evidence.
+It is labeled as conversational continuity, not corpus evidence.
 
-The full transcript remains persisted and auditable but is not automatically inserted into every synthesis call.
+The full transcript remains persisted and auditable but is not automatically inserted into every synthesis request.
 
-## 10. Seed data contract
+## 16. Seed data contract
 
 ```text
 ProblemSpaceState
     thread_id
     version
+    region_ids[]
+    relation_ids[]
+    constraint_ids[]
+    open_tension_ids[]
     contribution_ids[]
-    primary_focus
-    secondary_focus
-    tertiary_focus
-    background_regions[]
-    active_referents[]
-    active_relations[]
-    active_constraints[]
-    unresolved_references[]
-    superseded_markers[]
-    retired_markers[]
+    attention_lens
     source_turn_range
+```
+
+```text
+ProblemRegion
+    region_id
+    anchor_referents[]
+    relation_ids[]
+    local_constraint_ids[]
+    open_tension_ids[]
+    source_contribution_ids[]
+    persistence_state
+    activation_band
+    supersedes_region_id?
+```
+
+```text
+ProblemRelation
+    relation_id
+    source_region_id
+    relation_type
+    target_region_id?
+    source_contribution_id
+    lifecycle
+```
+
+```text
+OpenTension
+    tension_id
+    region_id
+    tension_type
+    unresolved_expression?
+    candidate_bindings[]
+    source_turn_id
+    lifecycle
+```
+
+```text
+AttentionLens
+    primary_region_ids[]
+    secondary_region_ids[]
+    tertiary_region_ids[]
+    background_region_ids[]
 ```
 
 ```text
@@ -292,70 +522,72 @@ BoundaryContribution
     contribution_id
     source_turn_id
     source_utterance_id
-    focus_operations[]
-    referent_operations[]
+    region_operations[]
     relation_operations[]
     constraint_operations[]
-    reference_resolutions[]
-    consolidation_operations[]
-    lifecycle_operations[]
+    tension_operations[]
+    attention_operations[]
+    preservation_declarations[]
+    release_declarations[]
 ```
 
-Exact field names remain provisional.
+Exact names remain provisional.
 
-## 11. Deterministic fold invariant
+## 17. Deterministic fold authority
 
-The fold function may:
+The fold may:
 
-- validate referenced marker identities;
-- apply declared adds, merges, moves, and retirements;
-- enforce configured upper bounds;
-- reject malformed state operations;
-- preserve history.
+- validate referenced identities;
+- apply declared operations;
+- enforce schema;
+- enforce configured bounds;
+- reject malformed transformations;
+- preserve history;
+- rebuild the active view.
 
 It may not:
 
-- infer whether two concepts are semantically equivalent;
-- generate a replacement summary;
+- infer semantic equivalence;
+- decide which region matters;
 - resolve ambiguous language;
-- decide which topic matters.
+- generate a replacement summary;
+- calculate a coherence score;
+- close an open tension on its own.
 
-Those are responsibilities of inference call 1.
+## 18. Branching
 
-## 12. Branching
-
-Conversation branching behavior is outside the initial kernel contract.
+Conversation-branch behavior remains outside the initial kernel contract.
 
 The kernel requires only:
 
-- each runtime thread has one isolated problem-space state;
+- each runtime thread has isolated problem-space state;
 - a fresh thread begins clean;
 - a continuing thread evolves only from its own history.
 
-Product behavior for cloning state at a UI branch point may be specified later.
+## 19. Examples
 
-## 13. Example
+### 19.1 Calf continuation
 
-### Turn 1
+Turn 1:
 
 ```text
 What did the calf eat?
 ```
 
-Boundary contribution:
+State:
 
 ```text
-primary focus:
+region:
     calf diet
 
-active referent:
+referent:
     calf
 
-active relation:
+relation:
     consumed food
 ```
 
-### Turn 2
+Turn 2:
 
 ```text
 When did that change?
@@ -364,34 +596,90 @@ When did that change?
 Boundary contribution:
 
 ```text
-primary focus:
-    temporal transition in calf diet
-
-continued referent:
+preserve:
     calf
+    calf diet
 
-resolved reference:
+redirect:
+    primary relation → temporal transition
+
+resolve tension:
     "that" → calf diet
 
-prior focus transition:
-    calf diet → secondary/background support
+attention:
+    temporal change → primary
+    prior diet state → supporting relation
 ```
 
-The second turn does not create a duplicate independent marker for `calf diet`.
+One region evolves.
 
-It updates and redirects the existing problem region.
+No duplicate `calf diet` marker is created.
 
-## 14. Acceptance conditions
+### 19.2 Correction
+
+Turn 1:
+
+```text
+Which book did I start first?
+```
+
+Turn 2:
+
+```text
+Sorry, I meant which was published first.
+```
+
+Boundary contribution:
+
+```text
+preserve:
+    compared books
+    comparison structure
+
+supersede:
+    reading chronology
+
+replace constraint:
+    publication chronology
+```
+
+### 19.3 Unresolved dimension
+
+Input:
+
+```text
+Was Capital before Blood Meridian?
+```
+
+Possible state:
+
+```text
+region:
+    Capital/Blood Meridian chronology
+
+open tension:
+    "before" dimension unresolved
+    candidates:
+        publication
+        reading
+```
+
+No false resolution is generated.
+
+## 20. Acceptance conditions
 
 The problem-space contract is acceptable when:
 
-1. contributions are append-only;
-2. the active view is reconstructible;
-3. semantically continuous turns can merge rather than pile up;
-4. focus tiers remain bounded;
-5. no numerical confidence system is required;
-6. no automatic decay silently removes context;
-7. unresolved references remain explicit;
-8. synthesis receives the current utterance, \(P_t\), and the immediately preceding turn;
-9. separate threads cannot share state;
-10. no deterministic component performs semantic consolidation without an inference-issued operation.
+1. the state is relational rather than list-like;
+2. boundary contributions are append-only perturbation records;
+3. the active view is reconstructible;
+4. semantic continuation can transform an existing region;
+5. recurrence is preserved without duplicate accumulation;
+6. attention bands remain views over one state;
+7. no numerical confidence or coherence score is required;
+8. no automatic decay silently removes context;
+9. open tensions remain explicit;
+10. synthesis receives \(P_t\), the newest utterance, and the previous turn;
+11. separate threads cannot share state;
+12. deterministic folding performs no semantic interpretation;
+13. problem-space coherence cannot become a post-retrieval evidence gate.
