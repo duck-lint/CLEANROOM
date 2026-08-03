@@ -109,7 +109,10 @@ fn capital_unit_has_one_subordinate_transport_segment() {
     assert_eq!(segment.segment_ordinal, 0);
     assert_eq!(segment.total_segments, 1);
     assert_eq!(segment.parent_unit_id, capital.unit_id);
-    assert_eq!(segment.reconstruction_group, "reconstruction:capital:chapter-2:2");
+    assert_eq!(
+        segment.reconstruction_group,
+        "reconstruction:capital:chapter-2:2"
+    );
     assert_eq!(segment.segment_id.as_str(), "segment:capital:chapter-2:2:0");
     assert_ne!(segment.segment_id.as_str(), capital.unit_id.as_str());
     assert_eq!(
