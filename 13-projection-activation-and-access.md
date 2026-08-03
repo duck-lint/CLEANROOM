@@ -121,9 +121,10 @@ expansion request
 Example:
 
 ```text
-Capital
+Marx, Karl — Capital
+    canonical identity: source-material UUID
     activated_by:
-        region: Capital/Blood Meridian chronology
+        region: Capital/Blood Meridian source-material chronology
         referent binding: Capital
         attention band: primary
 ```
@@ -280,7 +281,7 @@ continuation handles
 Example:
 
 ```text
-Capital
+Marx, Karl — Capital
     incoming journal occurrences: 300
     incoming book-note occurrences: 12
     outgoing lexicon occurrences: 8
@@ -512,11 +513,11 @@ Problem-space state:
 
 ```text
 region:
-    Capital/Blood Meridian chronology
+    Capital/Blood Meridian source-material chronology
 
 referents:
-    Capital
-    Blood Meridian
+    Marx, Karl — Capital
+    McCarthy, Cormac — Blood Meridian
 
 constraint:
     compare temporal relation
