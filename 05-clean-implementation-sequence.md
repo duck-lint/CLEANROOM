@@ -8,18 +8,17 @@ First implement the clean kernel as its own object.
 
 Existing code is consulted only after the new contracts and tests are accepted.
 
-## Phase 0 — Preserve and isolate
+## Phase 0 — Preserve and isolate repositories
 
-1. Preserve the current accepted runtime under a tag or stable branch.
-2. Create the clean-room branch from that exact commit.
-3. Delete the tracked implementation on the clean branch.
-4. Commit the clean state.
-5. Add only the clean-room documents and Organon.
-6. Freeze legacy development while the clean contracts are being derived.
+1. Preserve the accepted `semantic-traversal` runtime in its existing repository and history.
+2. Keep `duck-lint/CLEANROOM` as an independent repository.
+3. Import no legacy runtime source, orchestration, tests, diagnostics, or implementation plans into `CLEANROOM` during contract derivation.
+4. Add only the Organon, accepted clean-room documents, synthetic fixtures, machine-readable contracts, and new implementation.
+5. Record any later legacy artifact review as an explicit compatibility exercise.
 
 Deliverable:
 
-- a clean branch with repository history but no ambient implementation assumptions.
+- an independent clean-room repository with no ambient implementation assumptions.
 
 ## Phase 1 — Freeze language-neutral contracts
 
@@ -36,6 +35,8 @@ Required seed contracts:
 - `SemanticSpaceProjection`
 - `ActivatedProjection`
 - `SemanticAccessPlan`
+- `SemanticRegion`
+- `TransportSegment`
 - `ConformanceResult`
 - `RetrievalResult`
 - `ExecutionLimits`
@@ -65,10 +66,11 @@ Deliverable:
 
 Before touching the real corpus, create a minimal projection containing:
 
-- two book objects;
-- two dated journal units;
+- two canonical source-material book objects;
+- two dated journal objects with semantic units;
 - one canonical object link;
-- one heading-target link;
+- one heading-region target containing multiple semantic units;
+- one block target resolving to one semantic unit;
 - one person or animal object;
 - one invalid identifier/object combination;
 - exact, lexical, graph, vector, and temporal capabilities.
@@ -78,7 +80,8 @@ The fixture should demonstrate:
 - top-down inheritance;
 - bottom-up occurrence traversal;
 - incoming and outgoing navigation;
-- heading-specific unit addressability;
+- heading-region addressability;
+- block-specific unit addressability;
 - contextual relation participation;
 - invalid structural paths.
 
@@ -252,6 +255,8 @@ Then add one real surface at a time:
 
 Every result must hydrate to canonical semantic units and retain full provenance.
 
+When a technical provider limit requires segmentation, execution may use deterministic transport segments that retain one parent semantic-unit identity. Token or embedding limits may not silently create new semantic units.
+
 No result may be filtered by:
 
 - a generated semantic proposition;
@@ -326,30 +331,33 @@ Deliverable:
 
 Only after the clean kernel passes the synthetic suite:
 
-1. inspect the Organon-derived ingest representation;
-2. build a read-only adapter from persisted corpus facts into `SemanticSpaceProjection`;
-3. compare adapter output against projection requirements;
-4. add missing object/unit/occurrence addressability;
-5. do not import legacy runtime orchestration.
+1. inspect an exported or read-only view of the Organon-derived corpus representation;
+2. define a versioned substrate exchange contract;
+3. build a read-only adapter that translates corpus facts into `SemanticSpaceProjection`;
+4. compare adapter output against projection requirements;
+5. add missing object, region, unit, occurrence, anchor, or surface addressability at the proper substrate or adapter boundary;
+6. do not import legacy runtime orchestration into `CLEANROOM`.
 
 Deliverable:
 
+- versioned substrate exchange contract;
 - real-corpus projection adapter;
 - projection validation report.
 
-## Phase 11 — Evaluate legacy reuse
+## Phase 11 — Evaluate legacy compatibility
 
-Now inspect the old repository.
+Now inspect the existing `semantic-traversal` repository through a bounded compatibility review.
 
-For each component, classify it as:
+For each artifact, classify it as:
 
-- reusable unchanged behind an adapter;
-- reusable after removal of excess authority;
+- a valid external substrate producer;
+- reusable unchanged behind a versioned adapter;
+- reusable only after removal of excess authority;
 - useful only as migration logic;
-- useful only as test evidence;
+- useful only as observational test evidence;
 - having no place in the clean kernel.
 
-No component is preserved for familiarity or sunk cost.
+No component is copied into `CLEANROOM` for familiarity or sunk cost. Any accepted reuse must cross an explicit package, process, or protocol boundary.
 
 ## Phase 12 — Private UAT
 
@@ -385,7 +393,7 @@ Test at least:
 
 Timing is operational telemetry, not acceptance.
 
-## Phase 13 — Replacement decision
+## Phase 13 — Integration decision
 
 Accept the clean runtime only when:
 
@@ -395,4 +403,11 @@ Accept the clean runtime only when:
 - private UAT confirms the architecture;
 - no legacy semantic veto or coherence gate has reappeared.
 
-Then merge the clean branch as an intentional replacement while preserving repository history.
+Then choose an explicit integration strategy between the independent repositories, such as:
+
+- replacing the old runtime package with a released `CLEANROOM` runtime;
+- consuming `CLEANROOM` as a versioned dependency;
+- exposing `CLEANROOM` through a stable service boundary;
+- archiving the legacy runtime after migration.
+
+Repository ancestry need not be merged for the architecture to replace the old runtime.
