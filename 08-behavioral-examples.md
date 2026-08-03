@@ -69,7 +69,7 @@ That equivalence is synthesis work.
 
 ```text
 object: Cleo
-identifier: journal_date
+identifier: journal_entry_date
 surface: temporal
 ```
 
@@ -77,7 +77,7 @@ surface: temporal
 
 ```text
 Cleo
-    does not carry: journal_date
+    does not carry: journal_entry_date
 
 dated journal unit
     may mention or link to: Cleo
@@ -89,33 +89,36 @@ The direct assignment or path is structurally invalid because it is absent from 
 
 A different path through dated contextual units may be valid.
 
-## 4. Capital intrinsic type
+## 4. Canonical source-material identity
 
 ```text
-Capital
-    object_type: book
+Marx, Karl — Capital
+    canonical identity: UUID
+    note_type: source_material
+    format: book
+    creator: Karl Marx
 ```
 
-A semantic-access plan using `book` to address Capital is structurally possible.
+A semantic-access plan may discover this object through `Capital`, `Karl Marx`, `source_material`, or `book`, but execution binds to its canonical UUID rather than treating any discovery surface as the object itself.
 
 ## 5. Capital contextual participation
 
 ```text
-journal unit J1
+journal object or unit J1
     temporal anchor: July 2
-    authored link: [[Capital]]
+    authored link: [[Marx, Karl — Capital]]
 ```
 
-This supports access from the dated journal unit through the authored occurrence to Capital, or from Capital through its incoming occurrence to the dated journal unit.
+This supports access from the dated journal context through the outgoing occurrence to the canonical source-material object, or from that object through its incoming occurrence to the dated journal context and temporal anchor.
 
 It may establish the contextual relation `book_read_today`.
 
-That does not make `book_read_today` an intrinsic type of Capital.
+That does not make `book_read_today` or the journal date an intrinsic identifier of the source-material object.
 
 ## 6. Heading-specific target
 
 ```text
-I reviewed [[Capital#Chapter 2]] today.
+I reviewed [[Marx, Karl — Capital#Chapter 2]] today.
 ```
 
 Expected projection:
@@ -123,7 +126,8 @@ Expected projection:
 ```text
 source unit
 → authored heading occurrence
-→ canonical semantic region in Capital
+→ canonical semantic region in the Capital source-material object
+→ one or more contained semantic units
 ```
 
 Execution must preserve the region or unit identity resolved by the authored target.
@@ -139,9 +143,9 @@ Which did I start first, Capital or Blood Meridian?
 Expected semantic-access structure:
 
 ```text
-Capital ──────────────┐
-                      ├→ contextual dated occurrences → chronology
-Blood Meridian ───────┘
+Marx, Karl — Capital ───────────────┐
+                                      ├→ contextual dated occurrences → chronology
+McCarthy, Cormac — Blood Meridian ───┘
 ```
 
 Execution returns dated units while preserving which canonical target each unit references.
@@ -328,8 +332,7 @@ It does not copy the region into four stores.
 A working projection activates:
 
 ```text
-Capital
-Blood Meridian
+canonical source-material objects for Capital and Blood Meridian
 their dated contextual occurrences
 temporal surfaces
 ```
@@ -371,7 +374,21 @@ Synthesis receives the previous turn as labeled conversational continuity.
 
 It does not treat the previous assistant answer as corpus evidence.
 
-## 18. Provider failure
+## 18. Oversized unit transport
+
+One authored semantic unit exceeds an embedding or provider input limit.
+
+Expected behavior:
+
+```text
+semantic unit U
+→ transport segment U.1
+→ transport segment U.2
+```
+
+Both segments retain the same parent semantic-unit identity and reconstruction order. They do not become two independently authored semantic units.
+
+## 19. Provider failure
 
 If boundary inference fails:
 
