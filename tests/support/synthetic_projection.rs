@@ -5,6 +5,7 @@
 
 use semantic_traversal_core::{
     OccurrenceId, SemanticObjectId, SemanticRegionAddress, SemanticUnitId, TemporalAnchorId,
+    TransportSegmentId,
     model::{AddressKind, Direction, RecordProvenance, RetrievalSurfaceKind, SemanticAddress},
     projection::SemanticSpaceProjection,
     projection::{
@@ -13,9 +14,9 @@ use semantic_traversal_core::{
         IdentifierValue, IdentifierValueShape, OccurrencePresentation, OccurrenceRecord,
         OccurrenceSource, ProjectionValidationStatus, RetrievalSurfaceDescriptor,
         SemanticObjectClassDescriptor, SemanticObjectRecord, SemanticRegionRecord,
-        SemanticUnitContent, SemanticUnitRecord, SourceKind, StructuralTransition,
+        SemanticUnitContent, SemanticUnitRecord, SourceKind, SourceSpan, StructuralTransition,
         StructuralTransitionOperation, SurfaceMatchMode, TemporalAffordance, TemporalAnchorRecord,
-        TemporalValue,
+        TemporalValue, TransportSegmentRecord,
     },
 };
 
@@ -242,6 +243,7 @@ struct UnitInput<'a> {
     outgoing: &'a [&'a str],
     anchors: &'a [&'a str],
     surfaces: &'a [&'a str],
+    transport_segments: Option<TransportSegmentRecord>,
 }
 
 fn unit_record(input: UnitInput<'_>) -> SemanticUnitRecord {
@@ -273,7 +275,7 @@ fn unit_record(input: UnitInput<'_>) -> SemanticUnitRecord {
         temporal_anchor_ids: input.anchors.iter().map(|value| anchor(value)).collect(),
         retrieval_surface_ids: input.surfaces.iter().map(|value| (*value).into()).collect(),
         source_provenance: provenance_unit(&unit_id),
-        transport_segments: vec![],
+        transport_segments: input.transport_segments.into_iter().collect(),
     }
 }
 
@@ -518,6 +520,7 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
             RetrievalSurfaceKind::Temporal,
             vec![
                 AddressKind::SemanticObject,
+                AddressKind::SemanticRegion,
                 AddressKind::SemanticUnit,
                 AddressKind::TemporalAnchor,
                 AddressKind::Identifier,
@@ -819,6 +822,7 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
             outgoing: &[],
             anchors: &[],
             surfaces: common_surfaces,
+            transport_segments: None,
         }),
         unit_record(UnitInput {
             id: "unit:capital:chapter-2:2",
@@ -837,6 +841,19 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
             outgoing: &[],
             anchors: &[],
             surfaces: common_surfaces,
+            transport_segments: Some(TransportSegmentRecord {
+                segment_id: TransportSegmentId::parse("segment:capital:chapter-2:2:0")
+                    .expect("fixture transport identity is non-empty"),
+                parent_unit_id: capital_two.clone(),
+                segment_ordinal: 0,
+                source_span: SourceSpan {
+                    source: "synthetic:Marx, Karl — Capital.md".into(),
+                    start_byte: None,
+                    end_byte: None,
+                },
+                total_segments: 1,
+                reconstruction_group: "reconstruction:capital:chapter-2:2".into(),
+            }),
         }),
         unit_record(UnitInput {
             id: "unit:blood-meridian:chapter-1:1",
@@ -855,6 +872,7 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
             outgoing: &[],
             anchors: &[],
             surfaces: common_surfaces,
+            transport_segments: None,
         }),
         unit_record(UnitInput {
             id: "unit:journal:2026-07-02:1",
@@ -875,6 +893,7 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
             ],
             anchors: &["anchor:journal-one:2026-07-02"],
             surfaces: dated_surfaces,
+            transport_segments: None,
         }),
         unit_record(UnitInput {
             id: "unit:journal:2026-07-15:1",
@@ -891,6 +910,7 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
             outgoing: &["occurrence:journal-two:capital-block"],
             anchors: &["anchor:journal-two:2026-07-15"],
             surfaces: dated_surfaces,
+            transport_segments: None,
         }),
     ];
 

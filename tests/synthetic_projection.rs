@@ -6,8 +6,9 @@ use semantic_traversal_core::{
     SemanticObjectId,
     model::{AddressKind, Direction, RecordProvenance, RetrievalSurfaceKind, SemanticAddress},
     projection::{
-        CoverageSemantics, IdentifierAssignmentMode, OccurrenceSource, SemanticUnitContent,
-        StructuralTransitionOperation, TemporalAffordance, TemporalValue,
+        CoverageSemantics, IdentifierAssignmentMode, IdentifierRole, OccurrenceSource,
+        SemanticUnitContent, StructuralTransitionOperation, SurfaceMatchMode, TemporalAffordance,
+        TemporalValue,
     },
 };
 
@@ -45,6 +46,14 @@ fn fixed_projection_identity_and_exact_fixture_inventory_are_stable() {
     assert_eq!(projection.temporal_anchors.len(), 2);
     assert_eq!(projection.retrieval_surfaces.len(), 5);
     assert_eq!(projection.valid_transitions.len(), 19);
+    assert_eq!(
+        projection
+            .units
+            .iter()
+            .flat_map(|unit| unit.transport_segments.iter())
+            .count(),
+        1
+    );
 
     let marx = projection
         .objects
@@ -62,6 +71,62 @@ fn fixed_projection_identity_and_exact_fixture_inventory_are_stable() {
     assert_ne!(
         marx.object_id,
         SemanticObjectId::parse(MCCARTHY_OBJECT).unwrap()
+    );
+    assert_eq!(marx.object_class, "source_material");
+    for assignment_name in ["title", "creator", "note_type"] {
+        let assignment = projection
+            .identifier_assignments
+            .iter()
+            .find(|assignment| {
+                assignment.subject == SemanticAddress::Object(marx.object_id.clone())
+                    && assignment.identifier_name == assignment_name
+            })
+            .unwrap();
+        assert_ne!(assignment.assignment_id, marx.object_id.to_string());
+        let descriptor = projection
+            .identifier_descriptors
+            .iter()
+            .find(|descriptor| descriptor.identifier_name == assignment_name)
+            .unwrap();
+        assert!(matches!(
+            descriptor.semantic_role,
+            IdentifierRole::CanonicalNaming | IdentifierRole::ObjectClass
+        ));
+    }
+}
+
+#[test]
+fn capital_unit_has_one_subordinate_transport_segment() {
+    let projection = tiny_projection();
+    let capital = projection
+        .units
+        .iter()
+        .find(|unit| unit.unit_id.as_str() == "unit:capital:chapter-2:2")
+        .unwrap();
+    let [segment] = capital.transport_segments.as_slice() else {
+        panic!("Capital fixture must contain exactly one transport segment")
+    };
+    assert_eq!(segment.segment_ordinal, 0);
+    assert_eq!(segment.total_segments, 1);
+    assert_eq!(segment.parent_unit_id, capital.unit_id);
+    assert_eq!(segment.reconstruction_group, "reconstruction:capital:chapter-2:2");
+    assert_eq!(segment.segment_id.as_str(), "segment:capital:chapter-2:2:0");
+    assert_ne!(segment.segment_id.as_str(), capital.unit_id.as_str());
+    assert_eq!(
+        projection
+            .units
+            .iter()
+            .filter(|unit| unit.unit_id == segment.parent_unit_id)
+            .count(),
+        1
+    );
+    assert_eq!(
+        projection
+            .units
+            .iter()
+            .filter(|unit| unit.unit_id.as_str() == segment.segment_id.as_str())
+            .count(),
+        0
     );
 }
 
@@ -598,6 +663,11 @@ fn retrieval_coverage_is_explicitly_exhaustive_or_bounded() {
         assert_eq!(surface.default_candidate_limit, 8);
         assert_eq!(surface.hard_candidate_limit, 32);
         assert!(surface.continuation_supported);
+        assert!(surface.hydrates_to_semantic_units);
+        assert_eq!(
+            surface.technical_limitations,
+            vec!["synthetic fixture only".to_owned()]
+        );
         if kind == RetrievalSurfaceKind::Exact {
             assert_eq!(surface.coverage_semantics, CoverageSemantics::Exhaustive);
             assert!(surface.exhaustive_total_count_supported);
@@ -605,6 +675,125 @@ fn retrieval_coverage_is_explicitly_exhaustive_or_bounded() {
             assert_eq!(surface.coverage_semantics, CoverageSemantics::Bounded);
             assert!(!surface.exhaustive_total_count_supported);
         }
+    }
+}
+
+#[test]
+fn every_retrieval_surface_declares_its_intended_fixture_capability() {
+    let projection = tiny_projection();
+    let expected = [
+        (
+            RetrievalSurfaceKind::Exact,
+            SurfaceMatchMode::Literal,
+            AddressKind::SemanticUnit,
+            CoverageSemantics::Exhaustive,
+            vec![
+                AddressKind::SemanticObject,
+                AddressKind::SemanticRegion,
+                AddressKind::SemanticUnit,
+                AddressKind::Identifier,
+            ],
+            true,
+        ),
+        (
+            RetrievalSurfaceKind::Lexical,
+            SurfaceMatchMode::Terms,
+            AddressKind::SemanticUnit,
+            CoverageSemantics::Bounded,
+            vec![
+                AddressKind::SemanticObject,
+                AddressKind::SemanticRegion,
+                AddressKind::SemanticUnit,
+                AddressKind::Identifier,
+            ],
+            false,
+        ),
+        (
+            RetrievalSurfaceKind::Vector,
+            SurfaceMatchMode::NearestNeighbours,
+            AddressKind::SemanticUnit,
+            CoverageSemantics::Bounded,
+            vec![
+                AddressKind::SemanticObject,
+                AddressKind::SemanticRegion,
+                AddressKind::SemanticUnit,
+            ],
+            false,
+        ),
+        (
+            RetrievalSurfaceKind::Graph,
+            SurfaceMatchMode::Incidence,
+            AddressKind::Occurrence,
+            CoverageSemantics::Bounded,
+            vec![
+                AddressKind::SemanticObject,
+                AddressKind::SemanticRegion,
+                AddressKind::SemanticUnit,
+                AddressKind::Occurrence,
+                AddressKind::Identifier,
+            ],
+            false,
+        ),
+        (
+            RetrievalSurfaceKind::Temporal,
+            SurfaceMatchMode::Temporal,
+            AddressKind::SemanticUnit,
+            CoverageSemantics::Bounded,
+            vec![
+                AddressKind::SemanticObject,
+                AddressKind::SemanticRegion,
+                AddressKind::SemanticUnit,
+                AddressKind::TemporalAnchor,
+                AddressKind::Identifier,
+            ],
+            false,
+        ),
+    ];
+    for (kind, mode, returned, coverage, visible, total_count) in expected {
+        let surface = projection
+            .retrieval_surfaces
+            .iter()
+            .find(|surface| surface.kind == kind)
+            .unwrap();
+        assert!(surface.available);
+        assert_eq!(surface.match_modes, vec![mode]);
+        assert_eq!(surface.returned_identity, returned);
+        assert_eq!(surface.coverage_semantics, coverage);
+        assert_eq!(surface.exhaustive_total_count_supported, total_count);
+        assert_eq!(surface.default_candidate_limit, 8);
+        assert_eq!(surface.hard_candidate_limit, 32);
+        assert!(surface.continuation_supported);
+        assert!(surface.hydrates_to_semantic_units);
+        assert_eq!(
+            surface.technical_limitations,
+            vec!["synthetic fixture only".to_owned()]
+        );
+        assert_eq!(surface.visible_address_kinds, visible);
+    }
+}
+
+#[test]
+fn every_record_surface_membership_matches_named_surface_visibility() {
+    let projection = tiny_projection();
+    let check = |surface_ids: &[String], address_kind: AddressKind| {
+        for surface_id in surface_ids {
+            let surface = projection
+                .retrieval_surfaces
+                .iter()
+                .find(|surface| &surface.surface_id == surface_id)
+                .unwrap();
+            assert!(surface.available);
+            assert!(surface.visible_address_kinds.contains(&address_kind));
+        }
+    };
+    for object in &projection.objects {
+        check(&object.retrieval_surface_ids, AddressKind::SemanticObject);
+    }
+    for region in &projection.regions {
+        check(&region.retrieval_surface_ids, AddressKind::SemanticRegion);
+    }
+    for unit in &projection.units {
+        check(&unit.retrieval_surface_ids, AddressKind::SemanticUnit);
     }
 }
 
