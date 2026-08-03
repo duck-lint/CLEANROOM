@@ -1,0 +1,1028 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RetrievalResult",
+  "description": "Provenance-preserving result of executing one conforming semantic-access plan.\n\nIt retains canonical identity, operation outcomes, returned units, and path provenance. It contains no post-retrieval semantic-admission decision and cannot interpret whether a unit answers the current problem.",
+  "type": "object",
+  "required": [
+    "execution_status",
+    "operation_results",
+    "plan_id",
+    "projection_snapshot_id",
+    "returned_units"
+  ],
+  "properties": {
+    "execution_status": {
+      "description": "Overall mechanical execution status.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/RetrievalExecutionStatus"
+        }
+      ]
+    },
+    "operation_results": {
+      "description": "Per-operation mechanical outcomes.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/OperationExecutionRecord"
+      }
+    },
+    "plan_id": {
+      "description": "Semantic-access plan that was executed.",
+      "type": "string"
+    },
+    "projection_snapshot_id": {
+      "description": "Frozen projection snapshot used by execution.",
+      "type": "string"
+    },
+    "returned_units": {
+      "description": "Canonical semantic units returned by valid operations.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RetrievedSemanticUnit"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "IdentifierAddress": {
+      "description": "Address of an identifier descriptor or assignment.\n\nIt represents a named projected surface and optional represented value. It cannot replace canonical object or unit identity.",
+      "type": "object",
+      "required": [
+        "identifier_name"
+      ],
+      "properties": {
+        "identifier_name": {
+          "description": "Identifier name represented by the projection.",
+          "type": "string"
+        },
+        "represented_value": {
+          "description": "Optional exact represented value used to address one assignment.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "IdentifierValue": {
+      "description": "Value carried by one identifier assignment.\n\nThis is a closed structural union for exchange. It cannot be interpreted as evidence or a relation without its descriptor and provenance.",
+      "oneOf": [
+        {
+          "description": "One string value.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "string"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One signed integer value.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "integer"
+              ]
+            },
+            "value": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One boolean value.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "boolean"
+              ]
+            },
+            "value": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One canonical address value.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "semantic_address"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/SemanticAddress"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Collection of strings.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "strings"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Collection of canonical addresses.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "semantic_addresses"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/SemanticAddress"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "OperationExecutionRecord": {
+      "description": "Mechanical outcome of one plan operation.\n\nIt records obligation, completion, returned identities, and exact failure when present. It cannot judge semantic adequacy.",
+      "type": "object",
+      "required": [
+        "inspected_candidate_count",
+        "operation_id",
+        "requirement",
+        "returned_unit_ids",
+        "status"
+      ],
+      "properties": {
+        "inspected_candidate_count": {
+          "description": "Count of candidates inspected mechanically.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "operation_id": {
+          "description": "Plan operation identity.",
+          "type": "string"
+        },
+        "requirement": {
+          "description": "Required or optional execution obligation.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Requirement"
+            }
+          ]
+        },
+        "returned_unit_ids": {
+          "description": "Canonical unit identities returned by this operation.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "description": "Mechanical operation status.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/OperationExecutionStatus"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "OperationExecutionStatus": {
+      "description": "Mechanical status of one executed operation.\n\nVariants distinguish success, zero matches, unavailable surfaces, bounded truncation, and failure without introducing a semantic conclusion.",
+      "oneOf": [
+        {
+          "description": "Operation completed and may have returned one or more units.",
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "completed"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Operation completed successfully with zero matches.",
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "completed_zero_matches"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Operation returned a deterministic bounded subset.",
+          "type": "object",
+          "required": [
+            "reason",
+            "status"
+          ],
+          "properties": {
+            "reason": {
+              "description": "Stable mechanical truncation reason.",
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "truncated"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Required retrieval surface was unavailable.",
+          "type": "object",
+          "required": [
+            "status",
+            "surface_id"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "surface_unavailable"
+              ]
+            },
+            "surface_id": {
+              "description": "Concrete unavailable surface identity.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Operation failed for a stated technical reason.",
+          "type": "object",
+          "required": [
+            "reason",
+            "status"
+          ],
+          "properties": {
+            "reason": {
+              "description": "Exact technical failure description.",
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "failed"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "RecordProvenance": {
+      "description": "Provenance of a projected or retrieved fact.\n\nIt records where a fact was materialized from. It may not upgrade source authority or turn contextual participation into intrinsic typing.",
+      "oneOf": [
+        {
+          "description": "Frontmatter field on a canonical source object.",
+          "type": "object",
+          "required": [
+            "field_path",
+            "kind",
+            "object_id"
+          ],
+          "properties": {
+            "field_path": {
+              "description": "Authored field path.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "object_field"
+              ]
+            },
+            "object_id": {
+              "description": "Canonical object that owns the field.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Authored body span inside a canonical semantic unit.",
+          "type": "object",
+          "required": [
+            "kind",
+            "unit_id"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "semantic_unit"
+              ]
+            },
+            "source_span": {
+              "description": "Optional exact source span.",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/SourceSpan"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unit_id": {
+              "description": "Canonical semantic unit containing the source.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Deterministically materialized structural record.",
+          "type": "object",
+          "required": [
+            "kind",
+            "rule",
+            "sources"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "materialization"
+              ]
+            },
+            "rule": {
+              "description": "Named materialization rule or contract source.",
+              "type": "string"
+            },
+            "sources": {
+              "description": "Source record addresses used by the rule.",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/SemanticAddress"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Requirement": {
+      "description": "Execution obligation attached to a plan operation or requested output.\n\nIt states whether failure affects support for the requested route. It does not determine truth or semantic adequacy.",
+      "oneOf": [
+        {
+          "description": "Failure must be reported as affecting the requested route.",
+          "type": "string",
+          "enum": [
+            "required"
+          ]
+        },
+        {
+          "description": "Failure is recorded but need not invalidate the primary route.",
+          "type": "string",
+          "enum": [
+            "optional"
+          ]
+        }
+      ]
+    },
+    "RetrievalExecutionStatus": {
+      "description": "Mechanical completion status of retrieval execution.\n\nIt reports execution state only. Provider or surface failure must not be represented as a semantic conclusion.",
+      "oneOf": [
+        {
+          "description": "Every requested operation completed.",
+          "type": "string",
+          "enum": [
+            "complete"
+          ]
+        },
+        {
+          "description": "Some operations completed and exact failures are recorded.",
+          "type": "string",
+          "enum": [
+            "partial"
+          ]
+        },
+        {
+          "description": "No requested operation completed successfully.",
+          "type": "string",
+          "enum": [
+            "failed"
+          ]
+        }
+      ]
+    },
+    "RetrievalProvenance": {
+      "description": "Provenance of one retrieval route that returned a canonical semantic unit.\n\nIt records surface, path, operation, traversed addresses, occurrences, and anchors. It cannot score or interpret the returned content.",
+      "type": "object",
+      "required": [
+        "occurrence_ids",
+        "operation_id",
+        "path_id",
+        "surface_id",
+        "temporal_anchor_ids",
+        "traversed_addresses"
+      ],
+      "properties": {
+        "occurrence_ids": {
+          "description": "Authored occurrences traversed by the route.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "operation_id": {
+          "description": "Plan operation identity.",
+          "type": "string"
+        },
+        "path_id": {
+          "description": "Traversal path identity.",
+          "type": "string"
+        },
+        "surface_id": {
+          "description": "Concrete retrieval-surface identity.",
+          "type": "string"
+        },
+        "temporal_anchor_ids": {
+          "description": "Temporal anchors traversed by the route.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "traversed_addresses": {
+          "description": "Canonical addresses traversed in order.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SemanticAddress"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "RetrievalSurfaceAddress": {
+      "description": "Address of a retrieval-surface descriptor.\n\nIt names a projected capability only. It does not execute the surface or imply that the surface is available for a particular address.",
+      "type": "object",
+      "required": [
+        "surface_id"
+      ],
+      "properties": {
+        "surface_id": {
+          "description": "Snapshot-local retrieval-surface identifier.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RetrievedIdentifierAssignment": {
+      "description": "Identifier assignment retained on a retrieved canonical unit.\n\nIt preserves inheritance and source provenance. It cannot retype the unit or parent object beyond the frozen projection assignment.",
+      "type": "object",
+      "required": [
+        "assignment_id",
+        "identifier_name",
+        "provenance",
+        "value"
+      ],
+      "properties": {
+        "assignment_id": {
+          "description": "Projection assignment identity.",
+          "type": "string"
+        },
+        "identifier_name": {
+          "description": "Admitted identifier name.",
+          "type": "string"
+        },
+        "provenance": {
+          "description": "Original assignment provenance.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/RecordProvenance"
+            }
+          ]
+        },
+        "value": {
+          "description": "Structured represented value.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/IdentifierValue"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "RetrievedSemanticUnit": {
+      "description": "One canonical semantic unit returned by deterministic execution.\n\nIt preserves canonical unit, object, and region identity; authored content; identifiers and provenance; occurrences; anchors; paths; surfaces; and any subordinate transport segments. It cannot be semantically admitted or rejected inside this deterministic contract.",
+      "type": "object",
+      "required": [
+        "authored_content",
+        "identifier_assignments",
+        "incoming_occurrence_ids",
+        "outgoing_occurrence_ids",
+        "parent_object_id",
+        "parent_region_address",
+        "retrieval_provenance",
+        "temporal_anchors",
+        "transport_segment_provenance",
+        "unit_id"
+      ],
+      "properties": {
+        "authored_content": {
+          "description": "Raw authored Markdown or source block materialized by execution.",
+          "type": "string"
+        },
+        "identifier_assignments": {
+          "description": "Inherited and unit-local identifier values with provenance.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RetrievedIdentifierAssignment"
+          }
+        },
+        "incoming_occurrence_ids": {
+          "description": "Incoming occurrence identities targeting this unit.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outgoing_occurrence_ids": {
+          "description": "Authored outgoing occurrence identities.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "parent_object_id": {
+          "description": "Canonical parent semantic object identity.",
+          "type": "string"
+        },
+        "parent_region_address": {
+          "description": "Canonical authored region address.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/SemanticRegionAddress"
+            }
+          ]
+        },
+        "retrieval_provenance": {
+          "description": "Access-path and retrieval-surface provenance.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RetrievalProvenance"
+          }
+        },
+        "temporal_anchors": {
+          "description": "Temporal anchors preserved with value and provenance.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RetrievedTemporalAnchor"
+          }
+        },
+        "transport_segment_provenance": {
+          "description": "Technical segment provenance used to reconstruct this canonical unit.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TransportSegmentProvenance"
+          }
+        },
+        "unit_id": {
+          "description": "Canonical semantic-unit identity.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RetrievedTemporalAnchor": {
+      "description": "Temporal anchor retained on a retrieved canonical unit.\n\nIt preserves source identity and value only. It does not evaluate chronology or transfer a contextual anchor to another object.",
+      "type": "object",
+      "required": [
+        "anchor_id",
+        "provenance",
+        "value"
+      ],
+      "properties": {
+        "anchor_id": {
+          "description": "Canonical temporal-anchor identity.",
+          "type": "string"
+        },
+        "provenance": {
+          "description": "Original anchor provenance.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/RecordProvenance"
+            }
+          ]
+        },
+        "value": {
+          "description": "Structured represented temporal value.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/TemporalValue"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "SemanticAddress": {
+      "description": "Canonical or projected address used by plans and provenance records.\n\nIt can point only to represented address categories. It does not prove that the target exists in a given snapshot; structural conformance owns that later check.",
+      "oneOf": [
+        {
+          "description": "Canonical semantic object.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "object"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Canonical semantic unit.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "unit"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Authored semantic region.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "region"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/SemanticRegionAddress"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Identifier assignment or descriptor.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "identifier"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/IdentifierAddress"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Authored occurrence.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "occurrence"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Temporal anchor.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "temporal_anchor"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Retrieval surface.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "retrieval_surface"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/RetrievalSurfaceAddress"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SemanticRegionAddress": {
+      "description": "Address of an authored structural region inside one semantic object.\n\nThe address preserves both the canonical parent object and a non-empty authored structural address. It has no authority to select a unit, infer a heading target, or treat the region as a separate epistemic object class.",
+      "type": "object",
+      "required": [
+        "authored_structural_address",
+        "object_id"
+      ],
+      "properties": {
+        "authored_structural_address": {
+          "description": "Non-empty authored heading, block, or structural address.",
+          "type": "string"
+        },
+        "object_id": {
+          "description": "Canonical parent semantic object.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SourceSpan": {
+      "description": "Authored or materialized source span.\n\nThis is provenance for a represented record. It cannot reinterpret the source or establish semantic relevance.",
+      "type": "object",
+      "required": [
+        "source"
+      ],
+      "properties": {
+        "end_byte": {
+          "description": "Exclusive ending byte offset when known.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "source": {
+          "description": "Source path or stable source identity.",
+          "type": "string"
+        },
+        "start_byte": {
+          "description": "Inclusive starting byte offset when known.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "TemporalValue": {
+      "description": "Structured temporal value represented by a temporal anchor.\n\nIt preserves authored precision and does not perform ordering or inference.",
+      "oneOf": [
+        {
+          "description": "Calendar date in ISO-like authored form.",
+          "type": "object",
+          "required": [
+            "precision",
+            "value"
+          ],
+          "properties": {
+            "precision": {
+              "type": "string",
+              "enum": [
+                "date"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Date and time with an explicit offset or zone in authored form.",
+          "type": "object",
+          "required": [
+            "precision",
+            "value"
+          ],
+          "properties": {
+            "precision": {
+              "type": "string",
+              "enum": [
+                "date_time"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Calendar year.",
+          "type": "object",
+          "required": [
+            "precision",
+            "value"
+          ],
+          "properties": {
+            "precision": {
+              "type": "string",
+              "enum": [
+                "year"
+              ]
+            },
+            "value": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Relative or source-defined ordinal.",
+          "type": "object",
+          "required": [
+            "precision",
+            "value"
+          ],
+          "properties": {
+            "precision": {
+              "type": "string",
+              "enum": [
+                "ordinal"
+              ]
+            },
+            "value": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Named temporal label when no stronger syntax is admitted.",
+          "type": "object",
+          "required": [
+            "precision",
+            "value"
+          ],
+          "properties": {
+            "precision": {
+              "type": "string",
+              "enum": [
+                "label"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TransportSegmentProvenance": {
+      "description": "Provenance for a technical transport segment used during execution.\n\nIt remains subordinate to one canonical semantic unit and may not be promoted into an independent evidence identity.",
+      "type": "object",
+      "required": [
+        "segment_id",
+        "segment_ordinal",
+        "total_segments"
+      ],
+      "properties": {
+        "segment_id": {
+          "description": "Technical transport-segment identity.",
+          "type": "string"
+        },
+        "segment_ordinal": {
+          "description": "Zero-based deterministic reconstruction ordinal.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "total_segments": {
+          "description": "Total segment count used for complete reconstruction.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

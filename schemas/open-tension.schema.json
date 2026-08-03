@@ -1,0 +1,216 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OpenTension",
+  "description": "One explicit unresolved tension in the problem representation.\n\nIt preserves ambiguity, contradiction, or a missing relation without false resolution. It does not imply that the corpus lacks an answer and cannot close itself.",
+  "type": "object",
+  "required": [
+    "candidate_bindings",
+    "lifecycle",
+    "region_id",
+    "source_turn_id",
+    "tension_id",
+    "tension_type"
+  ],
+  "properties": {
+    "candidate_bindings": {
+      "description": "Candidate bindings or interpretations preserved without selection.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "lifecycle": {
+      "description": "Current lifecycle of the tension.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/TensionLifecycle"
+        }
+      ]
+    },
+    "region_id": {
+      "description": "Containing problem-region identity.",
+      "type": "string"
+    },
+    "source_turn_id": {
+      "description": "Source turn that introduced the tension.",
+      "type": "string"
+    },
+    "tension_id": {
+      "description": "Stable tension identity within the thread.",
+      "type": "string"
+    },
+    "tension_type": {
+      "description": "Declared tension category.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/OpenTensionType"
+        }
+      ]
+    },
+    "unresolved_expression": {
+      "description": "Source expression retained when useful for later interpretation.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "OpenTensionType": {
+      "description": "Declared categories of unresolved problem-space tension.\n\nA category preserves the kind of unresolved structure without choosing a candidate interpretation or making a corpus-absence claim.",
+      "oneOf": [
+        {
+          "description": "A referent remains unresolved.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "unresolved_reference"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Two represented commitments or framings conflict.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "contradiction"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "A requested comparison dimension remains unspecified.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "missing_comparison_dimension"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Multiple framings remain live.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "competing_framing"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "A recurrent question remains unresolved across contributions.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "recurrent_unresolved_question"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "The current problem representation lacks a required connection.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "required_connection_missing"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Named tension declared by boundary inference.",
+          "type": "object",
+          "required": [
+            "kind",
+            "name"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "declared"
+              ]
+            },
+            "name": {
+              "description": "Declared tension name.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TensionLifecycle": {
+      "description": "Lifecycle of an open-tension record.\n\nIt records thread history only. A deterministic component may not change the lifecycle without an accepted declaration.",
+      "oneOf": [
+        {
+          "description": "Still unresolved and operational.",
+          "type": "string",
+          "enum": [
+            "open"
+          ]
+        },
+        {
+          "description": "Declared resolved by boundary inference.",
+          "type": "string",
+          "enum": [
+            "resolved"
+          ]
+        },
+        {
+          "description": "Replaced by another framing or tension.",
+          "type": "string",
+          "enum": [
+            "superseded"
+          ]
+        },
+        {
+          "description": "Explicitly abandoned.",
+          "type": "string",
+          "enum": [
+            "abandoned"
+          ]
+        }
+      ]
+    }
+  }
+}

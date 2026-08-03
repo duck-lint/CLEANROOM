@@ -1,0 +1,1572 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SemanticAccessPlan",
+  "description": "Proposed typed access graph over one frozen semantic projection snapshot.\n\nIt preserves problem-space provenance, canonical address bindings, branching traversal paths, joins, output obligations, coverage requirements, and snapshot identity. It has no authority to execute, repair, judge meaning, or mark the underlying problem resolved.",
+  "type": "object",
+  "required": [
+    "address_bindings",
+    "configuration_snapshot_id",
+    "constraint_bindings",
+    "coverage_requirements",
+    "focus_utterance_id",
+    "joins",
+    "open_tension_bindings",
+    "plan_id",
+    "problem_region_bindings",
+    "problem_space_provenance",
+    "problem_space_version",
+    "projection_snapshot_id",
+    "relation_bindings",
+    "requested_outputs",
+    "traversal_paths"
+  ],
+  "properties": {
+    "address_bindings": {
+      "description": "Named canonical address bindings used by path operations.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/AddressBinding"
+      }
+    },
+    "configuration_snapshot_id": {
+      "description": "Configuration snapshot governing bounds and enabled surfaces.",
+      "type": "string"
+    },
+    "constraint_bindings": {
+      "description": "Bindings from active constraints to operation obligations.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ConstraintBinding"
+      }
+    },
+    "coverage_requirements": {
+      "description": "Measurable execution and coverage obligations.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CoverageRequirement"
+      }
+    },
+    "focus_utterance_id": {
+      "description": "Newest utterance identity that remains the plan focus.",
+      "type": "string"
+    },
+    "joins": {
+      "description": "Explicit joins that reassemble path outputs.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PlanJoin"
+      }
+    },
+    "open_tension_bindings": {
+      "description": "Bindings from open tensions to access objectives without resolution.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/OpenTensionBinding"
+      }
+    },
+    "plan_id": {
+      "description": "Stable plan identity.",
+      "type": "string"
+    },
+    "problem_region_bindings": {
+      "description": "Bindings from problem regions to canonical projected addresses.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ProblemRegionBinding"
+      }
+    },
+    "problem_space_provenance": {
+      "description": "Thread and contribution provenance for the accepted problem space.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ProblemSpacePlanProvenance"
+        }
+      ]
+    },
+    "problem_space_version": {
+      "description": "Accepted problem-space version used to construct the plan.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "projection_snapshot_id": {
+      "description": "Frozen projection snapshot against which the plan must conform.",
+      "type": "string"
+    },
+    "relation_bindings": {
+      "description": "Bindings from problem relations to represented paths or transitions.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ProblemRelationBinding"
+      }
+    },
+    "requested_outputs": {
+      "description": "Required and optional outputs requested from execution.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RequestedOutput"
+      }
+    },
+    "traversal_paths": {
+      "description": "Directed paths that may branch independently.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/TraversalPath"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "AddressBinding": {
+      "description": "Named canonical address binding used by plan operations.\n\nIt connects a planning label to a projected address. It does not establish structural existence; conformance owns that check.",
+      "type": "object",
+      "required": [
+        "address",
+        "binding_id",
+        "problem_space_provenance"
+      ],
+      "properties": {
+        "address": {
+          "description": "Canonical or projected address proposed by semantic-access inference.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/SemanticAddress"
+            }
+          ]
+        },
+        "binding_id": {
+          "description": "Stable plan-local binding identity.",
+          "type": "string"
+        },
+        "problem_space_provenance": {
+          "description": "Problem-space sources that motivated this binding.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProblemSpaceReference"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConstraintBinding": {
+      "description": "Binding from an active problem constraint to plan operations.\n\nIt declares required or optional structural work. It cannot enforce the constraint or determine semantic truth.",
+      "type": "object",
+      "required": [
+        "constraint_id",
+        "operation_ids",
+        "requirement"
+      ],
+      "properties": {
+        "constraint_id": {
+          "description": "Thread-local constraint identity.",
+          "type": "string"
+        },
+        "operation_ids": {
+          "description": "Operations that operationalize the declared structural obligation.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requirement": {
+          "description": "Requirement attached to the binding.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Requirement"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "CoverageRequirement": {
+      "description": "Measurable coverage obligation requested by a plan.\n\nIt constrains later claim scope and execution reporting. It cannot interpret returned units or authorize a claim before measurement completes.",
+      "type": "object",
+      "required": [
+        "coverage_requirement_id",
+        "kind",
+        "requirement"
+      ],
+      "properties": {
+        "coverage_requirement_id": {
+          "description": "Stable plan-local requirement identity.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Measurable coverage condition.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/CoverageRequirementKind"
+            }
+          ]
+        },
+        "requirement": {
+          "description": "Required or optional obligation.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Requirement"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "CoverageRequirementKind": {
+      "description": "Coverage conditions available to a semantic-access plan.\n\nThese conditions are mechanical execution requirements, not semantic gates.",
+      "oneOf": [
+        {
+          "description": "Complete exact eligible-scope enumeration and total count.",
+          "type": "object",
+          "required": [
+            "eligible_scope_binding_ids",
+            "kind",
+            "surface_id"
+          ],
+          "properties": {
+            "eligible_scope_binding_ids": {
+              "description": "Binding identities defining eligible scope.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "exhaustive_exact"
+              ]
+            },
+            "surface_id": {
+              "description": "Surface identity that must support exhaustive exact execution.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Required graph depth within configured maxima.",
+          "type": "object",
+          "required": [
+            "depth",
+            "kind"
+          ],
+          "properties": {
+            "depth": {
+              "description": "Required completed depth.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "graph_depth"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Required completion of specified operations.",
+          "type": "object",
+          "required": [
+            "kind",
+            "operation_ids"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "operations_completed"
+              ]
+            },
+            "operation_ids": {
+              "description": "Operation identities that must complete.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Required temporal range coverage.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "end": {
+              "description": "Inclusive upper bound.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "temporal_range"
+              ]
+            },
+            "start": {
+              "description": "Inclusive lower bound.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Direction": {
+      "description": "Explicit direction for a represented structural connection.\n\nDirection authorizes no traversal by itself; it is valid only when the projection represents the requested incidence.",
+      "oneOf": [
+        {
+          "description": "Move from source incidence toward its represented target.",
+          "type": "string",
+          "enum": [
+            "outgoing"
+          ]
+        },
+        {
+          "description": "Move from a target toward represented incoming incidence.",
+          "type": "string",
+          "enum": [
+            "incoming"
+          ]
+        }
+      ]
+    },
+    "IdentifierAddress": {
+      "description": "Address of an identifier descriptor or assignment.\n\nIt represents a named projected surface and optional represented value. It cannot replace canonical object or unit identity.",
+      "type": "object",
+      "required": [
+        "identifier_name"
+      ],
+      "properties": {
+        "identifier_name": {
+          "description": "Identifier name represented by the projection.",
+          "type": "string"
+        },
+        "represented_value": {
+          "description": "Optional exact represented value used to address one assignment.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "JoinOperation": {
+      "description": "Mechanical join operations admitted by the plan contract.\n\nThese variants preserve branch topology without interpreting evidence.",
+      "oneOf": [
+        {
+          "description": "Preserve inputs as separate grouped branches.",
+          "type": "string",
+          "enum": [
+            "group"
+          ]
+        },
+        {
+          "description": "Concatenate outputs while preserving provenance.",
+          "type": "string",
+          "enum": [
+            "concatenate"
+          ]
+        },
+        {
+          "description": "Order already materialized temporal records.",
+          "type": "string",
+          "enum": [
+            "temporal_order"
+          ]
+        }
+      ]
+    },
+    "OpenTensionBinding": {
+      "description": "Binding from one open tension to an access objective.\n\nIt may preserve multiple candidate routes. It cannot choose an interpretation, resolve the tension, or infer corpus absence.",
+      "type": "object",
+      "required": [
+        "candidate_binding_ids",
+        "requested_output_ids",
+        "tension_id"
+      ],
+      "properties": {
+        "candidate_binding_ids": {
+          "description": "Candidate address bindings or path outputs relevant to the tension.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requested_output_ids": {
+          "description": "Requested output identities intended to inform later synthesis.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tension_id": {
+          "description": "Thread-local open-tension identity.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OperationConstraints": {
+      "description": "Mechanical operation constraints attached to one plan operation.\n\nThey remain subordinate to the configuration snapshot and do not express semantic confidence or relevance thresholds.",
+      "type": "object",
+      "required": [
+        "eligible_scope_binding_ids"
+      ],
+      "properties": {
+        "eligible_scope_binding_ids": {
+          "description": "Optional exact object or region scope binding identities.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "maximum_candidates": {
+          "description": "Requested maximum candidate count when applicable.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "maximum_depth": {
+          "description": "Requested maximum structural depth when applicable.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlanJoin": {
+      "description": "Join that reassembles outputs from branching traversal paths.\n\nIt records graph topology and grouping intent only. It does not compare meaning or synthesize a conclusion.",
+      "type": "object",
+      "required": [
+        "input_bindings",
+        "join_id",
+        "operation",
+        "output_binding"
+      ],
+      "properties": {
+        "input_bindings": {
+          "description": "Input output-bindings from one or more branches.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "join_id": {
+          "description": "Stable plan-local join identity.",
+          "type": "string"
+        },
+        "operation": {
+          "description": "Mechanical join operation.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/JoinOperation"
+            }
+          ]
+        },
+        "output_binding": {
+          "description": "Output binding produced by the join.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlanOperation": {
+      "description": "One typed operation requested by a semantic-access plan.\n\nIt preserves obligation, inputs, structural operation, bounds, and output. It cannot execute, repair itself, or make a semantic judgment.",
+      "type": "object",
+      "required": [
+        "constraints",
+        "input_bindings",
+        "operation",
+        "operation_id",
+        "output_binding",
+        "requirement"
+      ],
+      "properties": {
+        "constraints": {
+          "description": "Configured or requested mechanical bounds.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/OperationConstraints"
+            }
+          ]
+        },
+        "input_bindings": {
+          "description": "Input bindings consumed by the operation.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "operation": {
+          "description": "Typed structural or retrieval-surface operation.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/PlanOperationType"
+            }
+          ]
+        },
+        "operation_id": {
+          "description": "Stable plan-local operation identity.",
+          "type": "string"
+        },
+        "output_binding": {
+          "description": "Named output binding emitted by the operation.",
+          "type": "string"
+        },
+        "requirement": {
+          "description": "Whether failure affects support for the requested route.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Requirement"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlanOperationType": {
+      "description": "Typed operation families available to a semantic-access plan.\n\nVariants describe represented structural requests. They do not implement traversal, retrieval, temporal interpretation, hydration, or repair.",
+      "oneOf": [
+        {
+          "description": "Follow one represented structural connection.",
+          "type": "object",
+          "required": [
+            "direction",
+            "kind",
+            "transition_id"
+          ],
+          "properties": {
+            "direction": {
+              "description": "Explicit incoming or outgoing direction.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Direction"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "follow_connection"
+              ]
+            },
+            "transition_id": {
+              "description": "Projection transition identity to follow.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Invoke one represented retrieval surface.",
+          "type": "object",
+          "required": [
+            "kind",
+            "match_mode",
+            "query",
+            "surface_id",
+            "surface_kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "search_surface"
+              ]
+            },
+            "match_mode": {
+              "description": "Match mode supported by the surface descriptor.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/SurfaceMatchMode"
+                }
+              ]
+            },
+            "query": {
+              "description": "Typed query payload.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/SurfaceQuery"
+                }
+              ]
+            },
+            "surface_id": {
+              "description": "Concrete projected retrieval-surface identity.",
+              "type": "string"
+            },
+            "surface_kind": {
+              "description": "Surface family for stable inspection.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/RetrievalSurfaceKind"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Hydrate projected results to canonical semantic units.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "hydrate_semantic_units"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Evaluate represented temporal anchors mechanically.",
+          "type": "object",
+          "required": [
+            "evaluation",
+            "kind"
+          ],
+          "properties": {
+            "evaluation": {
+              "description": "Requested temporal operation.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/TemporalEvaluation"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "evaluate_temporal"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ProblemRegionBinding": {
+      "description": "Binding from one problem region to canonical projected addresses.\n\nIt records exploratory resolution provenance but cannot assert that the binding answers the region or close an attached tension.",
+      "type": "object",
+      "required": [
+        "address_binding_ids",
+        "problem_region_id",
+        "rationale"
+      ],
+      "properties": {
+        "address_binding_ids": {
+          "description": "Canonical projected addresses resolved for the region.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "problem_region_id": {
+          "description": "Thread-local problem-region identity.",
+          "type": "string"
+        },
+        "rationale": {
+          "description": "Planning rationale retained for audit.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProblemRelationBinding": {
+      "description": "Binding from a problem-space relation to represented paths or transitions.\n\nIt preserves planning provenance only and does not create a corpus relation.",
+      "type": "object",
+      "required": [
+        "problem_relation_id",
+        "transition_ids",
+        "traversal_path_ids"
+      ],
+      "properties": {
+        "problem_relation_id": {
+          "description": "Thread-local problem-relation identity.",
+          "type": "string"
+        },
+        "transition_ids": {
+          "description": "Projection transition identities used by those paths.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "traversal_path_ids": {
+          "description": "Traversal paths selected to inspect represented structure.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProblemSpacePlanProvenance": {
+      "description": "Provenance of the problem-space state used for planning.\n\nIt supports inspection of why a plan exists. It is not corpus evidence and does not permit the plan to rewrite problem-space state.",
+      "type": "object",
+      "required": [
+        "contribution_ids",
+        "thread_id"
+      ],
+      "properties": {
+        "contribution_ids": {
+          "description": "Boundary contributions represented in the current planning context.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "thread_id": {
+          "description": "Thread identity owning the problem-space state.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProblemSpaceReference": {
+      "description": "Thread-local problem-space source referenced by a plan record.\n\nIt is provenance for planning and cannot be treated as corpus evidence or a canonical semantic address.",
+      "oneOf": [
+        {
+          "description": "Problem-region identity.",
+          "type": "object",
+          "required": [
+            "id",
+            "kind"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "region"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Problem-relation identity.",
+          "type": "object",
+          "required": [
+            "id",
+            "kind"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "relation"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Problem-constraint identity.",
+          "type": "object",
+          "required": [
+            "id",
+            "kind"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "constraint"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Open-tension identity.",
+          "type": "object",
+          "required": [
+            "id",
+            "kind"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "open_tension"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "RequestedOutput": {
+      "description": "Requested execution output and obligation.\n\nIt controls materialized packet shape but does not prescribe the final answer or judge whether an output is semantically sufficient.",
+      "type": "object",
+      "required": [
+        "kind",
+        "output_id",
+        "requirement",
+        "source_binding"
+      ],
+      "properties": {
+        "kind": {
+          "description": "Requested materialized shape.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/RequestedOutputKind"
+            }
+          ]
+        },
+        "output_id": {
+          "description": "Stable plan-local output identity.",
+          "type": "string"
+        },
+        "requirement": {
+          "description": "Required or optional execution obligation.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Requirement"
+            }
+          ]
+        },
+        "source_binding": {
+          "description": "Binding from which the output must be materialized.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RequestedOutputKind": {
+      "description": "Output shapes a semantic-access plan may request.\n\nVariants control execution materialization only and do not define a final natural-language response.",
+      "oneOf": [
+        {
+          "description": "Canonical semantic units.",
+          "type": "string",
+          "enum": [
+            "semantic_units"
+          ]
+        },
+        {
+          "description": "Canonical semantic-object identities.",
+          "type": "string",
+          "enum": [
+            "semantic_object_identities"
+          ]
+        },
+        {
+          "description": "Canonical semantic-unit identities.",
+          "type": "string",
+          "enum": [
+            "semantic_unit_identities"
+          ]
+        },
+        {
+          "description": "Canonical authored semantic regions.",
+          "type": "string",
+          "enum": [
+            "semantic_regions"
+          ]
+        },
+        {
+          "description": "Occurrence paths with provenance.",
+          "type": "string",
+          "enum": [
+            "occurrence_paths"
+          ]
+        },
+        {
+          "description": "Temporal-anchor records.",
+          "type": "string",
+          "enum": [
+            "temporal_anchors"
+          ]
+        },
+        {
+          "description": "Evidence grouped by canonical object.",
+          "type": "string",
+          "enum": [
+            "grouped_by_object"
+          ]
+        },
+        {
+          "description": "Mechanically ordered output.",
+          "type": "string",
+          "enum": [
+            "ordered_evidence"
+          ]
+        },
+        {
+          "description": "Exhaustive exact total count when supported.",
+          "type": "string",
+          "enum": [
+            "total_exact_count"
+          ]
+        },
+        {
+          "description": "Surface and path provenance.",
+          "type": "string",
+          "enum": [
+            "surface_provenance"
+          ]
+        }
+      ]
+    },
+    "Requirement": {
+      "description": "Execution obligation attached to a plan operation or requested output.\n\nIt states whether failure affects support for the requested route. It does not determine truth or semantic adequacy.",
+      "oneOf": [
+        {
+          "description": "Failure must be reported as affecting the requested route.",
+          "type": "string",
+          "enum": [
+            "required"
+          ]
+        },
+        {
+          "description": "Failure is recorded but need not invalidate the primary route.",
+          "type": "string",
+          "enum": [
+            "optional"
+          ]
+        }
+      ]
+    },
+    "RetrievalSurfaceAddress": {
+      "description": "Address of a retrieval-surface descriptor.\n\nIt names a projected capability only. It does not execute the surface or imply that the surface is available for a particular address.",
+      "type": "object",
+      "required": [
+        "surface_id"
+      ],
+      "properties": {
+        "surface_id": {
+          "description": "Snapshot-local retrieval-surface identifier.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RetrievalSurfaceKind": {
+      "description": "Retrieval-surface families admitted by the contracts.\n\nA family describes a capability class only; the projection determines whether a concrete surface exists and what it may inspect.",
+      "oneOf": [
+        {
+          "description": "Literal or exact matching.",
+          "type": "string",
+          "enum": [
+            "exact"
+          ]
+        },
+        {
+          "description": "Lexical matching.",
+          "type": "string",
+          "enum": [
+            "lexical"
+          ]
+        },
+        {
+          "description": "Vector-neighbour lookup.",
+          "type": "string",
+          "enum": [
+            "vector"
+          ]
+        },
+        {
+          "description": "Graph or incidence navigation.",
+          "type": "string",
+          "enum": [
+            "graph"
+          ]
+        },
+        {
+          "description": "Temporal lookup or ordering.",
+          "type": "string",
+          "enum": [
+            "temporal"
+          ]
+        }
+      ]
+    },
+    "SemanticAddress": {
+      "description": "Canonical or projected address used by plans and provenance records.\n\nIt can point only to represented address categories. It does not prove that the target exists in a given snapshot; structural conformance owns that later check.",
+      "oneOf": [
+        {
+          "description": "Canonical semantic object.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "object"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Canonical semantic unit.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "unit"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Authored semantic region.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "region"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/SemanticRegionAddress"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Identifier assignment or descriptor.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "identifier"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/IdentifierAddress"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Authored occurrence.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "occurrence"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Temporal anchor.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "temporal_anchor"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Retrieval surface.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "retrieval_surface"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/RetrievalSurfaceAddress"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SemanticRegionAddress": {
+      "description": "Address of an authored structural region inside one semantic object.\n\nThe address preserves both the canonical parent object and a non-empty authored structural address. It has no authority to select a unit, infer a heading target, or treat the region as a separate epistemic object class.",
+      "type": "object",
+      "required": [
+        "authored_structural_address",
+        "object_id"
+      ],
+      "properties": {
+        "authored_structural_address": {
+          "description": "Non-empty authored heading, block, or structural address.",
+          "type": "string"
+        },
+        "object_id": {
+          "description": "Canonical parent semantic object.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SurfaceMatchMode": {
+      "description": "Query or match modes exposed by a retrieval surface.\n\nModes constrain execution shape only and do not imply semantic relevance.",
+      "oneOf": [
+        {
+          "description": "Exact literal match.",
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "literal"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Token or term match.",
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "terms"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Nearest-neighbour candidate lookup.",
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "nearest_neighbours"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Typed edge or occurrence navigation.",
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "incidence"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Temporal range or ordering access.",
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "temporal"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Named configured mode not hard-coded as corpus meaning.",
+          "type": "object",
+          "required": [
+            "mode",
+            "name"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "declared"
+              ]
+            },
+            "name": {
+              "description": "Stable configured mode name.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SurfaceQuery": {
+      "description": "Typed query payload for a retrieval-surface operation.\n\nIt carries requested literals, terms, vectors-by-reference, graph filters, or temporal bounds. It does not decide relevance or synthesize a claim.",
+      "oneOf": [
+        {
+          "description": "Exact literal search.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "literal"
+              ]
+            },
+            "value": {
+              "description": "Literal to search without semantic expansion.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Lexical term search.",
+          "type": "object",
+          "required": [
+            "kind",
+            "values"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "terms"
+              ]
+            },
+            "values": {
+              "description": "Terms supplied by semantic-access inference.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Vector query referenced by an existing projected address or binding.",
+          "type": "object",
+          "required": [
+            "binding_id",
+            "kind"
+          ],
+          "properties": {
+            "binding_id": {
+              "description": "Binding whose represented vector may be queried.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "vector_from_binding"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Graph incidence constrained by represented transitions.",
+          "type": "object",
+          "required": [
+            "direction",
+            "kind",
+            "transition_ids"
+          ],
+          "properties": {
+            "direction": {
+              "description": "Explicit direction.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Direction"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "graph"
+              ]
+            },
+            "transition_ids": {
+              "description": "Allowed transition identities.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Temporal range query over represented anchors.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "end": {
+              "description": "Inclusive upper bound in the projection's admitted format.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "temporal_range"
+              ]
+            },
+            "start": {
+              "description": "Inclusive lower bound in the projection's admitted format.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TemporalEvaluation": {
+      "description": "Temporal evaluation requested after represented anchors are materialized.\n\nIt describes a deterministic operation only and does not choose the semantic meaning of an unresolved chronology dimension.",
+      "oneOf": [
+        {
+          "description": "Order anchors in ascending or descending represented time.",
+          "type": "object",
+          "required": [
+            "direction",
+            "kind"
+          ],
+          "properties": {
+            "direction": {
+              "description": "Sort direction.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/TemporalOrder"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "order"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Group anchors by canonical target binding.",
+          "type": "object",
+          "required": [
+            "binding_ids",
+            "kind"
+          ],
+          "properties": {
+            "binding_ids": {
+              "description": "Binding identities that define groups.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "group_by_binding"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Select earliest represented anchor per binding.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "earliest_per_binding"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Select latest represented anchor per binding.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "latest_per_binding"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TemporalOrder": {
+      "description": "Sort direction for deterministic temporal evaluation.\n\nIt controls ordering only and cannot infer chronology semantics.",
+      "oneOf": [
+        {
+          "description": "Earliest to latest.",
+          "type": "string",
+          "enum": [
+            "ascending"
+          ]
+        },
+        {
+          "description": "Latest to earliest.",
+          "type": "string",
+          "enum": [
+            "descending"
+          ]
+        }
+      ]
+    },
+    "TraversalPath": {
+      "description": "Directed route through represented semantic structure.\n\nA path may be one branch of a larger acyclic plan and may later join another path. It does not execute its operations or guarantee conformance.",
+      "type": "object",
+      "required": [
+        "operations",
+        "output_binding",
+        "path_id",
+        "problem_space_provenance",
+        "start_binding_ids"
+      ],
+      "properties": {
+        "operations": {
+          "description": "Ordered typed operations in this branch.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PlanOperation"
+          }
+        },
+        "output_binding": {
+          "description": "Named output binding materialized by the path when execution succeeds.",
+          "type": "string"
+        },
+        "path_id": {
+          "description": "Stable plan-local path identity.",
+          "type": "string"
+        },
+        "problem_space_provenance": {
+          "description": "Problem-space sources that motivated this path.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProblemSpaceReference"
+          }
+        },
+        "start_binding_ids": {
+          "description": "Canonical address bindings from which the path begins.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

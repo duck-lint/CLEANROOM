@@ -1,0 +1,1050 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ActivatedProjection",
+  "description": "Bounded positive working view over one frozen semantic-space projection.\n\nIt retains visible records, edges, telemetry, continuation descriptors, and activation provenance. Visible does not mean relevant; absent from this view does not mean absent from the corpus; this type has no negative-claim authority and does not perform activation or expansion.",
+  "type": "object",
+  "required": [
+    "activated_objects",
+    "activated_regions",
+    "activated_units",
+    "configuration_snapshot_id",
+    "continuation_handles",
+    "edges",
+    "projection_snapshot_id",
+    "telemetry"
+  ],
+  "properties": {
+    "activated_objects": {
+      "description": "Positive object records visible in the current working view.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ActivatedObjectRecord"
+      }
+    },
+    "activated_regions": {
+      "description": "Positive region records visible in the current working view.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ActivatedRegionRecord"
+      }
+    },
+    "activated_units": {
+      "description": "Positive unit records visible in the current working view.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ActivatedUnitRecord"
+      }
+    },
+    "configuration_snapshot_id": {
+      "description": "Configuration snapshot that bounded the view.",
+      "type": "string"
+    },
+    "continuation_handles": {
+      "description": "Bounded continuation handles for inspectable omitted structure.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ContinuationHandle"
+      }
+    },
+    "edges": {
+      "description": "Typed visible structural connections.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ActivatedEdge"
+      }
+    },
+    "projection_snapshot_id": {
+      "description": "Frozen projection snapshot from which the view was drawn.",
+      "type": "string"
+    },
+    "telemetry": {
+      "description": "Measured projection-access telemetry.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ProjectionTelemetry"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ActivatedEdge": {
+      "description": "Typed edge visible in an activated projection.\n\nIt mirrors represented projection structure and cannot invent a relation, execute traversal, or authorize semantic interpretation.",
+      "type": "object",
+      "required": [
+        "activation_provenance",
+        "direction",
+        "edge_id",
+        "source",
+        "target",
+        "transition_id"
+      ],
+      "properties": {
+        "activation_provenance": {
+          "description": "Provenance explaining visibility.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ActivationProvenance"
+          }
+        },
+        "direction": {
+          "description": "Explicit direction exposed to planning.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Direction"
+            }
+          ]
+        },
+        "edge_id": {
+          "description": "Snapshot-local visible edge identity.",
+          "type": "string"
+        },
+        "source": {
+          "description": "Canonical source address.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/SemanticAddress"
+            }
+          ]
+        },
+        "target": {
+          "description": "Canonical target address.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/SemanticAddress"
+            }
+          ]
+        },
+        "transition_id": {
+          "description": "Stable represented transition identity.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ActivatedObjectRecord": {
+      "description": "Visible summary of one canonical semantic object.\n\nIt exposes identity and bounded structural previews only. It does not hydrate evidence, score relevance, or imply completeness.",
+      "type": "object",
+      "required": [
+        "activation_provenance",
+        "available_surface_ids",
+        "contained_region_count",
+        "contained_unit_count",
+        "incoming_occurrence_count",
+        "object_id",
+        "outgoing_occurrence_count",
+        "visible_identifier_assignment_ids"
+      ],
+      "properties": {
+        "activation_provenance": {
+          "description": "Provenance explaining why this object became visible.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ActivationProvenance"
+          }
+        },
+        "available_surface_ids": {
+          "description": "Available surface identities visible for planning.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "contained_region_count": {
+          "description": "Count of contained semantic regions in the full snapshot.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "contained_unit_count": {
+          "description": "Count of contained semantic units in the full snapshot.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "incoming_occurrence_count": {
+          "description": "Bounded incoming-occurrence count.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "object_id": {
+          "description": "Canonical semantic object identity.",
+          "type": "string"
+        },
+        "outgoing_occurrence_count": {
+          "description": "Bounded outgoing-occurrence count.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "visible_identifier_assignment_ids": {
+          "description": "Identifier assignment identities currently visible.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ActivatedRegionRecord": {
+      "description": "Visible summary of one authored semantic region.\n\nIt preserves region identity and bounded contained-address previews but does not select units, collapse headings, or assert relevance.",
+      "type": "object",
+      "required": [
+        "activation_provenance",
+        "address",
+        "available_surface_ids",
+        "contained_unit_count",
+        "visible_unit_ids"
+      ],
+      "properties": {
+        "activation_provenance": {
+          "description": "Provenance explaining visibility.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ActivationProvenance"
+          }
+        },
+        "address": {
+          "description": "Canonical semantic-region address.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/SemanticRegionAddress"
+            }
+          ]
+        },
+        "available_surface_ids": {
+          "description": "Available surface identities.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "contained_unit_count": {
+          "description": "Full-snapshot count of contained units.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "visible_unit_ids": {
+          "description": "Bounded preview of directly contained canonical units.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ActivatedUnitRecord": {
+      "description": "Visible summary of one canonical semantic unit.\n\nIt exposes identity, bounded preview text, incidence summaries, anchors, and surfaces for planning. Full authored prose remains execution material; this record cannot admit or reject evidence.",
+      "type": "object",
+      "required": [
+        "activation_provenance",
+        "available_surface_ids",
+        "incoming_occurrence_count",
+        "outgoing_occurrence_count",
+        "parent_object_id",
+        "parent_region_address",
+        "temporal_anchor_count",
+        "text_preview",
+        "unit_id"
+      ],
+      "properties": {
+        "activation_provenance": {
+          "description": "Provenance explaining visibility.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ActivationProvenance"
+          }
+        },
+        "available_surface_ids": {
+          "description": "Available surface identities.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "incoming_occurrence_count": {
+          "description": "Count of incoming authored occurrences.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "outgoing_occurrence_count": {
+          "description": "Count of outgoing authored occurrences.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "parent_object_id": {
+          "description": "Canonical parent object identity.",
+          "type": "string"
+        },
+        "parent_region_address": {
+          "description": "Canonical authored region address.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/SemanticRegionAddress"
+            }
+          ]
+        },
+        "temporal_anchor_count": {
+          "description": "Count of represented temporal anchors.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "text_preview": {
+          "description": "Bounded text preview used only for access planning.",
+          "type": "string"
+        },
+        "unit_id": {
+          "description": "Canonical semantic-unit identity.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ActivationBand": {
+      "description": "Current activation band assigned to a problem region.\n\nA band changes visibility and foregrounding only. It does not duplicate the region, change its lifecycle, or become a relevance score.",
+      "oneOf": [
+        {
+          "description": "Immediate operational focus.",
+          "type": "string",
+          "enum": [
+            "primary"
+          ]
+        },
+        {
+          "description": "Live adjacent structure that materially informs primary focus.",
+          "type": "string",
+          "enum": [
+            "secondary"
+          ]
+        },
+        {
+          "description": "Lower-priority connected structure available for continuation.",
+          "type": "string",
+          "enum": [
+            "tertiary"
+          ]
+        },
+        {
+          "description": "Retained continuity outside the current foreground.",
+          "type": "string",
+          "enum": [
+            "background"
+          ]
+        }
+      ]
+    },
+    "ActivationProvenance": {
+      "description": "Source of positive activation for one visible record or edge.\n\nProvenance explains navigation only. It is not a relevance, confidence, or truth score and cannot close an open tension.",
+      "oneOf": [
+        {
+          "description": "Exposed by one active problem region.",
+          "type": "object",
+          "required": [
+            "kind",
+            "region_id"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "problem_region"
+              ]
+            },
+            "region_id": {
+              "description": "Thread-local problem-region identity.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Exposed by one problem-space relation.",
+          "type": "object",
+          "required": [
+            "kind",
+            "relation_id"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "problem_relation"
+              ]
+            },
+            "relation_id": {
+              "description": "Thread-local problem-relation identity.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Exposed by one active problem-space constraint.",
+          "type": "object",
+          "required": [
+            "constraint_id",
+            "kind"
+          ],
+          "properties": {
+            "constraint_id": {
+              "description": "Thread-local constraint identity.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "constraint"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Exposed by one explicit open tension.",
+          "type": "object",
+          "required": [
+            "kind",
+            "tension_id"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "open_tension"
+              ]
+            },
+            "tension_id": {
+              "description": "Thread-local tension identity.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Exposed by one region's current attention band.",
+          "type": "object",
+          "required": [
+            "band",
+            "kind",
+            "region_id"
+          ],
+          "properties": {
+            "band": {
+              "description": "Current band in the shared attention lens.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/ActivationBand"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "attention_band"
+              ]
+            },
+            "region_id": {
+              "description": "Region carrying the activation band.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Exposed by the newest utterance.",
+          "type": "object",
+          "required": [
+            "kind",
+            "utterance_id"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "newest_utterance"
+              ]
+            },
+            "utterance_id": {
+              "description": "Current utterance identity.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Exposed by a deterministic configuration default.",
+          "type": "object",
+          "required": [
+            "configuration_key",
+            "kind"
+          ],
+          "properties": {
+            "configuration_key": {
+              "description": "Stable configuration key.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "configured_default"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Exposed by a typed bounded expansion request.",
+          "type": "object",
+          "required": [
+            "kind",
+            "request_id"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "expansion_request"
+              ]
+            },
+            "request_id": {
+              "description": "Expansion request identity.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CandidateCount": {
+      "description": "Exactness of a projection-access candidate count.\n\nIt preserves measurement status only and does not express confidence in semantic relevance.",
+      "oneOf": [
+        {
+          "description": "Exact measured candidate count.",
+          "type": "object",
+          "required": [
+            "count",
+            "kind"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "exact"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Deterministic estimate supplied by the surface.",
+          "type": "object",
+          "required": [
+            "count",
+            "kind"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "estimated"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ContinuationHandle": {
+      "description": "Bounded continuation descriptor for a high-degree or truncated view.\n\nIt permits later typed expansion within configuration limits. It does not perform expansion or imply that omitted records are irrelevant.",
+      "type": "object",
+      "required": [
+        "activation_provenance",
+        "handle_id",
+        "next_page_limit",
+        "subject",
+        "surface_kind"
+      ],
+      "properties": {
+        "activation_provenance": {
+          "description": "Provenance of the activation that produced this handle.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ActivationProvenance"
+          }
+        },
+        "direction": {
+          "description": "Optional incidence direction for graph-like continuation.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Direction"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "handle_id": {
+          "description": "Stable handle identity.",
+          "type": "string"
+        },
+        "next_page_limit": {
+          "description": "Maximum records permitted in the next bounded page.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "remaining_count": {
+          "description": "Remaining measured records when known.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "subject": {
+          "description": "Canonical address whose neighbourhood or content may continue.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/SemanticAddress"
+            }
+          ]
+        },
+        "surface_kind": {
+          "description": "Surface family used for continuation.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/RetrievalSurfaceKind"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "CountByLabel": {
+      "description": "Count associated with one represented label.\n\nThis is mechanical telemetry, not a relevance distribution.",
+      "type": "object",
+      "required": [
+        "count",
+        "label"
+      ],
+      "properties": {
+        "count": {
+          "description": "Measured count.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "label": {
+          "description": "Identifier, object class, or other projected label.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Direction": {
+      "description": "Explicit direction for a represented structural connection.\n\nDirection authorizes no traversal by itself; it is valid only when the projection represents the requested incidence.",
+      "oneOf": [
+        {
+          "description": "Move from source incidence toward its represented target.",
+          "type": "string",
+          "enum": [
+            "outgoing"
+          ]
+        },
+        {
+          "description": "Move from a target toward represented incoming incidence.",
+          "type": "string",
+          "enum": [
+            "incoming"
+          ]
+        }
+      ]
+    },
+    "IdentifierAddress": {
+      "description": "Address of an identifier descriptor or assignment.\n\nIt represents a named projected surface and optional represented value. It cannot replace canonical object or unit identity.",
+      "type": "object",
+      "required": [
+        "identifier_name"
+      ],
+      "properties": {
+        "identifier_name": {
+          "description": "Identifier name represented by the projection.",
+          "type": "string"
+        },
+        "represented_value": {
+          "description": "Optional exact represented value used to address one assignment.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProjectionTelemetry": {
+      "description": "Measured access telemetry for an activated surface or region.\n\nIt reports counts, depth, truncation, budget, and continuation. It is not a semantic score and has no evidence-admission authority.",
+      "type": "object",
+      "required": [
+        "activation_provenance",
+        "candidate_count",
+        "continuation_available",
+        "current_depth",
+        "identifier_type_distribution",
+        "maximum_depth",
+        "remaining_expansion_budget",
+        "returned_count",
+        "surface_id",
+        "surface_kind",
+        "temporal_anchor_count",
+        "truncation_state",
+        "unresolved_target_count"
+      ],
+      "properties": {
+        "activation_provenance": {
+          "description": "Provenance explaining the measured activation.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ActivationProvenance"
+          }
+        },
+        "candidate_count": {
+          "description": "Exact or estimated candidate count.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/CandidateCount"
+            }
+          ]
+        },
+        "continuation_available": {
+          "description": "Whether bounded continuation is available.",
+          "type": "boolean"
+        },
+        "current_depth": {
+          "description": "Current represented expansion depth.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "identifier_type_distribution": {
+          "description": "Bounded counts by represented identifier or type label.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CountByLabel"
+          }
+        },
+        "maximum_depth": {
+          "description": "Configured hard maximum depth.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "remaining_expansion_budget": {
+          "description": "Remaining bounded expansion budget.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "returned_count": {
+          "description": "Count returned into the visible view.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "surface_id": {
+          "description": "Concrete surface identity.",
+          "type": "string"
+        },
+        "surface_kind": {
+          "description": "Retrieval surface family measured by this record.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/RetrievalSurfaceKind"
+            }
+          ]
+        },
+        "temporal_anchor_count": {
+          "description": "Count of visible temporal anchors.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "truncation_state": {
+          "description": "Mechanical truncation state.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/TruncationState"
+            }
+          ]
+        },
+        "unresolved_target_count": {
+          "description": "Count of structurally unresolved authored targets.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "RetrievalSurfaceAddress": {
+      "description": "Address of a retrieval-surface descriptor.\n\nIt names a projected capability only. It does not execute the surface or imply that the surface is available for a particular address.",
+      "type": "object",
+      "required": [
+        "surface_id"
+      ],
+      "properties": {
+        "surface_id": {
+          "description": "Snapshot-local retrieval-surface identifier.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RetrievalSurfaceKind": {
+      "description": "Retrieval-surface families admitted by the contracts.\n\nA family describes a capability class only; the projection determines whether a concrete surface exists and what it may inspect.",
+      "oneOf": [
+        {
+          "description": "Literal or exact matching.",
+          "type": "string",
+          "enum": [
+            "exact"
+          ]
+        },
+        {
+          "description": "Lexical matching.",
+          "type": "string",
+          "enum": [
+            "lexical"
+          ]
+        },
+        {
+          "description": "Vector-neighbour lookup.",
+          "type": "string",
+          "enum": [
+            "vector"
+          ]
+        },
+        {
+          "description": "Graph or incidence navigation.",
+          "type": "string",
+          "enum": [
+            "graph"
+          ]
+        },
+        {
+          "description": "Temporal lookup or ordering.",
+          "type": "string",
+          "enum": [
+            "temporal"
+          ]
+        }
+      ]
+    },
+    "SemanticAddress": {
+      "description": "Canonical or projected address used by plans and provenance records.\n\nIt can point only to represented address categories. It does not prove that the target exists in a given snapshot; structural conformance owns that later check.",
+      "oneOf": [
+        {
+          "description": "Canonical semantic object.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "object"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Canonical semantic unit.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "unit"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Authored semantic region.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "region"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/SemanticRegionAddress"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Identifier assignment or descriptor.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "identifier"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/IdentifierAddress"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Authored occurrence.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "occurrence"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Temporal anchor.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "temporal_anchor"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Retrieval surface.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "retrieval_surface"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/RetrievalSurfaceAddress"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SemanticRegionAddress": {
+      "description": "Address of an authored structural region inside one semantic object.\n\nThe address preserves both the canonical parent object and a non-empty authored structural address. It has no authority to select a unit, infer a heading target, or treat the region as a separate epistemic object class.",
+      "type": "object",
+      "required": [
+        "authored_structural_address",
+        "object_id"
+      ],
+      "properties": {
+        "authored_structural_address": {
+          "description": "Non-empty authored heading, block, or structural address.",
+          "type": "string"
+        },
+        "object_id": {
+          "description": "Canonical parent semantic object.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TruncationState": {
+      "description": "Mechanical truncation state of an activated result set.\n\nIt describes bounded visibility only and authorizes no conclusion about omitted corpus material.",
+      "oneOf": [
+        {
+          "description": "No truncation occurred within the measured scope.",
+          "type": "string",
+          "enum": [
+            "complete"
+          ]
+        },
+        {
+          "description": "Configured view bound truncated the visible result.",
+          "type": "string",
+          "enum": [
+            "bounded"
+          ]
+        },
+        {
+          "description": "Hard expansion budget truncated the visible result.",
+          "type": "string",
+          "enum": [
+            "budget_exhausted"
+          ]
+        }
+      ]
+    }
+  }
+}

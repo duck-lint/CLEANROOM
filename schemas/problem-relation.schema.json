@@ -1,0 +1,249 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ProblemRelation",
+  "description": "One represented relation among problem regions.\n\nIt records a declared relational connection and provenance. It may guide later projection access but is not itself a corpus address or executable traversal edge.",
+  "type": "object",
+  "required": [
+    "lifecycle",
+    "relation_id",
+    "relation_type",
+    "source_contribution_id",
+    "source_region_id"
+  ],
+  "properties": {
+    "lifecycle": {
+      "description": "Current lifecycle of the represented relation.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/RecordLifecycle"
+        }
+      ]
+    },
+    "relation_id": {
+      "description": "Stable relation identity within the thread.",
+      "type": "string"
+    },
+    "relation_type": {
+      "description": "Declared relation category.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ProblemRelationType"
+        }
+      ]
+    },
+    "source_contribution_id": {
+      "description": "Boundary contribution that declared this relation.",
+      "type": "string"
+    },
+    "source_region_id": {
+      "description": "Source problem-region identity.",
+      "type": "string"
+    },
+    "target_region_id": {
+      "description": "Optional target region when the relation is binary.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ProblemRelationType": {
+      "description": "Declared categories of problem-space relation.\n\nCategories describe the inferred thread representation only. They do not create corpus relations or authorize traversal.",
+      "oneOf": [
+        {
+          "description": "One region continues another.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "continuation"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One region depends on another.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "dependency"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Regions participate in a comparison.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "comparison"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One region corrects a prior framing.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "correction"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One region refines another.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "refinement"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "The relation is itself a causal question.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "causal_question"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Regions are linked by a temporal question or ordering.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "temporal"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Regions share a retained referent.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "shared_referent"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Regions share an active constraint.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "shared_constraint"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "A named relation declared by inference but not hard-coded as corpus data.",
+          "type": "object",
+          "required": [
+            "kind",
+            "name"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "declared"
+              ]
+            },
+            "name": {
+              "description": "Declared relation name.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "RecordLifecycle": {
+      "description": "Lifecycle shared by relation and constraint records.\n\nIt records whether a declared record is operationally current or retained historically. It grants no semantic decision authority.",
+      "oneOf": [
+        {
+          "description": "Currently active in the relational state.",
+          "type": "string",
+          "enum": [
+            "active"
+          ]
+        },
+        {
+          "description": "Preserved in history after replacement.",
+          "type": "string",
+          "enum": [
+            "superseded"
+          ]
+        },
+        {
+          "description": "Explicitly retired from the operational state.",
+          "type": "string",
+          "enum": [
+            "retired"
+          ]
+        }
+      ]
+    }
+  }
+}

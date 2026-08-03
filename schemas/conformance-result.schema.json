@@ -1,0 +1,786 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ConformanceResult",
+  "description": "Structural conformance outcome for one semantic-access plan.\n\nA valid result records structural membership. An invalid result records at least one exact structural violation. This type has no semantic authority and contains no relevance, paraphrase, proposition, confidence, or coherence judgment.",
+  "oneOf": [
+    {
+      "description": "Plan is structurally valid against the named frozen projection snapshot.",
+      "type": "object",
+      "required": [
+        "plan_id",
+        "projection_snapshot_id",
+        "status"
+      ],
+      "properties": {
+        "plan_id": {
+          "description": "Plan identity checked.",
+          "type": "string"
+        },
+        "projection_snapshot_id": {
+          "description": "Frozen projection snapshot used for the check.",
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "valid"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Plan is structurally invalid with exact represented violations.",
+      "type": "object",
+      "required": [
+        "plan_id",
+        "projection_snapshot_id",
+        "status",
+        "violations"
+      ],
+      "properties": {
+        "plan_id": {
+          "description": "Plan identity checked.",
+          "type": "string"
+        },
+        "projection_snapshot_id": {
+          "description": "Frozen projection snapshot used for the check.",
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "invalid"
+          ]
+        },
+        "violations": {
+          "description": "Non-empty exact violation collection.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/StructuralViolations"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "definitions": {
+    "AddressKind": {
+      "description": "Stable categories of address represented by the projection.\n\nThese labels describe structural input and output kinds. They do not judge semantic relevance or establish that a requested address exists.",
+      "oneOf": [
+        {
+          "description": "Canonical semantic object identity.",
+          "type": "string",
+          "enum": [
+            "semantic_object"
+          ]
+        },
+        {
+          "description": "Canonical semantic unit identity.",
+          "type": "string",
+          "enum": [
+            "semantic_unit"
+          ]
+        },
+        {
+          "description": "Authored region address within an object.",
+          "type": "string",
+          "enum": [
+            "semantic_region"
+          ]
+        },
+        {
+          "description": "Identifier assignment or descriptor address.",
+          "type": "string",
+          "enum": [
+            "identifier"
+          ]
+        },
+        {
+          "description": "Authored occurrence identity.",
+          "type": "string",
+          "enum": [
+            "occurrence"
+          ]
+        },
+        {
+          "description": "Materially sourced temporal anchor.",
+          "type": "string",
+          "enum": [
+            "temporal_anchor"
+          ]
+        },
+        {
+          "description": "Retrieval-surface address.",
+          "type": "string",
+          "enum": [
+            "retrieval_surface"
+          ]
+        }
+      ]
+    },
+    "Direction": {
+      "description": "Explicit direction for a represented structural connection.\n\nDirection authorizes no traversal by itself; it is valid only when the projection represents the requested incidence.",
+      "oneOf": [
+        {
+          "description": "Move from source incidence toward its represented target.",
+          "type": "string",
+          "enum": [
+            "outgoing"
+          ]
+        },
+        {
+          "description": "Move from a target toward represented incoming incidence.",
+          "type": "string",
+          "enum": [
+            "incoming"
+          ]
+        }
+      ]
+    },
+    "IdentifierAddress": {
+      "description": "Address of an identifier descriptor or assignment.\n\nIt represents a named projected surface and optional represented value. It cannot replace canonical object or unit identity.",
+      "type": "object",
+      "required": [
+        "identifier_name"
+      ],
+      "properties": {
+        "identifier_name": {
+          "description": "Identifier name represented by the projection.",
+          "type": "string"
+        },
+        "represented_value": {
+          "description": "Optional exact represented value used to address one assignment.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Requirement": {
+      "description": "Execution obligation attached to a plan operation or requested output.\n\nIt states whether failure affects support for the requested route. It does not determine truth or semantic adequacy.",
+      "oneOf": [
+        {
+          "description": "Failure must be reported as affecting the requested route.",
+          "type": "string",
+          "enum": [
+            "required"
+          ]
+        },
+        {
+          "description": "Failure is recorded but need not invalidate the primary route.",
+          "type": "string",
+          "enum": [
+            "optional"
+          ]
+        }
+      ]
+    },
+    "RetrievalSurfaceAddress": {
+      "description": "Address of a retrieval-surface descriptor.\n\nIt names a projected capability only. It does not execute the surface or imply that the surface is available for a particular address.",
+      "type": "object",
+      "required": [
+        "surface_id"
+      ],
+      "properties": {
+        "surface_id": {
+          "description": "Snapshot-local retrieval-surface identifier.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SemanticAddress": {
+      "description": "Canonical or projected address used by plans and provenance records.\n\nIt can point only to represented address categories. It does not prove that the target exists in a given snapshot; structural conformance owns that later check.",
+      "oneOf": [
+        {
+          "description": "Canonical semantic object.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "object"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Canonical semantic unit.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "unit"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Authored semantic region.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "region"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/SemanticRegionAddress"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Identifier assignment or descriptor.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "identifier"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/IdentifierAddress"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Authored occurrence.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "occurrence"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Temporal anchor.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "temporal_anchor"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Retrieval surface.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "retrieval_surface"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/RetrievalSurfaceAddress"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SemanticRegionAddress": {
+      "description": "Address of an authored structural region inside one semantic object.\n\nThe address preserves both the canonical parent object and a non-empty authored structural address. It has no authority to select a unit, infer a heading target, or treat the region as a separate epistemic object class.",
+      "type": "object",
+      "required": [
+        "authored_structural_address",
+        "object_id"
+      ],
+      "properties": {
+        "authored_structural_address": {
+          "description": "Non-empty authored heading, block, or structural address.",
+          "type": "string"
+        },
+        "object_id": {
+          "description": "Canonical parent semantic object.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "StructuralViolation": {
+      "description": "One exact structural violation found during conformance.\n\nIt identifies the affected operation or address, a closed structural code, and typed detail. It cannot express semantic relevance or repair meaning.",
+      "type": "object",
+      "required": [
+        "code",
+        "detail"
+      ],
+      "properties": {
+        "address": {
+          "description": "Canonical or proposed address associated with the violation.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SemanticAddress"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "code": {
+          "description": "Stable structural violation code.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/StructuralViolationCode"
+            }
+          ]
+        },
+        "detail": {
+          "description": "Exact typed structural detail.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/StructuralViolationDetail"
+            }
+          ]
+        },
+        "operation_id": {
+          "description": "Plan operation associated with the violation when applicable.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "requirement": {
+          "description": "Requirement of the affected operation when applicable.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Requirement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "StructuralViolationCode": {
+      "description": "Closed categories of structural conformance failure.\n\nThese categories describe projection membership, typing, direction, surface, output, and configuration only. They cannot encode semantic disagreement.",
+      "oneOf": [
+        {
+          "description": "Referenced canonical or projected address is absent.",
+          "type": "string",
+          "enum": [
+            "missing_address"
+          ]
+        },
+        {
+          "description": "Referenced identifier descriptor or assignment is absent.",
+          "type": "string",
+          "enum": [
+            "missing_identifier"
+          ]
+        },
+        {
+          "description": "Identifier cannot apply to the proposed address kind.",
+          "type": "string",
+          "enum": [
+            "identifier_not_applicable"
+          ]
+        },
+        {
+          "description": "Referenced relation or transition is absent.",
+          "type": "string",
+          "enum": [
+            "missing_relation"
+          ]
+        },
+        {
+          "description": "Requested incidence direction is not represented.",
+          "type": "string",
+          "enum": [
+            "direction_unavailable"
+          ]
+        },
+        {
+          "description": "Requested retrieval surface is absent or disabled.",
+          "type": "string",
+          "enum": [
+            "surface_unavailable"
+          ]
+        },
+        {
+          "description": "Operation input kind does not match the represented transition.",
+          "type": "string",
+          "enum": [
+            "input_type_mismatch"
+          ]
+        },
+        {
+          "description": "Requested output cannot be materialized from the operation graph.",
+          "type": "string",
+          "enum": [
+            "output_unavailable"
+          ]
+        },
+        {
+          "description": "Requested bound exceeds the configuration snapshot.",
+          "type": "string",
+          "enum": [
+            "configuration_bound_exceeded"
+          ]
+        },
+        {
+          "description": "Authored heading or block target remains unresolved.",
+          "type": "string",
+          "enum": [
+            "unresolved_authored_target"
+          ]
+        },
+        {
+          "description": "Requested transition is unsupported.",
+          "type": "string",
+          "enum": [
+            "unsupported_transition"
+          ]
+        }
+      ]
+    },
+    "StructuralViolationDetail": {
+      "description": "Typed detail attached to one structural violation.\n\nVariants retain the exact represented mismatch without introducing natural- language semantic adjudication.",
+      "oneOf": [
+        {
+          "description": "A named projection member was not present.",
+          "type": "object",
+          "required": [
+            "kind",
+            "member",
+            "member_kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "missing_member"
+              ]
+            },
+            "member": {
+              "description": "Stable missing identifier or address rendering.",
+              "type": "string"
+            },
+            "member_kind": {
+              "description": "Structural member category.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/AddressKind"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "An identifier was proposed for an inapplicable address kind.",
+          "type": "object",
+          "required": [
+            "applicable_address_kinds",
+            "identifier_name",
+            "kind",
+            "proposed_address_kind"
+          ],
+          "properties": {
+            "applicable_address_kinds": {
+              "description": "Address kinds admitted by the descriptor.",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/AddressKind"
+              }
+            },
+            "identifier_name": {
+              "description": "Identifier name.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "identifier_applicability"
+              ]
+            },
+            "proposed_address_kind": {
+              "description": "Proposed address kind.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/AddressKind"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "A direction was requested but not represented.",
+          "type": "object",
+          "required": [
+            "available",
+            "kind",
+            "requested"
+          ],
+          "properties": {
+            "available": {
+              "description": "Directions represented by the projection.",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Direction"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "direction"
+              ]
+            },
+            "requested": {
+              "description": "Requested direction.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Direction"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "A retrieval surface was unavailable for the requested address kind.",
+          "type": "object",
+          "required": [
+            "address_kind",
+            "kind",
+            "surface_id"
+          ],
+          "properties": {
+            "address_kind": {
+              "description": "Address kind supplied to the surface.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/AddressKind"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "surface"
+              ]
+            },
+            "surface_id": {
+              "description": "Concrete surface identity.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Operation input or output type did not match projection grammar.",
+          "type": "object",
+          "required": [
+            "actual",
+            "expected",
+            "kind"
+          ],
+          "properties": {
+            "actual": {
+              "description": "Actual structural kind.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/AddressKind"
+                }
+              ]
+            },
+            "expected": {
+              "description": "Expected structural kind.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/AddressKind"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "type_mismatch"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Requested numeric bound exceeded configuration.",
+          "type": "object",
+          "required": [
+            "bound_name",
+            "kind",
+            "maximum",
+            "requested"
+          ],
+          "properties": {
+            "bound_name": {
+              "description": "Stable bound name.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "bound_exceeded"
+              ]
+            },
+            "maximum": {
+              "description": "Configured hard maximum.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "requested": {
+              "description": "Requested value.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Authored target could not be resolved to the required kind.",
+          "type": "object",
+          "required": [
+            "authored_target",
+            "expected_target_kind",
+            "kind"
+          ],
+          "properties": {
+            "authored_target": {
+              "description": "Authored target text retained by the projection.",
+              "type": "string"
+            },
+            "expected_target_kind": {
+              "description": "Required resolved address kind.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/AddressKind"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "unresolved_target"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "A named transition could not consume or emit the requested structure.",
+          "type": "object",
+          "required": [
+            "explanation",
+            "kind",
+            "transition_id"
+          ],
+          "properties": {
+            "explanation": {
+              "description": "Exact structural explanation.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "transition"
+              ]
+            },
+            "transition_id": {
+              "description": "Referenced transition identity.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "StructuralViolations": {
+      "description": "Non-empty collection of exact structural violations.\n\nThe first violation is required by shape, preventing an invalid result from deserializing without a stated structural reason. The collection cannot carry semantic judgments.",
+      "type": "object",
+      "required": [
+        "additional",
+        "first"
+      ],
+      "properties": {
+        "additional": {
+          "description": "Additional exact structural violations.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/StructuralViolation"
+          }
+        },
+        "first": {
+          "description": "Required first structural violation.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/StructuralViolation"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
