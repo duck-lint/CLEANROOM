@@ -668,9 +668,33 @@ An unresolved region may occupy any attention band; an active region may occupy
 background activation. No numeric attention, persistence, confidence, decay,
 or coherence score is introduced.
 
-Execution, semantic validation, incidence rebuilding, attention rebuilding,
-bounds configuration, and replay remain explicitly deferred to conceptual PR
-3B.
+### Implemented deterministic realization
+
+Conceptual PR 3B realizes the accepted fold contract as a pure API:
+
+- callers pass either no prior state (for an empty accepted log) or the exact
+  prior derived state, plus explicit `ProblemSpaceFoldLimits`;
+- zero is a valid limit and excess rejects the complete contribution;
+- a closed, typed violation surface distinguishes envelope, identity,
+  lifecycle, declaration, closure, bound, and overflow failures;
+- fresh threads have no public version-zero state: the empty log supplies the
+  thread identity and the first accepted fold constructs version one;
+- active regional incidence and the single attention lens are rebuilt from
+  authoritative top-level vector order after every contribution;
+- accepted logs replay from no state, in vector order, through the same fold
+  mechanics, including after a Serde serialize/deserialize restart boundary.
+
+The realization adds no storage adapter and no production boundary-inference
+provider. Boundary inference remains outside the deterministic authority
+boundary and is represented only by a scripted test fixture. The accepted
+Serde unit-variant exception is unchanged.
+
+Relation supersession is not supported by the current fold contract. The
+current typed relation operations are `Connect` and `Disconnect`, and
+`Disconnect` produces `Retired` lifecycle. A `Relation + Supersede` release
+declaration is rejected as an unsupported subject/release-mode combination.
+Relation supersession remains deferred until a separate contract change
+defines a typed replacement operation and its provenance semantics.
 
 ## 19. Examples
 
