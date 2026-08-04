@@ -1101,3 +1101,401 @@ fn calf_continuation_uses_only_scripted_relation_and_attention_changes() {
         vec!["calf-diet"]
     );
 }
+
+#[test]
+fn split_does_not_transfer_populated_source_structure() {
+    let mut source = region("source");
+    source.anchor_referents.push(ProblemReferent {
+        referent_id: "source-ref".into(),
+        expression: "declared source referent".into(),
+        source_contribution_id: "c1".into(),
+    });
+    let mut initial = contribution("c1", "t1", vec![RegionOperation::Create { region: source }]);
+    initial
+        .relation_operations
+        .push(RelationOperation::Connect {
+            relation: ProblemRelation {
+                relation_id: "source-rel".into(),
+                source_region_id: "source".into(),
+                relation_type: ProblemRelationType::Declared {
+                    name: "source-only".into(),
+                },
+                target_region_id: None,
+                source_contribution_id: "c1".into(),
+                lifecycle: RecordLifecycle::Active,
+            },
+        });
+    initial
+        .constraint_operations
+        .push(ConstraintOperation::Add {
+            constraint: constraint("source-constraint", "c1", vec!["source"]),
+        });
+    initial.tension_operations.push(TensionOperation::Open {
+        tension: OpenTension {
+            tension_id: "source-tension".into(),
+            region_id: "source".into(),
+            tension_type: OpenTensionType::Declared {
+                name: "source-only".into(),
+            },
+            unresolved_expression: Some("source ambiguity".into()),
+            candidate_bindings: vec!["left".into(), "right".into()],
+            source_turn_id: "t1".into(),
+            lifecycle: TensionLifecycle::Open,
+        },
+    });
+    let initial =
+        fold_boundary_contribution(None, &log("split-populated"), &initial, &limits()).unwrap();
+    assert_eq!(initial.state.regions[0].source_contribution_ids, vec!["c1"]);
+    assert_eq!(initial.state.regions[0].anchor_referents.len(), 1);
+    assert_eq!(initial.state.regions[0].relation_ids, vec!["source-rel"]);
+    assert_eq!(
+        initial.state.regions[0].local_constraint_ids,
+        vec!["source-constraint"]
+    );
+    assert_eq!(
+        initial.state.regions[0].open_tension_ids,
+        vec!["source-tension"]
+    );
+
+    let mut left = region("left-result");
+    left.supersedes_region_id = Some("source".into());
+    let mut right = region("right-result");
+    right.supersedes_region_id = Some("source".into());
+    let mut split = contribution(
+        "c2",
+        "t2",
+        vec![RegionOperation::Split {
+            source_region_id: "source".into(),
+            resulting_regions: vec![left, right],
+            reason: "declared mechanical split".into(),
+        }],
+    );
+    split
+        .relation_operations
+        .push(RelationOperation::Disconnect {
+            relation_id: "source-rel".into(),
+            reason: "explicit cleanup before closure".into(),
+        });
+    split
+        .constraint_operations
+        .push(ConstraintOperation::Retire {
+            constraint_id: "source-constraint".into(),
+            reason: "explicit cleanup before closure".into(),
+        });
+    split.tension_operations.push(TensionOperation::Abandon {
+        tension_id: "source-tension".into(),
+        reason: "explicit cleanup before closure".into(),
+    });
+    split.release_declarations = vec![
+        ReleaseDeclaration {
+            subject: ProblemSpaceSubject::Region("source".into()),
+            mode: ReleaseMode::Supersede,
+            reason: "split supersedes source".into(),
+        },
+        ReleaseDeclaration {
+            subject: ProblemSpaceSubject::Relation("source-rel".into()),
+            mode: ReleaseMode::Retire,
+            reason: "disconnect retires relation".into(),
+        },
+        ReleaseDeclaration {
+            subject: ProblemSpaceSubject::Constraint("source-constraint".into()),
+            mode: ReleaseMode::Retire,
+            reason: "constraint retired explicitly".into(),
+        },
+        ReleaseDeclaration {
+            subject: ProblemSpaceSubject::OpenTension("source-tension".into()),
+            mode: ReleaseMode::Abandon,
+            reason: "tension abandoned explicitly".into(),
+        },
+        ReleaseDeclaration {
+            subject: ProblemSpaceSubject::Referent("source-ref".into()),
+            mode: ReleaseMode::Retire,
+            reason: "referent absent from operational results".into(),
+        },
+    ];
+
+    let final_fold = continue_with(&initial, split).unwrap();
+    let source_region = &final_fold.state.regions[0];
+    assert_eq!(
+        source_region.persistence_state,
+        RegionPersistenceState::Superseded
+    );
+    assert_eq!(source_region.source_contribution_ids, vec!["c1", "c2"]);
+    assert_eq!(source_region.anchor_referents[0].referent_id, "source-ref");
+    assert_eq!(source_region.relation_ids, Vec::<String>::new());
+    assert_eq!(source_region.local_constraint_ids, Vec::<String>::new());
+    assert_eq!(source_region.open_tension_ids, Vec::<String>::new());
+    assert_eq!(final_fold.state.regions[1].region_id, "left-result");
+    assert_eq!(final_fold.state.regions[2].region_id, "right-result");
+    for result in &final_fold.state.regions[1..=2] {
+        assert_eq!(result.source_contribution_ids, vec!["c2"]);
+        assert!(result.anchor_referents.is_empty());
+        assert!(result.relation_ids.is_empty());
+        assert!(result.local_constraint_ids.is_empty());
+        assert!(result.open_tension_ids.is_empty());
+    }
+    assert_eq!(
+        final_fold.state.relations[0].lifecycle,
+        RecordLifecycle::Retired
+    );
+    assert_eq!(
+        final_fold.state.constraints[0].lifecycle,
+        RecordLifecycle::Retired
+    );
+    assert_eq!(
+        final_fold.state.open_tensions[0].lifecycle,
+        TensionLifecycle::Abandoned
+    );
+    assert!(
+        final_fold
+            .state
+            .regions
+            .iter()
+            .filter(|region| matches!(
+                region.persistence_state,
+                RegionPersistenceState::Active
+                    | RegionPersistenceState::Background
+                    | RegionPersistenceState::Unresolved
+            ))
+            .all(|region| region
+                .anchor_referents
+                .iter()
+                .all(|referent| referent.referent_id != "source-ref"))
+    );
+    assert_eq!(
+        replay_boundary_contribution_log(&final_fold.accepted_log, &limits()).unwrap(),
+        Some(final_fold.state)
+    );
+}
+
+#[test]
+fn region_and_constraint_retirement_release_declarations_succeed() {
+    let mut initial = contribution(
+        "c1",
+        "t1",
+        vec![RegionOperation::Create {
+            region: region("retired-region"),
+        }],
+    );
+    initial
+        .constraint_operations
+        .push(ConstraintOperation::Add {
+            constraint: constraint("retired-constraint", "c1", vec!["retired-region"]),
+        });
+    let initial =
+        fold_boundary_contribution(None, &log("retire-thread"), &initial, &limits()).unwrap();
+
+    let mut retire = contribution(
+        "c2",
+        "t2",
+        vec![RegionOperation::Retire {
+            region_id: "retired-region".into(),
+            reason: "explicitly retired".into(),
+        }],
+    );
+    retire
+        .constraint_operations
+        .push(ConstraintOperation::Retire {
+            constraint_id: "retired-constraint".into(),
+            reason: "explicitly retired".into(),
+        });
+    retire.release_declarations = vec![
+        ReleaseDeclaration {
+            subject: ProblemSpaceSubject::Constraint("retired-constraint".into()),
+            mode: ReleaseMode::Retire,
+            reason: "typed constraint retire".into(),
+        },
+        ReleaseDeclaration {
+            subject: ProblemSpaceSubject::Region("retired-region".into()),
+            mode: ReleaseMode::Retire,
+            reason: "typed region retire".into(),
+        },
+    ];
+
+    let retired = continue_with(&initial, retire).unwrap();
+    assert_eq!(
+        retired.state.regions[0].persistence_state,
+        RegionPersistenceState::Retired
+    );
+    assert_eq!(
+        retired.state.constraints[0].lifecycle,
+        RecordLifecycle::Retired
+    );
+    assert!(retired.state.attention_lens.primary_region_ids.is_empty());
+}
+
+#[test]
+fn tension_supersession_release_declaration_succeeds() {
+    let mut initial = contribution(
+        "c1",
+        "t1",
+        vec![RegionOperation::Create {
+            region: region("tension-region"),
+        }],
+    );
+    initial.tension_operations.push(TensionOperation::Open {
+        tension: OpenTension {
+            tension_id: "old-tension".into(),
+            region_id: "tension-region".into(),
+            tension_type: OpenTensionType::CompetingFraming,
+            unresolved_expression: Some("old unresolved".into()),
+            candidate_bindings: vec!["reading".into(), "publication".into()],
+            source_turn_id: "t1".into(),
+            lifecycle: TensionLifecycle::Open,
+        },
+    });
+    let initial =
+        fold_boundary_contribution(None, &log("tension-supersede"), &initial, &limits()).unwrap();
+
+    let mut supersede = contribution("c2", "t2", vec![]);
+    supersede.tension_operations = vec![
+        TensionOperation::Open {
+            tension: OpenTension {
+                tension_id: "replacement-tension".into(),
+                region_id: "tension-region".into(),
+                tension_type: OpenTensionType::CompetingFraming,
+                unresolved_expression: Some("replacement unresolved".into()),
+                candidate_bindings: vec!["publication".into(), "reading".into()],
+                source_turn_id: "t2".into(),
+                lifecycle: TensionLifecycle::Open,
+            },
+        },
+        TensionOperation::Supersede {
+            tension_id: "old-tension".into(),
+            superseded_by_tension_id: "replacement-tension".into(),
+            reason: "replacement declared first".into(),
+        },
+    ];
+    supersede.release_declarations.push(ReleaseDeclaration {
+        subject: ProblemSpaceSubject::OpenTension("old-tension".into()),
+        mode: ReleaseMode::Supersede,
+        reason: "typed tension supersession".into(),
+    });
+
+    let final_fold = continue_with(&initial, supersede).unwrap();
+    assert_eq!(
+        final_fold.state.open_tensions[0].lifecycle,
+        TensionLifecycle::Superseded
+    );
+    assert_eq!(
+        final_fold.state.open_tensions[1].lifecycle,
+        TensionLifecycle::Open
+    );
+    assert_eq!(
+        final_fold.state.open_tensions[1].candidate_bindings,
+        vec!["publication", "reading"]
+    );
+    assert!(
+        final_fold.state.open_tensions[1]
+            .unresolved_expression
+            .is_some()
+    );
+    assert_eq!(
+        replay_boundary_contribution_log(&final_fold.accepted_log, &limits()).unwrap(),
+        Some(final_fold.state)
+    );
+}
+
+#[test]
+fn referent_release_modes_are_supported_only_after_explicit_operational_absence() {
+    for mode in [
+        ReleaseMode::Supersede,
+        ReleaseMode::Retire,
+        ReleaseMode::Abandon,
+    ] {
+        let mut source = region("referent-source");
+        source.anchor_referents.push(ProblemReferent {
+            referent_id: "released-ref".into(),
+            expression: "declared referent".into(),
+            source_contribution_id: "c1".into(),
+        });
+        let initial = fold_boundary_contribution(
+            None,
+            &log(&format!("referent-{mode:?}")),
+            &contribution("c1", "t1", vec![RegionOperation::Create { region: source }]),
+            &limits(),
+        )
+        .unwrap();
+        let original_state = initial.state.clone();
+        let original_log = initial.accepted_log.clone();
+
+        let mut replacement = region("referent-replacement");
+        replacement.supersedes_region_id = None;
+        let mut release = contribution(
+            "c2",
+            "t2",
+            vec![
+                RegionOperation::Create {
+                    region: replacement,
+                },
+                RegionOperation::Supersede {
+                    region_id: "referent-source".into(),
+                    superseded_by_region_id: "referent-replacement".into(),
+                    reason: "explicitly removes referent from operational state".into(),
+                },
+            ],
+        );
+        release.release_declarations.push(ReleaseDeclaration {
+            subject: ProblemSpaceSubject::Referent("released-ref".into()),
+            mode,
+            reason: "referent absent from every final operational region".into(),
+        });
+
+        let released = continue_with(&initial, release).unwrap();
+        assert_eq!(
+            released.state.regions[0].persistence_state,
+            RegionPersistenceState::Superseded
+        );
+        assert!(released.state.regions[1].anchor_referents.is_empty());
+        assert!(
+            released
+                .state
+                .regions
+                .iter()
+                .filter(|region| matches!(
+                    region.persistence_state,
+                    RegionPersistenceState::Active
+                        | RegionPersistenceState::Background
+                        | RegionPersistenceState::Unresolved
+                ))
+                .all(|region| region
+                    .anchor_referents
+                    .iter()
+                    .all(|referent| referent.referent_id != "released-ref"))
+        );
+        assert_eq!(initial.state, original_state);
+        assert_eq!(initial.accepted_log, original_log);
+    }
+
+    let mut retained_source = region("retained-referent-source");
+    retained_source.anchor_referents.push(ProblemReferent {
+        referent_id: "still-present-ref".into(),
+        expression: "declared referent".into(),
+        source_contribution_id: "c1".into(),
+    });
+    let retained = fold_boundary_contribution(
+        None,
+        &log("referent-negative"),
+        &contribution(
+            "c1",
+            "t1",
+            vec![RegionOperation::Create {
+                region: retained_source,
+            }],
+        ),
+        &limits(),
+    )
+    .unwrap();
+    let before = retained.clone();
+    let mut invalid = contribution("c2", "t2", vec![]);
+    invalid.release_declarations.push(ReleaseDeclaration {
+        subject: ProblemSpaceSubject::Referent("still-present-ref".into()),
+        mode: ReleaseMode::Retire,
+        reason: "declaration alone must not remove referent".into(),
+    });
+    assert!(matches!(
+        continue_with(&retained, invalid),
+        Err(ProblemSpaceFoldViolation::InvalidReleaseDeclaration)
+    ));
+    assert_eq!(retained, before);
+}
