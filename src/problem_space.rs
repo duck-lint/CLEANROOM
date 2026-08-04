@@ -2,7 +2,8 @@
 //!
 //! These records represent inferred thread-local state and declared boundary
 //! perturbations. They do not perform boundary inference, semantic merging,
-//! lifecycle transitions, deduplication, or the deterministic fold.
+//! lifecycle transitions, or semantic deduplication. Deterministic application
+//! of these records is provided by `problem_space_fold`.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
