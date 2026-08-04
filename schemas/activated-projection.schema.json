@@ -1,19 +1,32 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "ActivatedProjection",
-  "description": "Bounded positive working view over one frozen semantic-space projection.\n\nIt retains visible records, edges, telemetry, continuation descriptors, and activation provenance. Visible does not mean relevant; absent from this view does not mean absent from the corpus; this type has no negative-claim authority and does not perform activation or expansion.",
+  "description": "Bounded positive working view over one frozen semantic-space projection.",
   "type": "object",
   "required": [
+    "activated_identifier_assignments",
     "activated_objects",
+    "activated_occurrences",
     "activated_regions",
+    "activated_temporal_anchors",
     "activated_units",
     "configuration_snapshot_id",
     "continuation_handles",
     "edges",
+    "newest_utterance_id",
+    "problem_space_thread_id",
+    "problem_space_version",
     "projection_snapshot_id",
     "telemetry"
   ],
   "properties": {
+    "activated_identifier_assignments": {
+      "description": "Positive identifier-assignment records visible in the working view.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ActivatedIdentifierAssignmentRecord"
+      }
+    },
     "activated_objects": {
       "description": "Positive object records visible in the current working view.",
       "type": "array",
@@ -21,11 +34,25 @@
         "$ref": "#/definitions/ActivatedObjectRecord"
       }
     },
+    "activated_occurrences": {
+      "description": "Positive authored-occurrence records visible in the working view.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ActivatedOccurrenceRecord"
+      }
+    },
     "activated_regions": {
       "description": "Positive region records visible in the current working view.",
       "type": "array",
       "items": {
         "$ref": "#/definitions/ActivatedRegionRecord"
+      }
+    },
+    "activated_temporal_anchors": {
+      "description": "Positive temporal-anchor records visible in the working view.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ActivatedTemporalAnchorRecord"
       }
     },
     "activated_units": {
@@ -52,6 +79,20 @@
       "items": {
         "$ref": "#/definitions/ActivatedEdge"
       }
+    },
+    "newest_utterance_id": {
+      "description": "Newest utterance identity used for activation.",
+      "type": "string"
+    },
+    "problem_space_thread_id": {
+      "description": "Thread whose problem space shaped this view.",
+      "type": "string"
+    },
+    "problem_space_version": {
+      "description": "Exact problem-space version used for activation.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
     },
     "projection_snapshot_id": {
       "description": "Frozen projection snapshot from which the view was drawn.",
@@ -121,18 +162,85 @@
       },
       "additionalProperties": false
     },
+    "ActivatedIdentifierAssignmentRecord": {
+      "description": "Positive identifier-assignment visible in the working view.",
+      "type": "object",
+      "required": [
+        "activation_provenance",
+        "assignment_id",
+        "available_surface_ids",
+        "identifier_name",
+        "record_provenance",
+        "subject",
+        "value"
+      ],
+      "properties": {
+        "activation_provenance": {
+          "description": "Reasons this assignment became visible in the working view.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ActivationProvenance"
+          }
+        },
+        "assignment_id": {
+          "description": "Snapshot-local identifier-assignment identity.",
+          "type": "string"
+        },
+        "available_surface_ids": {
+          "description": "Retrieval surfaces structurally capable of inspecting this assignment.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "identifier_name": {
+          "description": "Projected identifier descriptor name.",
+          "type": "string"
+        },
+        "record_provenance": {
+          "description": "Corpus or materialization provenance from the frozen projection.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/RecordProvenance"
+            }
+          ]
+        },
+        "subject": {
+          "description": "Canonical projected subject of the assignment.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/SemanticAddress"
+            }
+          ]
+        },
+        "value": {
+          "description": "Represented projected value.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/IdentifierValue"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "ActivatedObjectRecord": {
       "description": "Visible summary of one canonical semantic object.\n\nIt exposes identity and bounded structural previews only. It does not hydrate evidence, score relevance, or imply completeness.",
       "type": "object",
       "required": [
         "activation_provenance",
+        "aliases",
         "available_surface_ids",
         "contained_region_count",
         "contained_unit_count",
         "incoming_occurrence_count",
+        "object_class",
         "object_id",
         "outgoing_occurrence_count",
-        "visible_identifier_assignment_ids"
+        "title",
+        "visible_identifier_assignment_ids",
+        "visible_region_addresses",
+        "visible_unit_ids"
       ],
       "properties": {
         "activation_provenance": {
@@ -140,6 +248,13 @@
           "type": "array",
           "items": {
             "$ref": "#/definitions/ActivationProvenance"
+          }
+        },
+        "aliases": {
+          "description": "Non-canonical aliases visible for discovery.",
+          "type": "array",
+          "items": {
+            "type": "string"
           }
         },
         "available_surface_ids": {
@@ -167,6 +282,10 @@
           "format": "uint64",
           "minimum": 0.0
         },
+        "object_class": {
+          "description": "Projected semantic-object class.",
+          "type": "string"
+        },
         "object_id": {
           "description": "Canonical semantic object identity.",
           "type": "string"
@@ -177,12 +296,119 @@
           "format": "uint64",
           "minimum": 0.0
         },
+        "title": {
+          "description": "Canonical or authored title surface.",
+          "type": "string"
+        },
         "visible_identifier_assignment_ids": {
           "description": "Identifier assignment identities currently visible.",
           "type": "array",
           "items": {
             "type": "string"
           }
+        },
+        "visible_region_addresses": {
+          "description": "Bounded visible authored-region topology.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SemanticRegionAddress"
+          }
+        },
+        "visible_unit_ids": {
+          "description": "Bounded visible contained units.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ActivatedOccurrenceRecord": {
+      "description": "Positive authored occurrence visible in the working view.",
+      "type": "object",
+      "required": [
+        "activation_provenance",
+        "authored_target_text",
+        "available_surface_ids",
+        "direction",
+        "occurrence_id",
+        "presentation_mode",
+        "resolved_target",
+        "source"
+      ],
+      "properties": {
+        "activation_provenance": {
+          "description": "Reasons this occurrence became visible.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ActivationProvenance"
+          }
+        },
+        "authored_target_text": {
+          "description": "Authored target text retained by the projection.",
+          "type": "string"
+        },
+        "available_surface_ids": {
+          "description": "Retrieval surfaces structurally capable of inspecting this occurrence.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "direction": {
+          "description": "Authored incidence direction.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Direction"
+            }
+          ]
+        },
+        "display_alias": {
+          "description": "Optional authored display alias.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "occurrence_id": {
+          "description": "Canonical authored-occurrence identity.",
+          "type": "string"
+        },
+        "presentation_mode": {
+          "description": "Link or embed presentation form.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/OccurrencePresentation"
+            }
+          ]
+        },
+        "resolved_target": {
+          "description": "Canonical projected target.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/SemanticAddress"
+            }
+          ]
+        },
+        "source": {
+          "description": "Authored object-field or semantic-unit source.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/OccurrenceSource"
+            }
+          ]
+        },
+        "source_span": {
+          "description": "Exact represented source span when present.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SourceSpan"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -195,6 +421,9 @@
         "address",
         "available_surface_ids",
         "contained_unit_count",
+        "heading_identity",
+        "heading_path",
+        "visible_identifier_assignment_ids",
         "visible_unit_ids"
       ],
       "properties": {
@@ -226,6 +455,24 @@
           "format": "uint64",
           "minimum": 0.0
         },
+        "heading_identity": {
+          "description": "Stable projected heading identity.",
+          "type": "string"
+        },
+        "heading_path": {
+          "description": "Complete authored heading path.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "visible_identifier_assignment_ids": {
+          "description": "Visible inherited identifier assignments.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "visible_unit_ids": {
           "description": "Bounded preview of directly contained canonical units.",
           "type": "array",
@@ -236,19 +483,81 @@
       },
       "additionalProperties": false
     },
+    "ActivatedTemporalAnchorRecord": {
+      "description": "Positive temporal anchor visible in the working view.",
+      "type": "object",
+      "required": [
+        "activation_provenance",
+        "anchor_id",
+        "available_surface_ids",
+        "record_provenance",
+        "subject",
+        "value"
+      ],
+      "properties": {
+        "activation_provenance": {
+          "description": "Reasons this anchor became visible.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ActivationProvenance"
+          }
+        },
+        "anchor_id": {
+          "description": "Canonical temporal-anchor identity.",
+          "type": "string"
+        },
+        "available_surface_ids": {
+          "description": "Retrieval surfaces structurally capable of inspecting this anchor.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "record_provenance": {
+          "description": "Corpus or materialization provenance from the projection.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/RecordProvenance"
+            }
+          ]
+        },
+        "subject": {
+          "description": "Canonical projected subject carrying the anchor.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/SemanticAddress"
+            }
+          ]
+        },
+        "value": {
+          "description": "Materially represented temporal value.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/TemporalValue"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "ActivatedUnitRecord": {
       "description": "Visible summary of one canonical semantic unit.\n\nIt exposes identity, bounded preview text, incidence summaries, anchors, and surfaces for planning. Full authored prose remains execution material; this record cannot admit or reject evidence.",
       "type": "object",
       "required": [
         "activation_provenance",
+        "authored_block_type",
         "available_surface_ids",
+        "heading_path",
         "incoming_occurrence_count",
         "outgoing_occurrence_count",
         "parent_object_id",
         "parent_region_address",
         "temporal_anchor_count",
         "text_preview",
-        "unit_id"
+        "text_preview_truncated",
+        "unit_id",
+        "visible_inherited_identifier_assignment_ids",
+        "visible_unit_local_identifier_assignment_ids"
       ],
       "properties": {
         "activation_provenance": {
@@ -258,8 +567,23 @@
             "$ref": "#/definitions/ActivationProvenance"
           }
         },
+        "authored_block_type": {
+          "description": "Authored source-block category.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/AuthoredBlockType"
+            }
+          ]
+        },
         "available_surface_ids": {
           "description": "Available surface identities.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "heading_path": {
+          "description": "Complete authored heading path.",
           "type": "array",
           "items": {
             "type": "string"
@@ -299,9 +623,27 @@
           "description": "Bounded text preview used only for access planning.",
           "type": "string"
         },
+        "text_preview_truncated": {
+          "description": "Whether the text preview was mechanically truncated.",
+          "type": "boolean"
+        },
         "unit_id": {
           "description": "Canonical semantic-unit identity.",
           "type": "string"
+        },
+        "visible_inherited_identifier_assignment_ids": {
+          "description": "Visible inherited identifier assignments.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "visible_unit_local_identifier_assignment_ids": {
+          "description": "Visible unit-local identifier assignments.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -358,6 +700,32 @@
             },
             "region_id": {
               "description": "Thread-local problem-region identity.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Exposed by one specific problem-space referent expression.\n\nThis records the textual source that caused exposure. It does not assert that the referent is canonically bound to the activated address.",
+          "type": "object",
+          "required": [
+            "kind",
+            "referent_id",
+            "region_id"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "problem_referent"
+              ]
+            },
+            "referent_id": {
+              "description": "Thread-local problem-referent identity.",
+              "type": "string"
+            },
+            "region_id": {
+              "description": "Containing problem-region identity.",
               "type": "string"
             }
           },
@@ -421,6 +789,34 @@
             },
             "tension_id": {
               "description": "Thread-local tension identity.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Exposed by one preserved candidate of an open tension.\n\nCandidate order is the declared vector order in the problem-space state. Exposure does not select this candidate or resolve the tension.",
+          "type": "object",
+          "required": [
+            "candidate_index",
+            "kind",
+            "tension_id"
+          ],
+          "properties": {
+            "candidate_index": {
+              "description": "Zero-based candidate index within the preserved candidate vector.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "open_tension_candidate"
+              ]
+            },
+            "tension_id": {
+              "description": "Thread-local open-tension identity.",
               "type": "string"
             }
           },
@@ -521,6 +917,67 @@
         }
       ]
     },
+    "AuthoredBlockType": {
+      "description": "Authored block categories that may materialize one semantic unit.\n\nThe variants preserve source form and cannot split a canonical unit based on provider limits.",
+      "oneOf": [
+        {
+          "description": "Authored paragraph.",
+          "type": "string",
+          "enum": [
+            "paragraph"
+          ]
+        },
+        {
+          "description": "Authored list block.",
+          "type": "string",
+          "enum": [
+            "list"
+          ]
+        },
+        {
+          "description": "Authored block quotation.",
+          "type": "string",
+          "enum": [
+            "block_quote"
+          ]
+        },
+        {
+          "description": "Authored table.",
+          "type": "string",
+          "enum": [
+            "table"
+          ]
+        },
+        {
+          "description": "Authored code fence.",
+          "type": "string",
+          "enum": [
+            "code_block"
+          ]
+        },
+        {
+          "description": "Authored display equation.",
+          "type": "string",
+          "enum": [
+            "equation"
+          ]
+        },
+        {
+          "description": "Authored callout.",
+          "type": "string",
+          "enum": [
+            "callout"
+          ]
+        },
+        {
+          "description": "Authored embedded media reference.",
+          "type": "string",
+          "enum": [
+            "embedded_media"
+          ]
+        }
+      ]
+    },
     "CandidateCount": {
       "description": "Exactness of a projection-access candidate count.\n\nIt preserves measurement status only and does not express confidence in semantic relevance.",
       "oneOf": [
@@ -570,47 +1027,206 @@
         }
       ]
     },
+    "ContinuationFilter": {
+      "description": "Typed filter applied to a continuation handle.",
+      "oneOf": [
+        {
+          "description": "Restrict to one projected structural transition.",
+          "type": "object",
+          "required": [
+            "kind",
+            "transition_id"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "transition"
+              ]
+            },
+            "transition_id": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Restrict source objects to a canonical path prefix.",
+          "type": "object",
+          "required": [
+            "canonical_path_prefix",
+            "kind"
+          ],
+          "properties": {
+            "canonical_path_prefix": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "source_path_prefix"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Restrict to one projected semantic-object class.",
+          "type": "object",
+          "required": [
+            "kind",
+            "object_class"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "object_class"
+              ]
+            },
+            "object_class": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Restrict by one projected identifier and optional represented value.",
+          "type": "object",
+          "required": [
+            "identifier_name",
+            "kind"
+          ],
+          "properties": {
+            "identifier_name": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "identifier"
+              ]
+            },
+            "represented_value": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Restrict by a temporal range.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "end": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/TemporalValue"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "temporal_range"
+              ]
+            },
+            "start": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/TemporalValue"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
     "ContinuationHandle": {
-      "description": "Bounded continuation descriptor for a high-degree or truncated view.\n\nIt permits later typed expansion within configuration limits. It does not perform expansion or imply that omitted records are irrelevant.",
+      "description": "Bounded continuation descriptor for a high-degree or truncated view.",
       "type": "object",
       "required": [
         "activation_provenance",
+        "configuration_snapshot_id",
+        "filters",
         "handle_id",
+        "next_offset",
         "next_page_limit",
-        "subject",
+        "ordering",
+        "origin",
+        "projection_snapshot_id",
+        "surface_id",
         "surface_kind"
       ],
       "properties": {
         "activation_provenance": {
-          "description": "Provenance of the activation that produced this handle.",
+          "description": "Reasons the truncated neighbourhood or result set became visible.",
           "type": "array",
           "items": {
             "$ref": "#/definitions/ActivationProvenance"
           }
         },
-        "direction": {
-          "description": "Optional incidence direction for graph-like continuation.",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Direction"
-            },
-            {
-              "type": "null"
-            }
-          ]
+        "configuration_snapshot_id": {
+          "description": "Activation configuration snapshot required by this continuation.",
+          "type": "string"
+        },
+        "filters": {
+          "description": "Typed filters already applied to the continuation.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ContinuationFilter"
+          }
         },
         "handle_id": {
           "description": "Stable handle identity.",
           "type": "string"
         },
+        "next_offset": {
+          "description": "Zero-based next offset in that stable ordering.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
         "next_page_limit": {
-          "description": "Maximum records permitted in the next bounded page.",
+          "description": "Maximum records permitted in the next page.",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
         },
+        "ordering": {
+          "description": "Stable ordering under which the cursor is interpreted.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ContinuationOrdering"
+            }
+          ]
+        },
+        "origin": {
+          "description": "Original probe or structural neighbourhood.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ContinuationOrigin"
+            }
+          ]
+        },
+        "projection_snapshot_id": {
+          "description": "Frozen projection snapshot required by this continuation.",
+          "type": "string"
+        },
         "remaining_count": {
-          "description": "Remaining measured records when known.",
+          "description": "Remaining records when mechanically knowable.",
           "type": [
             "integer",
             "null"
@@ -618,16 +1234,12 @@
           "format": "uint64",
           "minimum": 0.0
         },
-        "subject": {
-          "description": "Canonical address whose neighbourhood or content may continue.",
-          "allOf": [
-            {
-              "$ref": "#/definitions/SemanticAddress"
-            }
-          ]
+        "surface_id": {
+          "description": "Concrete projected retrieval-surface identity.",
+          "type": "string"
         },
         "surface_kind": {
-          "description": "Surface family used for continuation.",
+          "description": "Stable surface family.",
           "allOf": [
             {
               "$ref": "#/definitions/RetrievalSurfaceKind"
@@ -636,6 +1248,148 @@
         }
       },
       "additionalProperties": false
+    },
+    "ContinuationOrdering": {
+      "description": "Stable ordering under which a continuation cursor is interpreted.",
+      "oneOf": [
+        {
+          "description": "Stable order of the corresponding frozen projection vector.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "projection_vector_order"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Stable order declared by one deterministic surface.",
+          "type": "object",
+          "required": [
+            "kind",
+            "ordering_key"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "surface_declared"
+              ]
+            },
+            "ordering_key": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ContinuationOrigin": {
+      "description": "Original probe or structural neighbourhood described by a continuation handle.",
+      "oneOf": [
+        {
+          "description": "Continuation of one deterministic textual surface probe.",
+          "type": "object",
+          "required": [
+            "kind",
+            "match_mode",
+            "query_text"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "text_probe"
+              ]
+            },
+            "match_mode": {
+              "$ref": "#/definitions/SurfaceMatchMode"
+            },
+            "query_text": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Continuation of one structural neighbourhood.",
+          "type": "object",
+          "required": [
+            "kind",
+            "subject"
+          ],
+          "properties": {
+            "direction": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Direction"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "structural_neighbourhood"
+              ]
+            },
+            "subject": {
+              "$ref": "#/definitions/SemanticAddress"
+            },
+            "transition_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Continuation of one temporal surface probe.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "end": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/TemporalValue"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "temporal_probe"
+              ]
+            },
+            "start": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/TemporalValue"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "CountByLabel": {
       "description": "Count associated with one represented label.\n\nThis is mechanical telemetry, not a relevance distribution.",
@@ -697,6 +1451,209 @@
         }
       },
       "additionalProperties": false
+    },
+    "IdentifierValue": {
+      "description": "Value carried by one identifier assignment.\n\nThis is a closed structural union for exchange. It cannot be interpreted as evidence or a relation without its descriptor and provenance.",
+      "oneOf": [
+        {
+          "description": "One string value.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "string"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One signed integer value.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "integer"
+              ]
+            },
+            "value": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One boolean value.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "boolean"
+              ]
+            },
+            "value": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One canonical address value.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "semantic_address"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/SemanticAddress"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Collection of strings.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "strings"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Collection of canonical addresses.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "semantic_addresses"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/SemanticAddress"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "OccurrencePresentation": {
+      "description": "Presentation form of an authored occurrence.\n\nPresentation does not create a second target object or change canonical identity.",
+      "oneOf": [
+        {
+          "description": "Authored link occurrence.",
+          "type": "string",
+          "enum": [
+            "link"
+          ]
+        },
+        {
+          "description": "Authored embed occurrence.",
+          "type": "string",
+          "enum": [
+            "embed"
+          ]
+        }
+      ]
+    },
+    "OccurrenceSource": {
+      "description": "Authored source surface of one occurrence.\n\nIt distinguishes object-field context from semantic-unit body context and cannot transfer identifiers between source and target.",
+      "oneOf": [
+        {
+          "description": "Occurrence authored in an object field.",
+          "type": "object",
+          "required": [
+            "field_path",
+            "kind",
+            "object_id"
+          ],
+          "properties": {
+            "field_path": {
+              "description": "Authored field path.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "object_field"
+              ]
+            },
+            "object_id": {
+              "description": "Source canonical object.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Occurrence authored in a semantic unit body.",
+          "type": "object",
+          "required": [
+            "kind",
+            "unit_id"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "semantic_unit"
+              ]
+            },
+            "unit_id": {
+              "description": "Source canonical semantic unit.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "ProjectionTelemetry": {
       "description": "Measured access telemetry for an activated surface or region.\n\nIt reports counts, depth, truncation, budget, and continuation. It is not a semantic score and has no evidence-admission authority.",
@@ -801,6 +1758,98 @@
         }
       },
       "additionalProperties": false
+    },
+    "RecordProvenance": {
+      "description": "Provenance of a projected or retrieved fact.\n\nIt records where a fact was materialized from. It may not upgrade source authority or turn contextual participation into intrinsic typing.",
+      "oneOf": [
+        {
+          "description": "Frontmatter field on a canonical source object.",
+          "type": "object",
+          "required": [
+            "field_path",
+            "kind",
+            "object_id"
+          ],
+          "properties": {
+            "field_path": {
+              "description": "Authored field path.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "object_field"
+              ]
+            },
+            "object_id": {
+              "description": "Canonical object that owns the field.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Authored body span inside a canonical semantic unit.",
+          "type": "object",
+          "required": [
+            "kind",
+            "unit_id"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "semantic_unit"
+              ]
+            },
+            "source_span": {
+              "description": "Optional exact source span.",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/SourceSpan"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unit_id": {
+              "description": "Canonical semantic unit containing the source.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Deterministically materialized structural record.",
+          "type": "object",
+          "required": [
+            "kind",
+            "rule",
+            "sources"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "materialization"
+              ]
+            },
+            "rule": {
+              "description": "Named materialization rule or contract source.",
+              "type": "string"
+            },
+            "sources": {
+              "description": "Source record addresses used by the rule.",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/SemanticAddress"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "RetrievalSurfaceAddress": {
       "description": "Address of a retrieval-surface descriptor.\n\nIt names a projected capability only. It does not execute the surface or imply that the surface is available for a particular address.",
@@ -1019,6 +2068,251 @@
         }
       },
       "additionalProperties": false
+    },
+    "SourceSpan": {
+      "description": "Authored or materialized source span.\n\nThis is provenance for a represented record. It cannot reinterpret the source or establish semantic relevance.",
+      "type": "object",
+      "required": [
+        "source"
+      ],
+      "properties": {
+        "end_byte": {
+          "description": "Exclusive ending byte offset when known.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "source": {
+          "description": "Source path or stable source identity.",
+          "type": "string"
+        },
+        "start_byte": {
+          "description": "Inclusive starting byte offset when known.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "SurfaceMatchMode": {
+      "description": "Query or match modes exposed by a retrieval surface.\n\nModes constrain execution shape only and do not imply semantic relevance.",
+      "oneOf": [
+        {
+          "description": "Exact literal match.",
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "literal"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Token or term match.",
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "terms"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Nearest-neighbour candidate lookup.",
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "nearest_neighbours"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Typed edge or occurrence navigation.",
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "incidence"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Temporal range or ordering access.",
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "temporal"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Named configured mode not hard-coded as corpus meaning.",
+          "type": "object",
+          "required": [
+            "mode",
+            "name"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "declared"
+              ]
+            },
+            "name": {
+              "description": "Stable configured mode name.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TemporalValue": {
+      "description": "Structured temporal value represented by a temporal anchor.\n\nIt preserves authored precision and does not perform ordering or inference.",
+      "oneOf": [
+        {
+          "description": "Calendar date in ISO-like authored form.",
+          "type": "object",
+          "required": [
+            "precision",
+            "value"
+          ],
+          "properties": {
+            "precision": {
+              "type": "string",
+              "enum": [
+                "date"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Date and time with an explicit offset or zone in authored form.",
+          "type": "object",
+          "required": [
+            "precision",
+            "value"
+          ],
+          "properties": {
+            "precision": {
+              "type": "string",
+              "enum": [
+                "date_time"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Calendar year.",
+          "type": "object",
+          "required": [
+            "precision",
+            "value"
+          ],
+          "properties": {
+            "precision": {
+              "type": "string",
+              "enum": [
+                "year"
+              ]
+            },
+            "value": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Relative or source-defined ordinal.",
+          "type": "object",
+          "required": [
+            "precision",
+            "value"
+          ],
+          "properties": {
+            "precision": {
+              "type": "string",
+              "enum": [
+                "ordinal"
+              ]
+            },
+            "value": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Named temporal label when no stronger syntax is admitted.",
+          "type": "object",
+          "required": [
+            "precision",
+            "value"
+          ],
+          "properties": {
+            "precision": {
+              "type": "string",
+              "enum": [
+                "label"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "TruncationState": {
       "description": "Mechanical truncation state of an activated result set.\n\nIt describes bounded visibility only and authorizes no conclusion about omitted corpus material.",

@@ -1,8 +1,10 @@
 use schemars::{JsonSchema, schema_for};
 use semantic_traversal_core::{
-    AcceptedBoundaryContribution, ActivatedProjection, AttentionLens, BoundaryContribution,
-    BoundaryContributionLog, ConformanceResult, ExecutionLimits, OpenTension, ProblemRegion,
-    ProblemRelation, ProblemSpaceState, RetrievalResult, SemanticAccessPlan,
+    AcceptedBoundaryContribution, ActivatedIdentifierAssignmentRecord, ActivatedOccurrenceRecord,
+    ActivatedProjection, ActivatedTemporalAnchorRecord, ActivationUtterance, AttentionLens,
+    BoundaryContribution, BoundaryContributionLog, ConformanceResult, ContinuationHandle,
+    ExecutionLimits, OpenTension, ProblemRegion, ProblemRelation, ProblemSpaceState,
+    ProjectionActivationConfig, ProjectionActivationViolation, RetrievalResult, SemanticAccessPlan,
     SemanticSpaceProjection, SynthesisInput,
 };
 use serde::Serialize;
@@ -52,6 +54,34 @@ pub fn generated_schemas() -> Vec<(&'static str, String)> {
         (
             "activated-projection.schema.json",
             render_schema::<ActivatedProjection>(),
+        ),
+        (
+            "activation-utterance.schema.json",
+            render_schema::<ActivationUtterance>(),
+        ),
+        (
+            "projection-activation-config.schema.json",
+            render_schema::<ProjectionActivationConfig>(),
+        ),
+        (
+            "projection-activation-violation.schema.json",
+            render_schema::<ProjectionActivationViolation>(),
+        ),
+        (
+            "activated-identifier-assignment-record.schema.json",
+            render_schema::<ActivatedIdentifierAssignmentRecord>(),
+        ),
+        (
+            "activated-occurrence-record.schema.json",
+            render_schema::<ActivatedOccurrenceRecord>(),
+        ),
+        (
+            "activated-temporal-anchor-record.schema.json",
+            render_schema::<ActivatedTemporalAnchorRecord>(),
+        ),
+        (
+            "continuation-handle.schema.json",
+            render_schema::<ContinuationHandle>(),
         ),
         (
             "semantic-access-plan.schema.json",

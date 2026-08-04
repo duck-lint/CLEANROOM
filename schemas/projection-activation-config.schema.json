@@ -1,0 +1,241 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ProjectionActivationConfig",
+  "description": "Activation bounds and surface limits paired with one projection configuration.",
+  "type": "object",
+  "required": [
+    "background",
+    "configuration_snapshot_id",
+    "continuation_page_limit",
+    "hub_degree_threshold",
+    "maximum_activated_edges",
+    "maximum_activated_identifier_assignments",
+    "maximum_activated_objects",
+    "maximum_activated_occurrences",
+    "maximum_activated_regions",
+    "maximum_activated_temporal_anchors",
+    "maximum_activated_units",
+    "maximum_continuation_handles",
+    "maximum_initial_relation_depth",
+    "maximum_telemetry_records",
+    "primary",
+    "secondary",
+    "surface_limits",
+    "tertiary",
+    "unbanded"
+  ],
+  "properties": {
+    "background": {
+      "description": "Bounds applied to background problem-region activation.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ProjectionActivationBandConfig"
+        }
+      ]
+    },
+    "configuration_snapshot_id": {
+      "description": "Configuration snapshot paired with the projection.",
+      "type": "string"
+    },
+    "continuation_page_limit": {
+      "description": "Maximum page size carried by a continuation handle.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "hub_degree_threshold": {
+      "description": "Degree at which a visible address is represented as a hub summary.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "maximum_activated_edges": {
+      "description": "Total activated-edge bound.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "maximum_activated_identifier_assignments": {
+      "description": "Total activated-identifier-assignment bound.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "maximum_activated_objects": {
+      "description": "Total activated-object bound.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "maximum_activated_occurrences": {
+      "description": "Total activated-occurrence bound.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "maximum_activated_regions": {
+      "description": "Total activated-region bound.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "maximum_activated_temporal_anchors": {
+      "description": "Total activated-temporal-anchor bound.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "maximum_activated_units": {
+      "description": "Total activated-unit bound.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "maximum_continuation_handles": {
+      "description": "Total continuation-handle bound.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "maximum_initial_relation_depth": {
+      "description": "Maximum structural-transition depth during initial activation.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "maximum_telemetry_records": {
+      "description": "Total telemetry-record bound.",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "primary": {
+      "description": "Bounds applied to primary problem-region activation.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ProjectionActivationBandConfig"
+        }
+      ]
+    },
+    "secondary": {
+      "description": "Bounds applied to secondary problem-region activation.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ProjectionActivationBandConfig"
+        }
+      ]
+    },
+    "surface_limits": {
+      "description": "Per-surface candidate limits for every available projected surface.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ProjectionActivationSurfaceConfig"
+      }
+    },
+    "tertiary": {
+      "description": "Bounds applied to tertiary problem-region activation.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ProjectionActivationBandConfig"
+        }
+      ]
+    },
+    "unbanded": {
+      "description": "Bounds for newest-utterance, whole-space-constraint, and configured-default seeds.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ProjectionActivationBandConfig"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ProjectionActivationBandConfig": {
+      "description": "Per-band deterministic activation bounds.",
+      "type": "object",
+      "required": [
+        "maximum_structural_neighbors_per_record",
+        "maximum_textual_seeds",
+        "maximum_visible_units_per_region",
+        "text_preview_character_limit"
+      ],
+      "properties": {
+        "maximum_structural_neighbors_per_record": {
+          "description": "Maximum structural neighbours previewed for one visible address.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "maximum_textual_seeds": {
+          "description": "Maximum textual seeds consumed from this activation group.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "maximum_visible_units_per_region": {
+          "description": "Maximum directly contained units previewed for one activated region.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "text_preview_character_limit": {
+          "description": "Maximum Unicode scalar values retained in one unit text preview.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProjectionActivationSurfaceConfig": {
+      "description": "Per-surface candidate limits for every activation band.",
+      "type": "object",
+      "required": [
+        "background_candidate_limit",
+        "primary_candidate_limit",
+        "secondary_candidate_limit",
+        "surface_id",
+        "tertiary_candidate_limit",
+        "unbanded_candidate_limit"
+      ],
+      "properties": {
+        "background_candidate_limit": {
+          "description": "Candidate limit for background activation.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "primary_candidate_limit": {
+          "description": "Candidate limit for primary activation.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "secondary_candidate_limit": {
+          "description": "Candidate limit for secondary activation.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "surface_id": {
+          "description": "Concrete projected retrieval-surface identity.",
+          "type": "string"
+        },
+        "tertiary_candidate_limit": {
+          "description": "Candidate limit for tertiary activation.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "unbanded_candidate_limit": {
+          "description": "Candidate limit for unbanded activation.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

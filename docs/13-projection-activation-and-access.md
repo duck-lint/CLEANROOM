@@ -2,7 +2,7 @@
 
 ## Status
 
-Seed contract for review.
+Accepted representation closure for initial activation.
 
 This document defines how the full semantic projection becomes a bounded, positive, expandable working view for the second inference call.
 
@@ -125,7 +125,7 @@ Marx, Karl — Capital
     canonical identity: source-material UUID
     activated_by:
         region: Capital/Blood Meridian source-material chronology
-        referent binding: Capital
+        referent exposure: Capital
         attention band: primary
 ```
 
@@ -573,3 +573,94 @@ Projection activation is acceptable when:
 14. open tensions may activate multiple candidate routes without forced resolution;
 15. telemetry never becomes semantic judgment or coherence scoring;
 16. the final plan references resolved projected structure.
+
+## 14. Accepted PR 4A representation closure
+
+Status: accepted representation closure for initial deterministic activation.
+
+PR 4A closes the serializable contracts around:
+
+```text
+W_t^(0) = A_cfg(M_sigma, P_t, u_t, Lambda_t)
+```
+
+It does not implement `A_cfg`. The frozen semantic projection remains structural corpus authority. The problem space shapes bounded positive exposure but cannot create corpus structure. Visibility is not relevance, omission is not corpus absence, and activation provenance is not confidence, truth, relevance, or evidence admission.
+
+### Candidate exposure versus canonical binding
+
+Activation exposes projected candidates. It does not bind problem-space referents, problem regions, open tensions, or candidate expressions to canonical semantic addresses. `ProblemReferent` provenance means only that a referent expression exposed a projected candidate under the current surface, configuration, and bounds. It does not mean `problem referent == canonical semantic address`.
+
+Canonical problem-region/address binding remains semantic-access inference work in conceptual Phase 5. No activation representation may introduce `referent_binding`, `canonical_binding`, `problem_region_binding`, `ReferentBinding`, `CanonicalBinding`, `ResolvedProblemRegion`, or a problem-space-to-corpus mapping record.
+
+### Activation input identity
+
+The activation input includes an explicit `ActivationUtterance` containing `utterance_id` and complete conversational `text`. The text is input to deterministic activation, not corpus evidence.
+
+`ActivatedProjection` records the projection snapshot, configuration snapshot, problem-space thread id, exact problem-space version, and newest utterance id. It deliberately does not copy the complete problem-space state or utterance text.
+
+### Layered configuration and surface capability
+
+`ProjectionActivationConfig` is separate from the activated view. It has five configuration groups: unbanded, primary, secondary, tertiary, and background. Unbanded covers newest-utterance, whole-space-constraint, and configured-default seeds. Each group has textual-seed, structural-neighbour, visible-unit, and preview-text bounds. Per-surface limits are declared for every available projected surface and every activation band.
+
+Future PR 4B validation must enforce that configuration and projection snapshot configuration identities match; exactly one surface configuration exists for each available projection surface; unavailable, unknown, and duplicate surface configurations are invalid; each configured candidate limit is within the corresponding hard surface limit; and all available structurally capable configured surfaces participate automatically. No identifier-to-surface affordance may be omitted by hardcoded exception.
+
+Zero total bounds, zero band bounds, and zero surface candidate limits are valid mechanical bounds. A zero candidate limit yields no candidates for that surface and band but makes no negative corpus claim. `maximum_initial_relation_depth == 0` permits no structural expansion beyond directly exposed records. `continuation_page_limit == 0` suppresses continuation handles. No configuration value is a relevance score.
+
+### Explicit activated records and dual provenance
+
+The activated view has separate typed vectors for objects, regions, units, identifier assignments, authored occurrences, temporal anchors, edges, telemetry, and continuation handles. Identifier-assignment and temporal-anchor records carry both `record_provenance` and `activation_provenance`.
+
+`record_provenance` says where the projected fact came from in the frozen projection. `activation_provenance` says why it became visible now. These are separate axes and must not be collapsed.
+
+### Referent and tension-candidate exposure
+
+Activation provenance includes `ProblemReferent` and `OpenTensionCandidate`. `ProblemReferent` records the containing problem-region identity and thread-local referent identity. `OpenTensionCandidate` records the thread-local tension identity and zero-based candidate index in the preserved candidate vector. Candidate exposure does not select the candidate or resolve the tension.
+
+### Textual and structural activation sources
+
+Accepted textual source families are: newest utterance text; operational problem-region referent expressions; active constraint expressions; open-tension unresolved expressions; and each open-tension candidate binding in declared vector order.
+
+Accepted structural source families are: active problem-space relations; operational region topology; attention-band membership; and configured defaults. Problem-space relation labels or reasons must not be converted into invented natural-language search text. Relations guide structural exposure and attach `ProblemRelation` provenance.
+
+Future deterministic seed-group order is: newest utterance; active whole-problem-space constraints; primary problem regions; secondary problem regions; tertiary problem regions; background problem regions; configured defaults. Within each attention band, preserve region order from the corresponding `AttentionLens` vector, referent order from each region, active regional-constraint order from `ProblemSpaceState.constraints`, open-tension order from `ProblemSpaceState.open_tensions`, unresolved expression before candidate bindings, candidate-binding vector order, and active problem-relation order from `ProblemSpaceState.relations`.
+
+Later seeds may be mechanically omitted when a configured seed bound is reached. Such omission means only `not activated under this configured bound`; it does not mean irrelevant, absent, false, or evidentially empty.
+
+### First-seen canonical deduplication and provenance aggregation
+
+Future PR 4B output vectors use deterministic first-seen order. Available surfaces execute in `SemanticSpaceProjection.retrieval_surfaces` vector order. Surface candidates preserve each surface's deterministic returned order. Structural records preserve frozen projection vector order.
+
+Canonical object, region, unit, assignment, occurrence, anchor, and edge identities appear at most once in their respective activated vectors. When a canonical record is exposed through several paths, retain its first-seen position and append all unique activation-provenance entries in first-seen order. Do not merge records by title, alias, text, similarity, or inferred equivalence. Aliases never become duplicate canonical objects. Attention bands affect breadth and ordering but never semantic identity or truth. No numeric relevance or attention score is introduced.
+
+### Richer bounded summaries
+
+Activated object records expose title, aliases, object class, bounded visible region addresses, bounded visible unit ids, visible identifier assignment ids, full contained counts, occurrence counts, available surfaces, and activation provenance. Aliases are discovery surfaces, not canonical identity. Object class is projected typing, not a generated ontology.
+
+Activated region records expose heading path, heading identity, visible inherited identifier assignment ids, bounded visible unit ids, full contained count, surfaces, and activation provenance. Activated unit records expose authored block type, heading path, inherited and unit-local identifier assignment ids, text preview, truncation flag, incidence counts, temporal-anchor count, surfaces, and activation provenance.
+
+Previews are planning material, not retrieved evidence. Full authored prose remains execution material. A truncated preview authorizes no claim about omitted text. Contained-record vectors are bounded previews, while count fields describe the full frozen projection record. Visible identifier, occurrence, and anchor records remain separate typed records.
+
+### Self-describing continuation handles
+
+A continuation handle is serializable and restart-safe. It requires no hidden runtime registry, contains no evidence, and performs no expansion. Its offset has meaning only with the named frozen projection snapshot, activation configuration snapshot, surface, filters, and ordering. The projection or configuration snapshot must not change while continuing.
+
+Continuation origin is typed as a text probe, structural neighbourhood, or temporal probe. Filters are typed as transition, source path prefix, object class, identifier, or temporal range. Ordering is either projection-vector order or a surface-declared stable ordering key. Expansion execution belongs to Phase 5. Real retrieval execution belongs to Phase 7.
+
+### Typed activation violations
+
+`ProjectionActivationViolation` is the closed Phase 4B error vocabulary. It covers empty required identities, projection validation status, configuration snapshot mismatch, missing/unknown/unavailable/duplicate surface configuration, invalid configuration values, candidate limits exceeding hard limits, duplicate activated identities, invalid activated references, invalid activation provenance, invalid continuation handles, invalid telemetry, activated-view bound overflow, and count overflow. PR 4A defines the vocabulary only; it does not implement validation behavior, `Display`, or `Error`.
+
+### Exact PR boundary
+
+```text
+PR 4A
+    contracts, schemas, representation tests
+
+PR 4B
+    deterministic activation implementation
+    scripted surface access
+    telemetry
+    hub summaries
+    candidate exposure
+    no semantic binding
+```

@@ -1,0 +1,371 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ProjectionActivationViolation",
+  "description": "Closed typed error vocabulary reserved for deterministic activation validation.",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "field",
+        "violation"
+      ],
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "violation": {
+          "type": "string",
+          "enum": [
+            "empty_required_identity"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "status",
+        "violation"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/definitions/ProjectionValidationStatus"
+        },
+        "violation": {
+          "type": "string",
+          "enum": [
+            "projection_not_validated"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "activation_configuration_snapshot_id",
+        "projection_configuration_snapshot_id",
+        "violation"
+      ],
+      "properties": {
+        "activation_configuration_snapshot_id": {
+          "type": "string"
+        },
+        "projection_configuration_snapshot_id": {
+          "type": "string"
+        },
+        "violation": {
+          "type": "string",
+          "enum": [
+            "configuration_snapshot_mismatch"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "surface_id",
+        "violation"
+      ],
+      "properties": {
+        "surface_id": {
+          "type": "string"
+        },
+        "violation": {
+          "type": "string",
+          "enum": [
+            "missing_available_surface_configuration"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "surface_id",
+        "violation"
+      ],
+      "properties": {
+        "surface_id": {
+          "type": "string"
+        },
+        "violation": {
+          "type": "string",
+          "enum": [
+            "unknown_or_unavailable_surface_configuration"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "surface_id",
+        "violation"
+      ],
+      "properties": {
+        "surface_id": {
+          "type": "string"
+        },
+        "violation": {
+          "type": "string",
+          "enum": [
+            "duplicate_surface_configuration"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "field",
+        "violation"
+      ],
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "violation": {
+          "type": "string",
+          "enum": [
+            "invalid_configuration_value"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "hard_maximum",
+        "requested",
+        "surface_id",
+        "violation"
+      ],
+      "properties": {
+        "hard_maximum": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "requested": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "surface_id": {
+          "type": "string"
+        },
+        "violation": {
+          "type": "string",
+          "enum": [
+            "surface_candidate_limit_exceeds_hard_limit"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "identity",
+        "kind",
+        "violation"
+      ],
+      "properties": {
+        "identity": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ActivatedRecordKind"
+        },
+        "violation": {
+          "type": "string",
+          "enum": [
+            "duplicate_activated_identity"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "context",
+        "violation"
+      ],
+      "properties": {
+        "context": {
+          "type": "string"
+        },
+        "violation": {
+          "type": "string",
+          "enum": [
+            "invalid_activated_reference"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "context",
+        "violation"
+      ],
+      "properties": {
+        "context": {
+          "type": "string"
+        },
+        "violation": {
+          "type": "string",
+          "enum": [
+            "invalid_activation_provenance"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "context",
+        "handle_id",
+        "violation"
+      ],
+      "properties": {
+        "context": {
+          "type": "string"
+        },
+        "handle_id": {
+          "type": "string"
+        },
+        "violation": {
+          "type": "string",
+          "enum": [
+            "invalid_continuation_handle"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "context",
+        "surface_id",
+        "violation"
+      ],
+      "properties": {
+        "context": {
+          "type": "string"
+        },
+        "surface_id": {
+          "type": "string"
+        },
+        "violation": {
+          "type": "string",
+          "enum": [
+            "invalid_telemetry"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "actual",
+        "kind",
+        "maximum",
+        "violation"
+      ],
+      "properties": {
+        "actual": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "kind": {
+          "$ref": "#/definitions/ActivatedRecordKind"
+        },
+        "maximum": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "violation": {
+          "type": "string",
+          "enum": [
+            "activated_view_bound_exceeded"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "violation"
+      ],
+      "properties": {
+        "violation": {
+          "type": "string",
+          "enum": [
+            "count_overflow"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "definitions": {
+    "ActivatedRecordKind": {
+      "description": "Activated-vector identity category used by future validation violations.",
+      "type": "string",
+      "enum": [
+        "object",
+        "region",
+        "unit",
+        "identifier_assignment",
+        "occurrence",
+        "temporal_anchor",
+        "edge",
+        "telemetry",
+        "continuation_handle"
+      ]
+    },
+    "ProjectionValidationStatus": {
+      "description": "Validation state attached to a frozen projection representation.\n\nThis is recorded projection metadata. The enum does not validate anything and does not convert an invalid snapshot into a usable one.",
+      "oneOf": [
+        {
+          "description": "Snapshot has passed the accepted structural validation process.",
+          "type": "string",
+          "enum": [
+            "validated"
+          ]
+        },
+        {
+          "description": "Snapshot exists but has not yet been structurally validated.",
+          "type": "string",
+          "enum": [
+            "unvalidated"
+          ]
+        },
+        {
+          "description": "Snapshot is retained for diagnostics but is structurally invalid.",
+          "type": "string",
+          "enum": [
+            "invalid"
+          ]
+        }
+      ]
+    }
+  }
+}

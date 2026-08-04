@@ -16,7 +16,11 @@ pub mod projection;
 pub mod semantic_access;
 pub mod synthesis;
 
-pub use activation::ActivatedProjection;
+pub use activation::{
+    ActivatedIdentifierAssignmentRecord, ActivatedOccurrenceRecord, ActivatedProjection,
+    ActivatedTemporalAnchorRecord, ActivationUtterance, ContinuationHandle,
+    ProjectionActivationConfig, ProjectionActivationViolation,
+};
 pub use conformance::ConformanceResult;
 pub use execution::RetrievalResult;
 pub use model::{
