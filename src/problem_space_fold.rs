@@ -2,6 +2,8 @@
 //!
 //! This module implements `P_t = U(P_{t-1}, B_t)`. It validates and applies
 //! declarations; it has no authority to infer, normalize, or repair semantics.
+//! Relation supersession is deliberately unsupported: the exchanged relation
+//! operations can connect or disconnect only, and disconnect retires.
 
 use crate::problem_space::*;
 use std::{collections::HashSet, error::Error, fmt};
@@ -54,6 +56,7 @@ pub enum ProblemSpaceFoldViolation {
     StateVersionLogLengthMismatch,
     ContributionHistoryLogMismatch,
     SourceTurnRangeLogMismatch,
+    PriorStateReplayMismatch,
     AcceptedEntrySequenceMismatch {
         index: usize,
     },
@@ -63,6 +66,10 @@ pub enum ProblemSpaceFoldViolation {
     DuplicateAcceptedIdentity {
         kind: AcceptedIdentityKind,
         identity: String,
+    },
+    DuplicateRegionContributionProvenance {
+        region_id: String,
+        contribution_id: String,
     },
     ContributionDeclarationCountExcess,
     DuplicateRecordIdentity {
@@ -119,10 +126,25 @@ fn operational(p: &RegionPersistenceState) -> bool {
             | RegionPersistenceState::Unresolved
     )
 }
-fn add_once(values: &mut Vec<String>, value: &str) {
-    if !values.iter().any(|v| v == value) {
-        values.push(value.to_owned());
+fn ensure_region_provenance(region: &mut ProblemRegion, contribution_id: &str) -> Result<(), V> {
+    match region
+        .source_contribution_ids
+        .iter()
+        .filter(|id| id.as_str() == contribution_id)
+        .count()
+    {
+        0 => region
+            .source_contribution_ids
+            .push(contribution_id.to_owned()),
+        1 => {}
+        _ => {
+            return Err(V::DuplicateRegionContributionProvenance {
+                region_id: region.region_id.clone(),
+                contribution_id: contribution_id.to_owned(),
+            });
+        }
     }
+    Ok(())
 }
 fn region_pos(s: &ProblemSpaceState, id: &str) -> Result<usize, V> {
     s.regions
@@ -166,6 +188,222 @@ fn nonempty(id: &str, context: &'static str) -> Result<(), V> {
     } else {
         Ok(())
     }
+}
+
+fn validate_subject_identity(subject: &ProblemSpaceSubject) -> Result<(), V> {
+    let id = match subject {
+        ProblemSpaceSubject::Region(id)
+        | ProblemSpaceSubject::Relation(id)
+        | ProblemSpaceSubject::Constraint(id)
+        | ProblemSpaceSubject::OpenTension(id)
+        | ProblemSpaceSubject::Referent(id) => id,
+    };
+    nonempty(id, "problem-space subject identity")
+}
+
+fn validate_region_identities(region: &ProblemRegion) -> Result<(), V> {
+    nonempty(&region.region_id, "region_id")?;
+    if let Some(id) = &region.supersedes_region_id {
+        nonempty(id, "supersedes_region_id")?;
+    }
+    for id in &region.source_contribution_ids {
+        nonempty(id, "region source_contribution_id")?;
+    }
+    for referent in &region.anchor_referents {
+        nonempty(&referent.referent_id, "referent_id")?;
+        nonempty(
+            &referent.source_contribution_id,
+            "referent source_contribution_id",
+        )?;
+    }
+    for id in region
+        .relation_ids
+        .iter()
+        .chain(&region.local_constraint_ids)
+        .chain(&region.open_tension_ids)
+    {
+        nonempty(id, "region incidence identity")?;
+    }
+    Ok(())
+}
+
+fn validate_constraint_identities(constraint: &ProblemConstraint) -> Result<(), V> {
+    nonempty(&constraint.constraint_id, "constraint_id")?;
+    nonempty(
+        &constraint.source_contribution_id,
+        "constraint source_contribution_id",
+    )?;
+    if let ProblemConstraintApplicability::Regions { region_ids } = &constraint.applicability {
+        for id in region_ids {
+            nonempty(id, "constraint applicability region_id")?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_contribution_identities(c: &BoundaryContribution) -> Result<(), V> {
+    nonempty(&c.contribution_id, "contribution_id")?;
+    nonempty(&c.source_turn_id, "source_turn_id")?;
+    nonempty(&c.source_utterance_id, "source_utterance_id")?;
+    for op in &c.region_operations {
+        match op {
+            RegionOperation::Create { region } => validate_region_identities(region)?,
+            RegionOperation::Preserve { region_id, .. }
+            | RegionOperation::Reinforce { region_id, .. }
+            | RegionOperation::Retire { region_id, .. } => nonempty(region_id, "region_id")?,
+            RegionOperation::Extend {
+                region_id,
+                referent,
+            } => {
+                nonempty(region_id, "region_id")?;
+                nonempty(&referent.referent_id, "referent_id")?;
+                nonempty(
+                    &referent.source_contribution_id,
+                    "referent source_contribution_id",
+                )?;
+            }
+            RegionOperation::Merge {
+                source_region_ids,
+                resulting_region,
+                ..
+            } => {
+                for id in source_region_ids {
+                    nonempty(id, "merge source region_id")?;
+                }
+                validate_region_identities(resulting_region)?;
+            }
+            RegionOperation::Split {
+                source_region_id,
+                resulting_regions,
+                ..
+            } => {
+                nonempty(source_region_id, "split source region_id")?;
+                for region in resulting_regions {
+                    validate_region_identities(region)?;
+                }
+            }
+            RegionOperation::Supersede {
+                region_id,
+                superseded_by_region_id,
+                ..
+            } => {
+                nonempty(region_id, "supersession source region_id")?;
+                nonempty(
+                    superseded_by_region_id,
+                    "supersession replacement region_id",
+                )?;
+            }
+        }
+    }
+    for op in &c.relation_operations {
+        match op {
+            RelationOperation::Connect { relation } => {
+                nonempty(&relation.relation_id, "relation_id")?;
+                nonempty(&relation.source_region_id, "relation source_region_id")?;
+                if let Some(id) = &relation.target_region_id {
+                    nonempty(id, "relation target_region_id")?;
+                }
+                nonempty(
+                    &relation.source_contribution_id,
+                    "relation source_contribution_id",
+                )?;
+            }
+            RelationOperation::Disconnect { relation_id, .. } => {
+                nonempty(relation_id, "disconnect relation_id")?
+            }
+        }
+    }
+    for op in &c.constraint_operations {
+        match op {
+            ConstraintOperation::Add { constraint } => validate_constraint_identities(constraint)?,
+            ConstraintOperation::Replace {
+                prior_constraint_id,
+                replacement,
+                ..
+            } => {
+                nonempty(prior_constraint_id, "prior constraint_id")?;
+                validate_constraint_identities(replacement)?;
+            }
+            ConstraintOperation::Retire { constraint_id, .. } => {
+                nonempty(constraint_id, "retired constraint_id")?
+            }
+        }
+    }
+    for op in &c.tension_operations {
+        match op {
+            TensionOperation::Open { tension } => {
+                nonempty(&tension.tension_id, "tension_id")?;
+                nonempty(&tension.region_id, "tension region_id")?;
+                nonempty(&tension.source_turn_id, "tension source_turn_id")?;
+            }
+            TensionOperation::Resolve { tension_id, .. }
+            | TensionOperation::Abandon { tension_id, .. } => nonempty(tension_id, "tension_id")?,
+            TensionOperation::Supersede {
+                tension_id,
+                superseded_by_tension_id,
+                ..
+            } => {
+                nonempty(tension_id, "superseded tension_id")?;
+                nonempty(superseded_by_tension_id, "replacement tension_id")?;
+            }
+        }
+    }
+    for operation in &c.attention_operations {
+        nonempty(&operation.region_id, "attention region_id")?;
+    }
+    for declaration in &c.preservation_declarations {
+        validate_subject_identity(&declaration.subject)?;
+    }
+    for declaration in &c.release_declarations {
+        validate_subject_identity(&declaration.subject)?;
+    }
+    Ok(())
+}
+
+fn validate_state_identities(state: &ProblemSpaceState) -> Result<(), V> {
+    nonempty(&state.thread_id, "state thread_id")?;
+    nonempty(
+        &state.source_turn_range.first_turn_id,
+        "first source turn_id",
+    )?;
+    nonempty(&state.source_turn_range.last_turn_id, "last source turn_id")?;
+    for region in &state.regions {
+        validate_region_identities(region)?;
+    }
+    for relation in &state.relations {
+        nonempty(&relation.relation_id, "relation_id")?;
+        nonempty(&relation.source_region_id, "relation source_region_id")?;
+        if let Some(id) = &relation.target_region_id {
+            nonempty(id, "relation target_region_id")?;
+        }
+        nonempty(
+            &relation.source_contribution_id,
+            "relation source_contribution_id",
+        )?;
+    }
+    for constraint in &state.constraints {
+        validate_constraint_identities(constraint)?;
+    }
+    for tension in &state.open_tensions {
+        nonempty(&tension.tension_id, "tension_id")?;
+        nonempty(&tension.region_id, "tension region_id")?;
+        nonempty(&tension.source_turn_id, "tension source_turn_id")?;
+    }
+    for history in &state.contribution_history {
+        nonempty(&history.contribution_id, "history contribution_id")?;
+        nonempty(&history.source_turn_id, "history source_turn_id")?;
+    }
+    for id in state
+        .attention_lens
+        .primary_region_ids
+        .iter()
+        .chain(&state.attention_lens.secondary_region_ids)
+        .chain(&state.attention_lens.tertiary_region_ids)
+        .chain(&state.attention_lens.background_region_ids)
+    {
+        nonempty(id, "attention lens region_id")?;
+    }
+    Ok(())
 }
 
 fn transformations(c: &BoundaryContribution) -> Vec<BoundaryOperationKind> {
@@ -344,7 +582,8 @@ fn check_app(s: &ProblemSpaceState, a: &ProblemConstraintApplicability) -> Resul
         }
         let mut seen = HashSet::new();
         for id in region_ids {
-            if id.is_empty() || !seen.insert(id) {
+            nonempty(id, "constraint applicability region_id")?;
+            if !seen.insert(id) {
                 return Err(V::InvalidConstraintApplicability);
             }
             let p = region_pos(s, id)?;
@@ -367,16 +606,14 @@ fn record_new(kind: ProblemSpaceRecordKind, id: &str, present: bool) -> Result<(
     }
 }
 
-pub fn fold_boundary_contribution(
+fn apply_one(
     prior_state: Option<&ProblemSpaceState>,
     accepted_log: &BoundaryContributionLog,
     contribution: &BoundaryContribution,
     limits: &ProblemSpaceFoldLimits,
 ) -> Result<ProblemSpaceFoldOutput, V> {
     validate_pair(prior_state, accepted_log)?;
-    nonempty(&contribution.contribution_id, "contribution_id")?;
-    nonempty(&contribution.source_turn_id, "source_turn_id")?;
-    nonempty(&contribution.source_utterance_id, "source_utterance_id")?;
+    validate_contribution_identities(contribution)?;
     for e in &accepted_log.entries {
         for (a, b, k) in [
             (
@@ -457,7 +694,7 @@ pub fn fold_boundary_contribution(
                     });
                 }
                 let mut x = region.clone();
-                add_once(&mut x.source_contribution_ids, cid);
+                ensure_region_provenance(&mut x, cid)?;
                 s.regions.push(x)
             }
             RegionOperation::Preserve { region_id, .. } => {
@@ -482,7 +719,7 @@ pub fn fold_boundary_contribution(
                         identity: region_id.clone(),
                     });
                 }
-                add_once(&mut s.regions[q].source_contribution_ids, cid)
+                ensure_region_provenance(&mut s.regions[q], cid)?
             }
             RegionOperation::Reinforce { region_id, .. } => {
                 let p = region_pos(&s, region_id)?;
@@ -492,7 +729,7 @@ pub fn fold_boundary_contribution(
                         identity: region_id.clone(),
                     });
                 }
-                add_once(&mut s.regions[p].source_contribution_ids, cid)
+                ensure_region_provenance(&mut s.regions[p], cid)?
             }
             RegionOperation::Extend {
                 region_id,
@@ -522,7 +759,7 @@ pub fn fold_boundary_contribution(
                     });
                 }
                 s.regions[p].anchor_referents.push(referent.clone());
-                add_once(&mut s.regions[p].source_contribution_ids, cid)
+                ensure_region_provenance(&mut s.regions[p], cid)?
             }
             RegionOperation::Merge {
                 source_region_ids,
@@ -555,10 +792,10 @@ pub fn fold_boundary_contribution(
                         });
                     }
                     s.regions[p].persistence_state = RegionPersistenceState::Superseded;
-                    add_once(&mut s.regions[p].source_contribution_ids, cid)
+                    ensure_region_provenance(&mut s.regions[p], cid)?
                 }
                 let mut x = resulting_region.clone();
-                add_once(&mut x.source_contribution_ids, cid);
+                ensure_region_provenance(&mut x, cid)?;
                 s.regions.push(x)
             }
             RegionOperation::Split {
@@ -586,10 +823,10 @@ pub fn fold_boundary_contribution(
                     return Err(V::InvalidSplitShape);
                 }
                 s.regions[p].persistence_state = RegionPersistenceState::Superseded;
-                add_once(&mut s.regions[p].source_contribution_ids, cid);
+                ensure_region_provenance(&mut s.regions[p], cid)?;
                 for x in resulting_regions {
                     let mut x = x.clone();
-                    add_once(&mut x.source_contribution_ids, cid);
+                    ensure_region_provenance(&mut x, cid)?;
                     s.regions.push(x)
                 }
             }
@@ -616,8 +853,8 @@ pub fn fold_boundary_contribution(
                 }
                 s.regions[a].persistence_state = RegionPersistenceState::Superseded;
                 s.regions[b].supersedes_region_id = Some(region_id.clone());
-                add_once(&mut s.regions[a].source_contribution_ids, cid);
-                add_once(&mut s.regions[b].source_contribution_ids, cid)
+                ensure_region_provenance(&mut s.regions[a], cid)?;
+                ensure_region_provenance(&mut s.regions[b], cid)?
             }
             RegionOperation::Retire { region_id, .. } => {
                 let p = region_pos(&s, region_id)?;
@@ -630,7 +867,7 @@ pub fn fold_boundary_contribution(
                     });
                 }
                 s.regions[p].persistence_state = RegionPersistenceState::Retired;
-                add_once(&mut s.regions[p].source_contribution_ids, cid)
+                ensure_region_provenance(&mut s.regions[p], cid)?
             }
         }
     }
@@ -830,7 +1067,7 @@ pub fn fold_boundary_contribution(
             return Err(V::InvalidAttentionAssignment);
         }
         s.regions[p].activation_band = op.band.clone();
-        add_once(&mut s.regions[p].source_contribution_ids, cid)
+        ensure_region_provenance(&mut s.regions[p], cid)?
     }
     validate_declarations(&prior_snapshot, &s, contribution)?;
     rebuild(&mut s);
@@ -917,10 +1154,9 @@ fn validate_declarations(
                     x.region_id == *id && x.persistence_state == RegionPersistenceState::Retired
                 })
             }
-            (ProblemSpaceSubject::Relation(id), ReleaseMode::Supersede) => finals
-                .relations
-                .iter()
-                .any(|x| x.relation_id == *id && x.lifecycle == RecordLifecycle::Superseded),
+            (ProblemSpaceSubject::Relation(_), ReleaseMode::Supersede) => {
+                return Err(V::UnsupportedSubjectReleaseModeCombination);
+            }
             (ProblemSpaceSubject::Relation(id), ReleaseMode::Retire) => finals
                 .relations
                 .iter()
@@ -1015,9 +1251,19 @@ fn closure(
     log: &BoundaryContributionLog,
     c: &BoundaryContribution,
 ) -> Result<(), V> {
+    validate_state_identities(s)?;
     let fail = |context| V::FinalReferentialIntegrityFailure { context };
     let mut ids = HashSet::new();
     for r in &s.regions {
+        let mut provenance = HashSet::new();
+        for contribution_id in &r.source_contribution_ids {
+            if !provenance.insert(contribution_id) {
+                return Err(V::DuplicateRegionContributionProvenance {
+                    region_id: r.region_id.clone(),
+                    contribution_id: contribution_id.clone(),
+                });
+            }
+        }
         nonempty(&r.region_id, "region_id")?;
         if !ids.insert(&r.region_id) {
             return Err(V::DuplicateRecordIdentity {
@@ -1216,7 +1462,7 @@ fn bounds(s: &ProblemSpaceState, l: &ProblemSpaceFoldLimits) -> Result<(), V> {
     Ok(())
 }
 
-pub fn replay_boundary_contribution_log(
+fn replay_entries(
     log: &BoundaryContributionLog,
     limits: &ProblemSpaceFoldLimits,
 ) -> Result<Option<ProblemSpaceState>, V> {
@@ -1227,8 +1473,7 @@ pub fn replay_boundary_contribution_log(
         entries: vec![],
     };
     for expected in &log.entries {
-        let out =
-            fold_boundary_contribution(state.as_ref(), &rebuilt, &expected.contribution, limits)?;
+        let out = apply_one(state.as_ref(), &rebuilt, &expected.contribution, limits)?;
         let actual = out.accepted_log.entries.last().expect("fold appends entry");
         if actual.sequence != expected.sequence {
             return Err(V::AcceptedEntrySequenceMismatch {
@@ -1244,4 +1489,38 @@ pub fn replay_boundary_contribution_log(
         rebuilt = out.accepted_log
     }
     Ok(state)
+}
+
+pub fn fold_boundary_contribution(
+    prior_state: Option<&ProblemSpaceState>,
+    accepted_log: &BoundaryContributionLog,
+    contribution: &BoundaryContribution,
+    limits: &ProblemSpaceFoldLimits,
+) -> Result<ProblemSpaceFoldOutput, ProblemSpaceFoldViolation> {
+    validate_pair(prior_state, accepted_log)?;
+    if let Some(prior) = prior_state {
+        validate_state_identities(prior)?;
+        // Authority checking is structural, not a reapplication of today's
+        // operational policy. Historical accepted entries therefore replay
+        // under private permissive bounds while retaining all other checks.
+        let permissive = ProblemSpaceFoldLimits {
+            max_total_declarations_per_contribution: usize::MAX,
+            max_operational_regions: usize::MAX,
+            max_active_relations: usize::MAX,
+            max_open_tensions: usize::MAX,
+            max_background_regions: usize::MAX,
+        };
+        if replay_entries(accepted_log, &permissive)?.as_ref() != Some(prior) {
+            return Err(V::PriorStateReplayMismatch);
+        }
+    }
+    apply_one(prior_state, accepted_log, contribution, limits)
+}
+
+pub fn replay_boundary_contribution_log(
+    log: &BoundaryContributionLog,
+    limits: &ProblemSpaceFoldLimits,
+) -> Result<Option<ProblemSpaceState>, ProblemSpaceFoldViolation> {
+    validate_log(log)?;
+    replay_entries(log, limits)
 }

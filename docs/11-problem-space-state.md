@@ -689,6 +689,13 @@ provider. Boundary inference remains outside the deterministic authority
 boundary and is represented only by a scripted test fixture. The accepted
 Serde unit-variant exception is unchanged.
 
+Relation supersession is not supported by the current fold contract. The
+current typed relation operations are `Connect` and `Disconnect`, and
+`Disconnect` produces `Retired` lifecycle. A `Relation + Supersede` release
+declaration is rejected as an unsupported subject/release-mode combination.
+Relation supersession remains deferred until a separate contract change
+defines a typed replacement operation and its provenance semantics.
+
 ## 19. Examples
 
 ### 19.1 Calf continuation
