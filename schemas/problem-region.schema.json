@@ -30,7 +30,7 @@
       }
     },
     "local_constraint_ids": {
-      "description": "Constraint identities local to this region.",
+      "description": "Derived active regional-incidence index, rebuilt by the future fold.\n\nThis contains only active regional constraints explicitly targeting this operational region. Canonical applicability lives on [`ProblemConstraint::applicability`]; whole-problem-space, superseded, and retired constraints are absent here.",
       "type": "array",
       "items": {
         "type": "string"
@@ -80,7 +80,7 @@
   "additionalProperties": false,
   "definitions": {
     "ActivationBand": {
-      "description": "Current activation band assigned to a problem region.\n\nA band changes visibility and foregrounding only. It does not duplicate the region, change its lifecycle, or become a relevance score.",
+      "description": "Current activation band assigned to a problem region.\n\nA band changes visibility and foregrounding only. It does not duplicate the region or change its identity, applicability, lifecycle, or semantic strength. It is categorical and never a numeric attention or relevance score.",
       "oneOf": [
         {
           "description": "Immediate operational focus.",

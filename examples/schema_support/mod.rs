@@ -1,8 +1,9 @@
 use schemars::{JsonSchema, schema_for};
 use semantic_traversal_core::{
-    ActivatedProjection, AttentionLens, BoundaryContribution, ConformanceResult, ExecutionLimits,
-    OpenTension, ProblemRegion, ProblemRelation, ProblemSpaceState, RetrievalResult,
-    SemanticAccessPlan, SemanticSpaceProjection, SynthesisInput,
+    AcceptedBoundaryContribution, ActivatedProjection, AttentionLens, BoundaryContribution,
+    BoundaryContributionLog, ConformanceResult, ExecutionLimits, OpenTension, ProblemRegion,
+    ProblemRelation, ProblemSpaceState, RetrievalResult, SemanticAccessPlan,
+    SemanticSpaceProjection, SynthesisInput,
 };
 use serde::Serialize;
 
@@ -35,6 +36,14 @@ pub fn generated_schemas() -> Vec<(&'static str, String)> {
         (
             "boundary-contribution.schema.json",
             render_schema::<BoundaryContribution>(),
+        ),
+        (
+            "boundary-contribution-log.schema.json",
+            render_schema::<BoundaryContributionLog>(),
+        ),
+        (
+            "accepted-boundary-contribution.schema.json",
+            render_schema::<AcceptedBoundaryContribution>(),
         ),
         (
             "semantic-space-projection.schema.json",

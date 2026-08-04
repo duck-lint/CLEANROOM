@@ -24,8 +24,8 @@ pub use model::{
 };
 pub use packet::ExecutionLimits;
 pub use problem_space::{
-    AttentionLens, BoundaryContribution, OpenTension, ProblemRegion, ProblemRelation,
-    ProblemSpaceState,
+    AcceptedBoundaryContribution, AttentionLens, BoundaryContribution, BoundaryContributionLog,
+    OpenTension, ProblemConstraintApplicability, ProblemRegion, ProblemRelation, ProblemSpaceState,
 };
 pub use projection::SemanticSpaceProjection;
 pub use semantic_access::SemanticAccessPlan;

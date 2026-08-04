@@ -27,7 +27,7 @@ pub struct ProblemSpaceState {
     pub constraints: Vec<ProblemConstraint>,
     /// Explicit unresolved tensions and their lifecycle state.
     pub open_tensions: Vec<OpenTension>,
-    /// Contribution and persistence history needed for reconstruction.
+    /// Compact derived audit summary; the accepted log is the replay source.
     pub contribution_history: Vec<ContributionHistoryRecord>,
     /// Current activation bands over the one relational state.
     pub attention_lens: AttentionLens,
@@ -49,7 +49,12 @@ pub struct ProblemRegion {
     pub anchor_referents: Vec<ProblemReferent>,
     /// Relation identities incident to this region.
     pub relation_ids: Vec<String>,
-    /// Constraint identities local to this region.
+    /// Derived active regional-incidence index, rebuilt by the future fold.
+    ///
+    /// This contains only active regional constraints explicitly targeting this
+    /// operational region. Canonical applicability lives on
+    /// [`ProblemConstraint::applicability`]; whole-problem-space, superseded,
+    /// and retired constraints are absent here.
     pub local_constraint_ids: Vec<String>,
     /// Open-tension identities attached to this region.
     pub open_tension_ids: Vec<String>,
@@ -96,10 +101,43 @@ pub struct ProblemConstraint {
     pub constraint_id: String,
     /// Human-readable declared constraint expression.
     pub expression: String,
+    /// Canonical declaration of where this constraint applies.
+    pub applicability: ProblemConstraintApplicability,
     /// Boundary contribution that introduced the constraint.
     pub source_contribution_id: String,
     /// Current lifecycle of the constraint record.
     pub lifecycle: RecordLifecycle,
+}
+
+/// Canonical applicability authored for one problem-space constraint.
+///
+/// In the future fold, [`ProblemConstraintApplicability::WholeProblemSpace`]
+/// applies to every operational region and never appears in
+/// [`ProblemRegion::local_constraint_ids`]. [`ProblemConstraintApplicability::Regions`]
+/// explicitly targets one or several regions; vector order grants no priority.
+/// Active regional constraints may target only operational regions: active,
+/// background, and unresolved persistence states are operational, while
+/// superseded and retired states are not.
+///
+/// Duplicate, empty, or unresolved target sets are invalid future fold input.
+/// Shared applicability remains one canonical constraint, whose identity is
+/// included in every targeted operational region's derived active-incidence
+/// index. Superseding or retiring a region never transfers, narrows, or retires
+/// constraints automatically: boundary inference must explicitly replace or
+/// retire affected constraints, and every replacement fully declares its own
+/// applicability. The fold must not inherit applicability by convenience.
+/// Historical superseded or retired constraints retain their authored
+/// applicability for audit. These are fold invariants, not Serde validation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ProblemConstraintApplicability {
+    /// Applies to all operational regions.
+    WholeProblemSpace,
+    /// Applies exactly to the declared regional identities.
+    Regions {
+        /// Target regions; ordering carries no precedence or priority.
+        region_ids: Vec<String>,
+    },
 }
 
 /// One explicit unresolved tension in the problem representation.
@@ -129,8 +167,13 @@ pub struct OpenTension {
 /// Current attention bands over one relational problem-space state.
 ///
 /// These vectors are views over shared region identities, not independent
-/// topic stores. The lens may guide access but cannot alter semantic identity,
-/// score truth, or admit evidence.
+/// topic stores. Activation changes neither identity, constraint applicability,
+/// lifecycle, nor semantic strength. In a valid future folded state, every
+/// operational region occupies exactly one band and this lens agrees with its
+/// [`ProblemRegion::activation_band`]. An unresolved region may occupy any
+/// band, and an active region may occupy background activation. The lens may
+/// guide access but cannot score attention, persistence, confidence, decay,
+/// coherence, or truth, and cannot admit evidence.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AttentionLens {
@@ -149,6 +192,21 @@ pub struct AttentionLens {
 /// It carries typed operations and preservation or release declarations. This
 /// record does not apply operations, infer semantic equivalence, enforce
 /// bounds, or produce a new `ProblemSpaceState`.
+///
+/// The future deterministic fold has this normative phase order: (0) preflight
+/// envelope and declared-identity uniqueness; (1) region operations; (2)
+/// relation operations; (3) constraint operations; (4) tension operations; (5)
+/// attention operations; (6) preservation/release declaration validation; (7)
+/// rebuild derived incidence indexes and the attention lens; (8) validate final
+/// referential and lifecycle closure; (9) enforce configured bounds; and (10)
+/// atomically commit state, history, accepted-log entry, and version increment.
+/// Operations within each category execute in declared vector order. The fold
+/// does not sort, semantically consolidate, or reinterpret them. Later phases
+/// may reference newly declared regions. Working-copy incompleteness never
+/// permits partial commit; preservation and release declarations are audit
+/// declarations, not a second mutation mechanism. Contradictory terminal
+/// operations and configured-bound excess are rejected, not reconciled or
+/// silently removed. This contract declares no executor in this PR.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BoundaryContribution {
@@ -172,6 +230,44 @@ pub struct BoundaryContribution {
     pub preservation_declarations: Vec<PreservationDeclaration>,
     /// Structure explicitly released, superseded, or retired.
     pub release_declarations: Vec<ReleaseDeclaration>,
+}
+
+/// Ordered log of boundary contributions accepted for exactly one thread.
+///
+/// This is the authoritative replay input, separate from both the source
+/// transcript and [`ProblemSpaceState::contribution_history`]. A fresh thread
+/// begins at state version zero with an empty log. The first accepted entry has
+/// sequence one; sequences are contiguous and unique, while vector order is
+/// authoritative replay order. Contribution, source-turn, and source-utterance
+/// identities cannot be accepted twice within the thread.
+///
+/// The log stores neither a transcript copy nor timestamps, storage paths,
+/// provider metadata, or state snapshots. These are future runtime invariants,
+/// not validations implemented by this representation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BoundaryContributionLog {
+    /// Identity of the one thread to which every entry belongs.
+    pub thread_id: String,
+    /// Accepted contributions in authoritative replay order.
+    pub entries: Vec<AcceptedBoundaryContribution>,
+}
+
+/// One boundary contribution accepted for future deterministic replay.
+///
+/// `prior_state_version` is the version before application. Every successful
+/// future fold appends exactly one entry and increments the state version once.
+/// A failed contribution appends nothing, mutates no history, and does not
+/// increment the version; no partial state may become observable.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AcceptedBoundaryContribution {
+    /// Contiguous one-based position in the thread's accepted sequence.
+    pub sequence: u64,
+    /// State version observed immediately before successful application.
+    pub prior_state_version: u64,
+    /// Complete accepted declaration retained as authoritative replay input.
+    pub contribution: BoundaryContribution,
 }
 
 /// Referent retained inside a problem region.
@@ -211,7 +307,9 @@ pub enum RegionPersistenceState {
 /// Current activation band assigned to a problem region.
 ///
 /// A band changes visibility and foregrounding only. It does not duplicate the
-/// region, change its lifecycle, or become a relevance score.
+/// region or change its identity, applicability, lifecycle, or semantic
+/// strength. It is categorical and never a numeric attention or relevance
+/// score.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ActivationBand {

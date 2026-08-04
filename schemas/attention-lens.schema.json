@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "AttentionLens",
-  "description": "Current attention bands over one relational problem-space state.\n\nThese vectors are views over shared region identities, not independent topic stores. The lens may guide access but cannot alter semantic identity, score truth, or admit evidence.",
+  "description": "Current attention bands over one relational problem-space state.\n\nThese vectors are views over shared region identities, not independent topic stores. Activation changes neither identity, constraint applicability, lifecycle, nor semantic strength. In a valid future folded state, every operational region occupies exactly one band and this lens agrees with its [`ProblemRegion::activation_band`]. An unresolved region may occupy any band, and an active region may occupy background activation. The lens may guide access but cannot score attention, persistence, confidence, decay, coherence, or truth, and cannot admit evidence.",
   "type": "object",
   "required": [
     "background_region_ids",

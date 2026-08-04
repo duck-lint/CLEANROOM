@@ -1,16 +1,17 @@
 #[path = "../examples/schema_support/mod.rs"]
 mod schema_support;
 
-use std::{fs, path::PathBuf};
+use std::{collections::BTreeSet, fs, path::PathBuf};
 
 use serde::{Serialize, de::DeserializeOwned};
 use static_assertions::assert_type_ne_all;
 
 use semantic_traversal_core::{
-    ActivatedProjection, AttentionLens, BoundaryContribution, ConformanceResult, ExecutionLimits,
-    OccurrenceId, OpenTension, ProblemRegion, ProblemRelation, ProblemSpaceState, RetrievalResult,
-    SemanticAccessPlan, SemanticObjectId, SemanticRegionAddress, SemanticSpaceProjection,
-    SemanticUnitId, SynthesisInput, TemporalAnchorId, TransportSegmentId,
+    AcceptedBoundaryContribution, ActivatedProjection, AttentionLens, BoundaryContribution,
+    BoundaryContributionLog, ConformanceResult, ExecutionLimits, OccurrenceId, OpenTension,
+    ProblemRegion, ProblemRelation, ProblemSpaceState, RetrievalResult, SemanticAccessPlan,
+    SemanticObjectId, SemanticRegionAddress, SemanticSpaceProjection, SemanticUnitId,
+    SynthesisInput, TemporalAnchorId, TransportSegmentId,
     activation::{
         ActivatedEdge, ActivatedObjectRecord, ActivatedRegionRecord, ActivatedUnitRecord,
         ActivationProvenance, CandidateCount, ContinuationHandle, CountByLabel,
@@ -32,10 +33,10 @@ use semantic_traversal_core::{
     packet::{AppliedExecutionBound, CoverageFact},
     problem_space::{
         ActivationBand, AttentionOperation, BoundaryOperationKind, ConstraintOperation,
-        ContributionHistoryRecord, OpenTensionType, ProblemConstraint, ProblemReferent,
-        ProblemRelationType, RecordLifecycle, RegionOperation, RegionPersistenceState,
-        RelationOperation, ReleaseDeclaration, ReleaseMode, SourceTurnRange, TensionLifecycle,
-        TensionOperation,
+        ContributionHistoryRecord, OpenTensionType, ProblemConstraint,
+        ProblemConstraintApplicability, ProblemReferent, ProblemRelationType, RecordLifecycle,
+        RegionOperation, RegionPersistenceState, RelationOperation, ReleaseDeclaration,
+        ReleaseMode, SourceTurnRange, TensionLifecycle, TensionOperation,
     },
     projection::{
         AuthoredBlockType, BlockTargetMapping, CoverageSemantics, IdentifierAssignment,
@@ -155,6 +156,9 @@ fn boundary_contribution() -> BoundaryContribution {
             constraint: ProblemConstraint {
                 constraint_id: "constraint:temporal".into(),
                 expression: "compare temporal anchors".into(),
+                applicability: ProblemConstraintApplicability::Regions {
+                    region_ids: vec!["region:chronology".into()],
+                },
                 source_contribution_id: "contribution:1".into(),
                 lifecycle: RecordLifecycle::Active,
             },
@@ -186,6 +190,9 @@ fn problem_space_state() -> ProblemSpaceState {
         constraints: vec![ProblemConstraint {
             constraint_id: "constraint:temporal".into(),
             expression: "compare temporal anchors".into(),
+            applicability: ProblemConstraintApplicability::Regions {
+                region_ids: vec!["region:chronology".into()],
+            },
             source_contribution_id: "contribution:1".into(),
             lifecycle: RecordLifecycle::Active,
         }],
@@ -672,6 +679,27 @@ round_trip_test!(problem_relation_round_trip, problem_relation());
 round_trip_test!(open_tension_round_trip, open_tension());
 round_trip_test!(attention_lens_round_trip, attention_lens());
 round_trip_test!(boundary_contribution_round_trip, boundary_contribution());
+#[test]
+fn whole_problem_space_applicability_round_trip() {
+    let applicability = ProblemConstraintApplicability::WholeProblemSpace;
+    assert_eq!(
+        serde_json::to_value(&applicability).expect("applicability must serialize"),
+        serde_json::json!({"kind": "whole_problem_space"})
+    );
+    assert_round_trip(applicability);
+}
+round_trip_test!(
+    one_region_applicability_round_trip,
+    ProblemConstraintApplicability::Regions {
+        region_ids: vec!["region:one".into()]
+    }
+);
+round_trip_test!(
+    shared_regional_applicability_round_trip,
+    ProblemConstraintApplicability::Regions {
+        region_ids: vec!["region:one".into(), "region:two".into()]
+    }
+);
 round_trip_test!(semantic_space_projection_round_trip, projection());
 round_trip_test!(activated_projection_round_trip, activated_projection());
 round_trip_test!(semantic_access_plan_round_trip, semantic_access_plan());
@@ -679,6 +707,156 @@ round_trip_test!(conformance_result_round_trip, conformance_result());
 round_trip_test!(retrieval_result_round_trip, retrieval_result());
 round_trip_test!(execution_limits_round_trip, execution_limits());
 round_trip_test!(synthesis_input_round_trip, synthesis_input());
+
+#[test]
+fn accepted_contribution_log_round_trip() {
+    assert_round_trip(BoundaryContributionLog {
+        thread_id: "thread:1".into(),
+        entries: vec![AcceptedBoundaryContribution {
+            sequence: 1,
+            prior_state_version: 0,
+            contribution: boundary_contribution(),
+        }],
+    });
+}
+
+#[test]
+fn boundary_operation_vector_order_survives_round_trip() {
+    let mut contribution = boundary_contribution();
+    contribution.attention_operations = vec![
+        AttentionOperation {
+            region_id: "region:first".into(),
+            band: ActivationBand::Secondary,
+        },
+        AttentionOperation {
+            region_id: "region:second".into(),
+            band: ActivationBand::Background,
+        },
+    ];
+
+    let json = serde_json::to_string(&contribution).expect("contribution must serialize");
+    let decoded: BoundaryContribution =
+        serde_json::from_str(&json).expect("contribution must deserialize");
+    assert_eq!(
+        decoded.attention_operations,
+        contribution.attention_operations
+    );
+}
+
+#[test]
+fn attention_is_orthogonal_to_region_persistence() {
+    let mut active_background = problem_region();
+    active_background.persistence_state = RegionPersistenceState::Active;
+    active_background.activation_band = ActivationBand::Background;
+    assert_round_trip(active_background);
+
+    let mut unresolved_primary = problem_region();
+    unresolved_primary.persistence_state = RegionPersistenceState::Unresolved;
+    unresolved_primary.activation_band = ActivationBand::Primary;
+    assert_round_trip(unresolved_primary);
+}
+
+#[test]
+fn canonical_applicability_and_derived_regional_incidence_round_trip() {
+    let mut state = problem_space_state();
+    let mut second_region = problem_region();
+    second_region.region_id = "region:second".into();
+    second_region.local_constraint_ids = vec!["constraint:shared".into()];
+    state.regions[0].local_constraint_ids = vec!["constraint:shared".into()];
+    state.regions.push(second_region);
+    state.constraints = vec![
+        ProblemConstraint {
+            constraint_id: "constraint:whole".into(),
+            expression: "applies throughout".into(),
+            applicability: ProblemConstraintApplicability::WholeProblemSpace,
+            source_contribution_id: "contribution:1".into(),
+            lifecycle: RecordLifecycle::Active,
+        },
+        ProblemConstraint {
+            constraint_id: "constraint:shared".into(),
+            expression: "applies to both regions".into(),
+            applicability: ProblemConstraintApplicability::Regions {
+                region_ids: vec!["region:chronology".into(), "region:second".into()],
+            },
+            source_contribution_id: "contribution:1".into(),
+            lifecycle: RecordLifecycle::Active,
+        },
+    ];
+
+    assert!(state.regions.iter().all(|region| {
+        !region
+            .local_constraint_ids
+            .contains(&"constraint:whole".to_owned())
+    }));
+    assert!(state.regions.iter().all(|region| {
+        region
+            .local_constraint_ids
+            .contains(&"constraint:shared".to_owned())
+    }));
+    assert_round_trip(state);
+}
+
+#[test]
+fn rejects_invalid_constraint_applicability_shapes() {
+    let mut missing = serde_json::to_value(problem_space_state().constraints.remove(0))
+        .expect("constraint must serialize");
+    missing
+        .as_object_mut()
+        .expect("constraint is an object")
+        .remove("applicability");
+    assert!(serde_json::from_value::<ProblemConstraint>(missing).is_err());
+
+    for invalid in [
+        r#"{"kind":"unknown"}"#,
+        r#"{"kind":"regions","region_ids":["region:one"],"extra":true}"#,
+        r#"{"kind":"regions"}"#,
+    ] {
+        assert!(
+            serde_json::from_str::<ProblemConstraintApplicability>(invalid).is_err(),
+            "accepted invalid applicability shape: {invalid}"
+        );
+    }
+}
+
+#[test]
+fn rejects_invalid_accepted_contribution_log_shapes() {
+    let contribution =
+        serde_json::to_value(boundary_contribution()).expect("contribution fixture must serialize");
+    let valid_entry = serde_json::json!({
+        "sequence": 1,
+        "prior_state_version": 0,
+        "contribution": contribution,
+    });
+
+    assert!(
+        serde_json::from_value::<BoundaryContributionLog>(serde_json::json!({
+            "entries": []
+        }))
+        .is_err()
+    );
+    assert!(
+        serde_json::from_value::<BoundaryContributionLog>(serde_json::json!({
+            "thread_id": "thread:1", "entries": [], "extra": true
+        }))
+        .is_err()
+    );
+
+    for missing_field in ["sequence", "prior_state_version", "contribution"] {
+        let mut entry = valid_entry.clone();
+        entry
+            .as_object_mut()
+            .expect("entry is an object")
+            .remove(missing_field);
+        assert!(serde_json::from_value::<AcceptedBoundaryContribution>(entry).is_err());
+    }
+
+    let mut unknown = valid_entry;
+    unknown
+        .as_object_mut()
+        .expect("entry is an object")
+        .insert("extra".into(), serde_json::json!(true));
+    assert!(serde_json::from_value::<AcceptedBoundaryContribution>(unknown).is_err());
+}
 
 #[test]
 fn rejects_malformed_semantic_object_id() {
@@ -749,6 +927,22 @@ fn required_identities_are_distinct_at_compile_time() {
 #[test]
 fn committed_schemas_are_current() {
     let schema_directory = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("schemas");
+
+    let committed_names: BTreeSet<_> = fs::read_dir(&schema_directory)
+        .expect("schema directory must exist")
+        .map(|entry| {
+            entry
+                .expect("schema entry must be readable")
+                .file_name()
+                .into_string()
+                .expect("schema filename must be UTF-8")
+        })
+        .collect();
+    let generated_names: BTreeSet<_> = schema_support::generated_schemas()
+        .into_iter()
+        .map(|(filename, _)| filename.to_owned())
+        .collect();
+    assert_eq!(committed_names, generated_names, "schema inventory differs");
 
     for (filename, generated) in schema_support::generated_schemas() {
         let committed = fs::read_to_string(schema_directory.join(filename))
