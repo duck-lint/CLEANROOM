@@ -132,7 +132,7 @@ pub struct ProblemConstraint {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ProblemConstraintApplicability {
     /// Applies to all operational regions.
-    WholeProblemSpace {},
+    WholeProblemSpace,
     /// Applies exactly to the declared regional identities.
     Regions {
         /// Target regions; ordering carries no precedence or priority.

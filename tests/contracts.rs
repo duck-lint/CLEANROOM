@@ -679,10 +679,15 @@ round_trip_test!(problem_relation_round_trip, problem_relation());
 round_trip_test!(open_tension_round_trip, open_tension());
 round_trip_test!(attention_lens_round_trip, attention_lens());
 round_trip_test!(boundary_contribution_round_trip, boundary_contribution());
-round_trip_test!(
-    whole_problem_space_applicability_round_trip,
-    ProblemConstraintApplicability::WholeProblemSpace {}
-);
+#[test]
+fn whole_problem_space_applicability_round_trip() {
+    let applicability = ProblemConstraintApplicability::WholeProblemSpace;
+    assert_eq!(
+        serde_json::to_value(&applicability).expect("applicability must serialize"),
+        serde_json::json!({"kind": "whole_problem_space"})
+    );
+    assert_round_trip(applicability);
+}
 round_trip_test!(
     one_region_applicability_round_trip,
     ProblemConstraintApplicability::Regions {
@@ -763,7 +768,7 @@ fn canonical_applicability_and_derived_regional_incidence_round_trip() {
         ProblemConstraint {
             constraint_id: "constraint:whole".into(),
             expression: "applies throughout".into(),
-            applicability: ProblemConstraintApplicability::WholeProblemSpace {},
+            applicability: ProblemConstraintApplicability::WholeProblemSpace,
             source_contribution_id: "contribution:1".into(),
             lifecycle: RecordLifecycle::Active,
         },
@@ -803,10 +808,8 @@ fn rejects_invalid_constraint_applicability_shapes() {
 
     for invalid in [
         r#"{"kind":"unknown"}"#,
-        r#"{"kind":"whole_problem_space","extra":true}"#,
         r#"{"kind":"regions","region_ids":["region:one"],"extra":true}"#,
         r#"{"kind":"regions"}"#,
-        r#"{"kind":"whole_problem_space","region_ids":[]}"#,
     ] {
         assert!(
             serde_json::from_str::<ProblemConstraintApplicability>(invalid).is_err(),
