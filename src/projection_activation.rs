@@ -150,6 +150,12 @@ struct ExposureContext {
     activation_provenance: Vec<ActivationProvenance>,
 }
 
+#[derive(Clone)]
+struct ExposureAggregate {
+    probe_ids: Vec<String>,
+    activation_provenance: Vec<ActivationProvenance>,
+}
+
 #[derive(Default)]
 struct Work {
     objects: Vec<ActivatedObjectRecord>,
@@ -163,7 +169,7 @@ struct Work {
     handles: Vec<ContinuationHandle>,
     order: Vec<SemanticAddress>,
     bounded_probe_ids: HashSet<String>,
-    edge_provenance: Vec<(EdgeTuple, ExposureContext)>,
+    edge_provenance: Vec<(EdgeTuple, ExposureAggregate)>,
     probe_counter: u64,
     telemetry_counter: u64,
     continuation_counter: u64,
@@ -2035,23 +2041,22 @@ fn remember_edge_provenance(w: &mut Work, edge: EdgeTuple, exposure: &ExposureCo
         .iter_mut()
         .find(|(known, _)| known == &edge)
     {
-        if existing.probe_id != exposure.probe_id {
-            push_unique(
-                &mut existing.activation_provenance,
-                ActivationProvenance::ConfiguredDefault {
-                    configuration_key: "bounded_structural_context".into(),
-                },
-            );
-        }
+        push_unique(&mut existing.probe_ids, exposure.probe_id.clone());
         merge(
             &mut existing.activation_provenance,
             &exposure.activation_provenance,
         );
     } else {
-        w.edge_provenance.push((edge, exposure.clone()));
+        w.edge_provenance.push((
+            edge,
+            ExposureAggregate {
+                probe_ids: vec![exposure.probe_id.clone()],
+                activation_provenance: exposure.activation_provenance.clone(),
+            },
+        ));
     }
 }
-fn exposure_for_edge(w: &Work, edge: &EdgeTuple) -> Option<ExposureContext> {
+fn exposure_for_edge(w: &Work, edge: &EdgeTuple) -> Option<ExposureAggregate> {
     w.edge_provenance
         .iter()
         .find(|(known, _)| known == edge)
@@ -2060,11 +2065,7 @@ fn exposure_for_edge(w: &Work, edge: &EdgeTuple) -> Option<ExposureContext> {
 fn provenance_for_edge(w: &Work, edge: &EdgeTuple) -> Vec<ActivationProvenance> {
     exposure_for_edge(w, edge)
         .map(|exposure| exposure.activation_provenance)
-        .unwrap_or_else(|| {
-            vec![ActivationProvenance::ConfiguredDefault {
-                configuration_key: "bounded_structural_context".into(),
-            }]
-        })
+        .unwrap_or_default()
 }
 
 fn build_visible_edges_and_structure_handles(
@@ -2089,9 +2090,11 @@ fn build_visible_edges_and_structure_handles(
     for edge in &visible_edges {
         if w.edges.len() >= c.maximum_activated_edges as usize {
             if let Some(exposure) = exposure_for_edge(w, edge) {
-                w.bounded_probe_ids.insert(exposure.probe_id);
+                for probe_id in exposure.probe_ids {
+                    w.bounded_probe_ids.insert(probe_id);
+                }
             }
-            break;
+            continue;
         }
         let edge_id = next_id("activated-edge", &mut w.edge_counter)?;
         w.edges.push(ActivatedEdge {
@@ -2103,88 +2106,101 @@ fn build_visible_edges_and_structure_handles(
             activation_provenance: provenance_for_edge(w, edge),
         });
     }
-    if c.continuation_page_limit > 0 {
-        for source in w.order.clone() {
-            let all = enumerate_edges(p, &source);
-            let degree = u64::try_from(all.len())
-                .map_err(|_| ProjectionActivationViolation::CountOverflow)?;
-            let mut grouped: Vec<(&String, &Direction, Vec<&EdgeTuple>)> = Vec::new();
-            for edge in &all {
-                if let Some((_, _, targets)) = grouped
-                    .iter_mut()
-                    .find(|(tid, dir, _)| *tid == &edge.transition_id && *dir == &edge.direction)
-                {
-                    targets.push(edge);
-                } else {
-                    grouped.push((&edge.transition_id, &edge.direction, vec![edge]));
-                }
+    for source in w.order.clone() {
+        let all = enumerate_edges(p, &source);
+        let degree =
+            u64::try_from(all.len()).map_err(|_| ProjectionActivationViolation::CountOverflow)?;
+        let mut grouped: Vec<(&String, &Direction, Vec<&EdgeTuple>)> = Vec::new();
+        for edge in &all {
+            if let Some((_, _, targets)) = grouped
+                .iter_mut()
+                .find(|(tid, dir, _)| *tid == &edge.transition_id && *dir == &edge.direction)
+            {
+                targets.push(edge);
+            } else {
+                grouped.push((&edge.transition_id, &edge.direction, vec![edge]));
             }
-            for (transition_id, direction, group) in grouped {
-                let visible_count_usize = group
-                    .iter()
-                    .filter(|edge| {
-                        visible(p, w, &edge.source)
-                            && visible(p, w, &edge.target)
-                            && w.edges.iter().any(|activated| {
-                                activated.source == edge.source
-                                    && activated.transition_id == edge.transition_id
-                                    && activated.direction == edge.direction
-                                    && activated.target == edge.target
-                            })
-                    })
-                    .count();
-                if visible_count_usize >= group.len() && degree < c.hub_degree_threshold {
-                    continue;
-                }
-                if w.handles.len() >= c.maximum_continuation_handles as usize {
-                    for edge in &group {
-                        if let Some(exposure) = exposure_for_edge(w, edge) {
-                            w.bounded_probe_ids.insert(exposure.probe_id);
-                        }
+        }
+        for (transition_id, direction, group) in grouped {
+            let visible_count_usize = group
+                .iter()
+                .filter(|edge| visible(p, w, &edge.target))
+                .count();
+            if visible_count_usize >= group.len() && degree < c.hub_degree_threshold {
+                continue;
+            }
+            let mut related = ExposureAggregate {
+                probe_ids: vec![],
+                activation_provenance: vec![],
+            };
+            for edge in &group {
+                if let Some(exposure) = exposure_for_edge(w, edge) {
+                    for probe_id in exposure.probe_ids {
+                        push_unique(&mut related.probe_ids, probe_id);
                     }
-                    break;
+                    merge(
+                        &mut related.activation_provenance,
+                        &exposure.activation_provenance,
+                    );
                 }
-                let visible_count = u64::try_from(visible_count_usize)
-                    .map_err(|_| ProjectionActivationViolation::CountOverflow)?;
-                let total = u64::try_from(group.len())
-                    .map_err(|_| ProjectionActivationViolation::CountOverflow)?;
-                let remaining = total
-                    .checked_sub(visible_count)
-                    .ok_or(ProjectionActivationViolation::CountOverflow)?;
-                if remaining == 0 {
-                    continue;
-                }
-                let key = if degree >= c.hub_degree_threshold {
-                    "high_degree_summary"
-                } else {
-                    "bounded_structural_context"
-                };
-                let handle_id = next_id("activation-continuation", &mut w.continuation_counter)?;
-                w.handles.push(ContinuationHandle {
-                    handle_id,
-                    projection_snapshot_id: p.projection_snapshot_id.clone(),
-                    configuration_snapshot_id: c.configuration_snapshot_id.clone(),
-                    problem_space_thread_id: ps.thread_id.clone(),
-                    problem_space_version: ps.version,
-                    newest_utterance_id: u.utterance_id.clone(),
-                    origin: ContinuationOrigin::StructuralNeighbourhood {
-                        subject: source.clone(),
-                        transition_id: Some(transition_id.clone()),
-                        direction: Some(direction.clone()),
-                    },
-                    access: ContinuationAccess::ProjectionStructure,
-                    filters: vec![ContinuationFilter::Transition {
-                        transition_id: transition_id.clone(),
-                    }],
-                    ordering: ContinuationOrdering::ProjectionVectorOrder,
-                    next_offset: visible_count,
-                    remaining_count: Some(remaining),
-                    next_page_limit: c.continuation_page_limit,
-                    activation_provenance: vec![ActivationProvenance::ConfiguredDefault {
-                        configuration_key: key.into(),
-                    }],
-                });
             }
+            let visible_count = u64::try_from(visible_count_usize)
+                .map_err(|_| ProjectionActivationViolation::CountOverflow)?;
+            let total = u64::try_from(group.len())
+                .map_err(|_| ProjectionActivationViolation::CountOverflow)?;
+            let remaining = total
+                .checked_sub(visible_count)
+                .ok_or(ProjectionActivationViolation::CountOverflow)?;
+            if remaining == 0 {
+                continue;
+            }
+            let key = if degree >= c.hub_degree_threshold {
+                "high_degree_summary"
+            } else {
+                "bounded_structural_context"
+            };
+            for probe_id in &related.probe_ids {
+                w.bounded_probe_ids.insert(probe_id.clone());
+            }
+            push_unique(
+                &mut related.activation_provenance,
+                ActivationProvenance::ConfiguredDefault {
+                    configuration_key: key.into(),
+                },
+            );
+            if c.continuation_page_limit == 0
+                || w.handles.len() >= c.maximum_continuation_handles as usize
+            {
+                continue;
+            }
+            let handle_id = next_id("activation-continuation", &mut w.continuation_counter)?;
+            for telemetry in &mut w.telemetry {
+                if related.probe_ids.contains(&telemetry.probe_id) {
+                    telemetry.continuation_available = true;
+                }
+            }
+            w.handles.push(ContinuationHandle {
+                handle_id,
+                projection_snapshot_id: p.projection_snapshot_id.clone(),
+                configuration_snapshot_id: c.configuration_snapshot_id.clone(),
+                problem_space_thread_id: ps.thread_id.clone(),
+                problem_space_version: ps.version,
+                newest_utterance_id: u.utterance_id.clone(),
+                origin: ContinuationOrigin::StructuralNeighbourhood {
+                    subject: source.clone(),
+                    transition_id: Some(transition_id.clone()),
+                    direction: Some(direction.clone()),
+                },
+                access: ContinuationAccess::ProjectionStructure,
+                filters: vec![ContinuationFilter::Transition {
+                    transition_id: transition_id.clone(),
+                }],
+                ordering: ContinuationOrdering::ProjectionVectorOrder,
+                next_offset: visible_count,
+                remaining_count: Some(remaining),
+                next_page_limit: c.continuation_page_limit,
+                activation_provenance: related.activation_provenance.clone(),
+            });
         }
     }
     for telemetry in &mut w.telemetry {
