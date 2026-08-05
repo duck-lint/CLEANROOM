@@ -15,9 +15,9 @@ use semantic_traversal_core::{
     activation::{
         ActivatedEdge, ActivatedIdentifierAssignmentRecord, ActivatedObjectRecord,
         ActivatedOccurrenceRecord, ActivatedRegionRecord, ActivatedTemporalAnchorRecord,
-        ActivatedUnitRecord, ActivationProvenance, CandidateCount, ContinuationFilter,
-        ContinuationHandle, ContinuationOrdering, ContinuationOrigin, CountByLabel,
-        ProjectionTelemetry, TruncationState,
+        ActivatedUnitRecord, ActivationProvenance, CandidateCount, ContinuationAccess,
+        ContinuationFilter, ContinuationHandle, ContinuationOrdering, ContinuationOrigin,
+        CountByLabel, ProjectionTelemetry, TruncationState,
     },
     conformance::{
         StructuralViolation, StructuralViolationCode, StructuralViolationDetail,
@@ -497,13 +497,18 @@ fn activated_projection() -> ActivatedProjection {
             handle_id: "continuation:incoming".into(),
             projection_snapshot_id: "projection:1".into(),
             configuration_snapshot_id: "configuration:1".into(),
+            problem_space_thread_id: "thread:1".into(),
+            problem_space_version: 1,
+            newest_utterance_id: "utterance:1".into(),
             origin: ContinuationOrigin::StructuralNeighbourhood {
                 subject: SemanticAddress::Object(object_id()),
                 transition_id: Some("transition:containment".into()),
                 direction: Some(Direction::Incoming),
             },
-            surface_id: "surface:graph".into(),
-            surface_kind: RetrievalSurfaceKind::Graph,
+            access: ContinuationAccess::RetrievalSurface {
+                surface_id: "surface:graph".into(),
+                surface_kind: RetrievalSurfaceKind::Graph,
+            },
             filters: vec![ContinuationFilter::Transition {
                 transition_id: "transition:containment".into(),
             }],

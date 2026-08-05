@@ -508,8 +508,10 @@ pub enum ContinuationFilter {
     ObjectClass { object_class: String },
     /// Restrict by one projected identifier and optional represented value.
     Identifier {
+        /// Projected identifier descriptor name.
         identifier_name: String,
-        represented_value: Option<String>,
+        /// Optional exact represented projected value.
+        represented_value: Option<IdentifierValue>,
     },
     /// Restrict by a temporal range.
     TemporalRange {
@@ -528,6 +530,25 @@ pub enum ContinuationOrdering {
     SurfaceDeclared { ordering_key: String },
 }
 
+/// Mechanism through which a continuation page is interpreted.
+///
+/// Projection-structure continuation follows frozen represented topology
+/// directly. Retrieval-surface continuation resumes one concrete projected
+/// surface. Neither variant executes continuation by itself.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ContinuationAccess {
+    /// Continue deterministic structure represented directly by the projection.
+    ProjectionStructure,
+    /// Continue one concrete projected retrieval surface.
+    RetrievalSurface {
+        /// Concrete snapshot-local surface identity.
+        surface_id: String,
+        /// Stable surface family declared by the projection.
+        surface_kind: RetrievalSurfaceKind,
+    },
+}
+
 /// Bounded continuation descriptor for a high-degree or truncated view.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -538,12 +559,16 @@ pub struct ContinuationHandle {
     pub projection_snapshot_id: String,
     /// Activation configuration snapshot required by this continuation.
     pub configuration_snapshot_id: String,
+    /// Thread whose accepted problem space shaped the original activation.
+    pub problem_space_thread_id: String,
+    /// Exact accepted problem-space version used for the original activation.
+    pub problem_space_version: u64,
+    /// Newest utterance identity used for the original activation.
+    pub newest_utterance_id: String,
     /// Original probe or structural neighbourhood.
     pub origin: ContinuationOrigin,
-    /// Concrete projected retrieval-surface identity.
-    pub surface_id: String,
-    /// Stable surface family.
-    pub surface_kind: RetrievalSurfaceKind,
+    /// Mechanism required to interpret and continue this handle.
+    pub access: ContinuationAccess,
     /// Typed filters already applied to the continuation.
     pub filters: Vec<ContinuationFilter>,
     /// Stable ordering under which the cursor is interpreted.

@@ -642,9 +642,13 @@ Previews are planning material, not retrieved evidence. Full authored prose rema
 
 ### Self-describing continuation handles
 
-A continuation handle is serializable and restart-safe. It requires no hidden runtime registry, contains no evidence, and performs no expansion. Its offset has meaning only with the named frozen projection snapshot, activation configuration snapshot, surface, filters, and ordering. The projection or configuration snapshot must not change while continuing.
+A continuation handle is serializable and restart-safe. It requires no hidden runtime registry, contains no evidence, and performs no expansion. Its offset has meaning only with the named frozen projection snapshot, activation configuration snapshot, problem-space thread, problem-space version, newest utterance, access mechanism, filters, and ordering. The projection snapshot, activation configuration snapshot, problem-space thread, problem-space version, and newest utterance identity must match the active continuation context exactly. A stale, cross-thread, cross-version, cross-utterance, cross-projection, or cross-configuration handle is a future typed violation.
 
-Continuation origin is typed as a text probe, structural neighbourhood, or temporal probe. Filters are typed as transition, source path prefix, object class, identifier, or temporal range. Ordering is either projection-vector order or a surface-declared stable ordering key. Expansion execution belongs to Phase 5. Real retrieval execution belongs to Phase 7.
+Continuation origin is typed as a text probe, structural neighbourhood, or temporal probe. Continuation access is typed separately: direct projection-structure continuation follows frozen represented topology without inventing a retrieval surface, while retrieval-surface continuation resumes one concrete projected surface. Text and temporal probes require `ContinuationAccess::RetrievalSurface`. Structural neighbourhoods may continue through `ContinuationAccess::ProjectionStructure` or through a declared retrieval surface; the latter is valid only when the frozen projection declares that concrete surface and structural transition relationship. PR 4A records these combinations only and does not validate them.
+
+Filters are typed as transition, source path prefix, object class, identifier, or temporal range. Identifier filters preserve the exact projected `IdentifierValue` union and must not stringify integer, boolean, semantic-address, or collection values. The filter representation does not decide scalar-versus-collection membership semantics, semantic equivalence, value normalization, relevance, or usefulness.
+
+`ContinuationOrdering::ProjectionVectorOrder` is valid for direct projection-structure continuation. `ContinuationOrdering::SurfaceDeclared` is valid for retrieval-surface continuation. Other origin, access, and ordering combinations are subject to Phase 4B typed validation. No ordering field is a semantic rank or relevance score. Expansion execution belongs to Phase 5. Real retrieval execution belongs to Phase 7.
 
 ### Typed activation violations
 

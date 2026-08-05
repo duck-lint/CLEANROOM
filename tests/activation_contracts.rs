@@ -140,20 +140,34 @@ fn temporal() -> ActivatedTemporalAnchorRecord {
     }
 }
 fn handle(origin: ContinuationOrigin) -> ContinuationHandle {
+    handle_with_access(
+        origin,
+        ContinuationAccess::RetrievalSurface {
+            surface_id: "surface:exact".into(),
+            surface_kind: RetrievalSurfaceKind::Exact,
+        },
+    )
+}
+fn handle_with_access(
+    origin: ContinuationOrigin,
+    access: ContinuationAccess,
+) -> ContinuationHandle {
     ContinuationHandle {
         handle_id: "handle:1".into(),
         projection_snapshot_id: "projection:1".into(),
         configuration_snapshot_id: "configuration:1".into(),
+        problem_space_thread_id: "thread:1".into(),
+        problem_space_version: 7,
+        newest_utterance_id: "utterance:1".into(),
         origin,
-        surface_id: "surface:exact".into(),
-        surface_kind: RetrievalSurfaceKind::Exact,
+        access,
         filters: vec![
             ContinuationFilter::ObjectClass {
                 object_class: "concept".into(),
             },
             ContinuationFilter::Identifier {
                 identifier_name: "title".into(),
-                represented_value: Some("Capital".into()),
+                represented_value: Some(IdentifierValue::String("Capital".into())),
             },
         ],
         ordering: ContinuationOrdering::SurfaceDeclared {
@@ -268,7 +282,15 @@ fn activation_utterance_round_trip() {
 fn projection_activation_config_round_trip() {
     let c = config();
     assert_eq!(round(&c), c);
-    assert!(serde_json::from_value::<ProjectionActivationConfig>(json!({"unbanded":{}})).is_err());
+}
+#[test]
+fn activation_config_requires_configuration_snapshot_identity() {
+    let mut value = serde_json::to_value(config()).unwrap();
+    value
+        .as_object_mut()
+        .unwrap()
+        .remove("configuration_snapshot_id");
+    assert!(serde_json::from_value::<ProjectionActivationConfig>(value).is_err());
 }
 #[test]
 fn activated_projection_preserves_input_snapshot_identity() {
@@ -391,6 +413,113 @@ fn continuation_filters_preserve_declared_order() {
     ));
 }
 #[test]
+fn continuation_identifier_filter_preserves_typed_value() {
+    let cases = [
+        IdentifierValue::Integer(1867),
+        IdentifierValue::Boolean(true),
+        IdentifierValue::SemanticAddress(addr()),
+        IdentifierValue::Strings(vec!["Capital".into(), "Volume I".into()]),
+    ];
+
+    for represented_value in cases {
+        let filter = ContinuationFilter::Identifier {
+            identifier_name: "typed".into(),
+            represented_value: Some(represented_value.clone()),
+        };
+        assert_eq!(round(&filter), filter);
+
+        let serialized = serde_json::to_value(&filter).unwrap();
+        let typed_value = serialized
+            .get("represented_value")
+            .expect("represented value must serialize");
+        if matches!(represented_value, IdentifierValue::Integer(_)) {
+            assert_eq!(typed_value, &json!({"kind":"integer","value":1867}));
+        }
+        if matches!(represented_value, IdentifierValue::Boolean(_)) {
+            assert_eq!(typed_value, &json!({"kind":"boolean","value":true}));
+        }
+    }
+}
+#[test]
+fn continuation_projection_structure_access_round_trip() {
+    let access = ContinuationAccess::ProjectionStructure;
+    assert_eq!(round(&access), access);
+    assert_eq!(
+        serde_json::to_value(access).unwrap(),
+        json!({"kind":"projection_structure"})
+    );
+}
+#[test]
+fn continuation_retrieval_surface_access_round_trip() {
+    let access = ContinuationAccess::RetrievalSurface {
+        surface_id: "surface:graph".into(),
+        surface_kind: RetrievalSurfaceKind::Graph,
+    };
+    assert_eq!(round(&access), access);
+    assert_eq!(
+        serde_json::to_value(access).unwrap(),
+        json!({"kind":"retrieval_surface","surface_id":"surface:graph","surface_kind":"graph"})
+    );
+}
+#[test]
+fn continuation_preserves_activation_input_context() {
+    let handle = handle(ContinuationOrigin::TextProbe {
+        query_text: "Capital".into(),
+        match_mode: SurfaceMatchMode::Literal,
+    });
+    assert_eq!(handle.projection_snapshot_id, "projection:1");
+    assert_eq!(handle.configuration_snapshot_id, "configuration:1");
+    assert_eq!(handle.problem_space_thread_id, "thread:1");
+    assert_eq!(handle.problem_space_version, 7);
+    assert_eq!(handle.newest_utterance_id, "utterance:1");
+}
+#[test]
+fn continuation_structural_neighbourhood_projection_structure_round_trip() {
+    let handle = handle_with_access(
+        ContinuationOrigin::StructuralNeighbourhood {
+            subject: addr(),
+            transition_id: Some("transition:contains".into()),
+            direction: Some(Direction::Outgoing),
+        },
+        ContinuationAccess::ProjectionStructure,
+    );
+    assert_eq!(round(&handle), handle);
+    assert_eq!(
+        serde_json::to_value(&handle.access).unwrap(),
+        json!({"kind":"projection_structure"})
+    );
+}
+#[test]
+fn continuation_structural_neighbourhood_retrieval_surface_round_trip() {
+    let handle = handle_with_access(
+        ContinuationOrigin::StructuralNeighbourhood {
+            subject: addr(),
+            transition_id: Some("transition:contains".into()),
+            direction: Some(Direction::Outgoing),
+        },
+        ContinuationAccess::RetrievalSurface {
+            surface_id: "surface:graph".into(),
+            surface_kind: RetrievalSurfaceKind::Graph,
+        },
+    );
+    assert_eq!(round(&handle), handle);
+}
+#[test]
+fn activated_record_requires_record_provenance() {
+    let mut value = serde_json::to_value(assignment()).unwrap();
+    value.as_object_mut().unwrap().remove("record_provenance");
+    assert!(serde_json::from_value::<ActivatedIdentifierAssignmentRecord>(value).is_err());
+}
+#[test]
+fn activated_record_requires_activation_provenance() {
+    let mut value = serde_json::to_value(occurrence()).unwrap();
+    value
+        .as_object_mut()
+        .unwrap()
+        .remove("activation_provenance");
+    assert!(serde_json::from_value::<ActivatedOccurrenceRecord>(value).is_err());
+}
+#[test]
 fn activation_violation_categories_round_trip() {
     let values = vec![
         ProjectionActivationViolation::EmptyRequiredIdentity {
@@ -496,6 +625,41 @@ fn invalid_activation_exchange_shapes_are_rejected() {
     );
     assert!(serde_json::from_value::<ContinuationOrigin>(json!({"kind":"bogus"})).is_err());
     assert!(serde_json::from_value::<ContinuationFilter>(json!({"kind":"bogus"})).is_err());
+    assert!(serde_json::from_value::<ContinuationAccess>(json!({"kind":"bogus"})).is_err());
+    assert!(
+        serde_json::from_value::<ContinuationAccess>(
+            json!({"kind":"retrieval_surface","surface_kind":"graph"})
+        )
+        .is_err()
+    );
+    assert!(
+        serde_json::from_value::<ContinuationAccess>(
+            json!({"kind":"retrieval_surface","surface_id":"surface:graph"})
+        )
+        .is_err()
+    );
     assert!(serde_json::from_value::<ContinuationOrdering>(json!({"kind":"bogus"})).is_err());
-    assert!(serde_json::from_value::<ContinuationHandle>(json!({"handle_id":"h","origin":{"kind":"text_probe","query_text":"q","match_mode":{"mode":"literal"}},"surface_id":"s","surface_kind":"exact","filters":[],"ordering":{"kind":"projection_vector_order"},"next_offset":0,"next_page_limit":1,"activation_provenance":[]})).is_err());
+
+    let valid_handle = serde_json::to_value(handle(ContinuationOrigin::TextProbe {
+        query_text: "Capital".into(),
+        match_mode: SurfaceMatchMode::Literal,
+    }))
+    .unwrap();
+
+    for required_field in [
+        "problem_space_thread_id",
+        "problem_space_version",
+        "newest_utterance_id",
+    ] {
+        let mut value = valid_handle.clone();
+        value.as_object_mut().unwrap().remove(required_field);
+        assert!(serde_json::from_value::<ContinuationHandle>(value).is_err());
+    }
+
+    let mut old_shape = valid_handle;
+    let object = old_shape.as_object_mut().unwrap();
+    object.remove("access");
+    object.insert("surface_id".into(), json!("surface:exact"));
+    object.insert("surface_kind".into(), json!("exact"));
+    assert!(serde_json::from_value::<ContinuationHandle>(old_shape).is_err());
 }

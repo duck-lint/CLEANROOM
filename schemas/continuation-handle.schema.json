@@ -4,19 +4,29 @@
   "description": "Bounded continuation descriptor for a high-degree or truncated view.",
   "type": "object",
   "required": [
+    "access",
     "activation_provenance",
     "configuration_snapshot_id",
     "filters",
     "handle_id",
+    "newest_utterance_id",
     "next_offset",
     "next_page_limit",
     "ordering",
     "origin",
-    "projection_snapshot_id",
-    "surface_id",
-    "surface_kind"
+    "problem_space_thread_id",
+    "problem_space_version",
+    "projection_snapshot_id"
   ],
   "properties": {
+    "access": {
+      "description": "Mechanism required to interpret and continue this handle.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ContinuationAccess"
+        }
+      ]
+    },
     "activation_provenance": {
       "description": "Reasons the truncated neighbourhood or result set became visible.",
       "type": "array",
@@ -37,6 +47,10 @@
     },
     "handle_id": {
       "description": "Stable handle identity.",
+      "type": "string"
+    },
+    "newest_utterance_id": {
+      "description": "Newest utterance identity used for the original activation.",
       "type": "string"
     },
     "next_offset": {
@@ -67,6 +81,16 @@
         }
       ]
     },
+    "problem_space_thread_id": {
+      "description": "Thread whose accepted problem space shaped the original activation.",
+      "type": "string"
+    },
+    "problem_space_version": {
+      "description": "Exact accepted problem-space version used for the original activation.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
     "projection_snapshot_id": {
       "description": "Frozen projection snapshot required by this continuation.",
       "type": "string"
@@ -79,18 +103,6 @@
       ],
       "format": "uint64",
       "minimum": 0.0
-    },
-    "surface_id": {
-      "description": "Concrete projected retrieval-surface identity.",
-      "type": "string"
-    },
-    "surface_kind": {
-      "description": "Stable surface family.",
-      "allOf": [
-        {
-          "$ref": "#/definitions/RetrievalSurfaceKind"
-        }
-      ]
     }
   },
   "additionalProperties": false,
@@ -364,6 +376,57 @@
         }
       ]
     },
+    "ContinuationAccess": {
+      "description": "Mechanism through which a continuation page is interpreted.\n\nProjection-structure continuation follows frozen represented topology directly. Retrieval-surface continuation resumes one concrete projected surface. Neither variant executes continuation by itself.",
+      "oneOf": [
+        {
+          "description": "Continue deterministic structure represented directly by the projection.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "projection_structure"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Continue one concrete projected retrieval surface.",
+          "type": "object",
+          "required": [
+            "kind",
+            "surface_id",
+            "surface_kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "retrieval_surface"
+              ]
+            },
+            "surface_id": {
+              "description": "Concrete snapshot-local surface identity.",
+              "type": "string"
+            },
+            "surface_kind": {
+              "description": "Stable surface family declared by the projection.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/RetrievalSurfaceKind"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
     "ContinuationFilter": {
       "description": "Typed filter applied to a continuation handle.",
       "oneOf": [
@@ -436,6 +499,7 @@
           ],
           "properties": {
             "identifier_name": {
+              "description": "Projected identifier descriptor name.",
               "type": "string"
             },
             "kind": {
@@ -445,9 +509,14 @@
               ]
             },
             "represented_value": {
-              "type": [
-                "string",
-                "null"
+              "description": "Optional exact represented projected value.",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/IdentifierValue"
+                },
+                {
+                  "type": "null"
+                }
               ]
             }
           },
@@ -672,6 +741,138 @@
         }
       },
       "additionalProperties": false
+    },
+    "IdentifierValue": {
+      "description": "Value carried by one identifier assignment.\n\nThis is a closed structural union for exchange. It cannot be interpreted as evidence or a relation without its descriptor and provenance.",
+      "oneOf": [
+        {
+          "description": "One string value.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "string"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One signed integer value.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "integer"
+              ]
+            },
+            "value": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One boolean value.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "boolean"
+              ]
+            },
+            "value": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "One canonical address value.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "semantic_address"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/SemanticAddress"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Collection of strings.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "strings"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Collection of canonical addresses.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "semantic_addresses"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/SemanticAddress"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "RetrievalSurfaceAddress": {
       "description": "Address of a retrieval-surface descriptor.\n\nIt names a projected capability only. It does not execute the surface or imply that the surface is available for a particular address.",
