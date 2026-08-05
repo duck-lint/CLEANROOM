@@ -10,14 +10,17 @@ use semantic_traversal_core::{
         CandidateCount, ContinuationAccess, ProjectionActivationBandConfig,
         ProjectionActivationSurfaceConfig, TruncationState,
     },
-    model::{AddressKind, RetrievalSurfaceKind, SemanticAddress},
+    model::{AddressKind, IdentifierAddress, RetrievalSurfaceKind, SemanticAddress},
     problem_space::{
         ActivationBand, AttentionLens, OpenTension, OpenTensionType, ProblemConstraint,
         ProblemConstraintApplicability, ProblemReferent, ProblemRegion, ProblemRelation,
         ProblemRelationType, ProblemSpaceState, RecordLifecycle, RegionPersistenceState,
         SourceTurnRange, TensionLifecycle,
     },
-    projection::{ProjectionValidationStatus, SurfaceMatchMode},
+    projection::{
+        IdentifierValue, OccurrenceSource, ProjectionValidationStatus, SemanticUnitContent,
+        SurfaceMatchMode, TemporalValue,
+    },
 };
 use support::{scripted_activation::ScriptedProjectionActivationAccess, synthetic_projection};
 
@@ -1720,626 +1723,872 @@ fn empty_text_seed_is_dispatched_without_semantic_filtering() {
 
 #[test]
 fn referent_candidate_exposure_does_not_create_binding() {
-    let scenario_name = "referent_candidate_exposure_does_not_create_binding";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "referent candidate exposure does not create binding",
-        52,
+    let (mut projection, mut ps, mut cfg, mut u) = seed_order_inputs();
+    only_available_surfaces(&mut projection, &mut cfg, &["surface:exact"]);
+    cfg.unbanded.maximum_textual_seeds = 0;
+    cfg.primary.maximum_textual_seeds = 1;
+    cfg.secondary.maximum_textual_seeds = 0;
+    cfg.tertiary.maximum_textual_seeds = 0;
+    cfg.background.maximum_textual_seeds = 0;
+    ps.regions[0].anchor_referents.truncate(1);
+    ps.constraints.clear();
+    ps.open_tensions.clear();
+    u.text = "ignored newest".into();
+    let unit_id = synthetic_projection::unit("unit:capital:chapter-2:1");
+    let access = ScriptedProjectionActivationAccess {
+        results: vec![(
+            exact_seed_probe(
+                0,
+                "referent A",
+                referent_provenance(
+                    "region:primary-order",
+                    "referent:a",
+                    ActivationBand::Primary,
+                ),
+                ProjectionActivationProbeBand::Attention(ActivationBand::Primary),
+            ),
+            candidate_result(SemanticAddress::Unit(unit_id.clone())),
+        )],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    let activated =
+        semantic_traversal_core::activate_projection(&projection, &ps, &u, &cfg, &access).unwrap();
+    let unit = activated
+        .activated_units
+        .iter()
+        .find(|record| record.unit_id == unit_id)
+        .unwrap();
+    assert!(
+        unit.activation_provenance
+            .contains(&ActivationProvenance::ProblemRegion {
+                region_id: "region:primary-order".into()
+            })
     );
-    assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+    assert!(
+        unit.activation_provenance
+            .contains(&ActivationProvenance::ProblemReferent {
+                region_id: "region:primary-order".into(),
+                referent_id: "referent:a".into()
+            })
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
+    assert!(
+        unit.activation_provenance
+            .contains(&ActivationProvenance::AttentionBand {
+                region_id: "region:primary-order".into(),
+                band: ActivationBand::Primary
+            })
     );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 52,
-        "referent_candidate_exposure_does_not_create_binding uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
+    assert!(unit.activation_provenance.iter().any(|p| matches!(p, ActivationProvenance::ConfiguredDefault { configuration_key } if configuration_key == "automatic_surface_fan_out")));
+    let serialized = serde_json::to_string(&activated).unwrap();
+    assert!(!serialized.contains("referent_binding"));
+    assert!(!serialized.contains("canonical_binding"));
+    assert!(!serialized.contains("problem_region_binding"));
 }
 
 #[test]
 fn open_tension_candidate_exposure_preserves_candidate_index() {
-    let scenario_name = "open_tension_candidate_exposure_preserves_candidate_index";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "open tension candidate exposure preserves candidate index",
-        58,
+    let (projection, mut ps, mut cfg, u) = seed_order_inputs();
+    cfg.unbanded.maximum_textual_seeds = 0;
+    cfg.primary.maximum_textual_seeds = 4;
+    cfg.secondary.maximum_textual_seeds = 0;
+    cfg.tertiary.maximum_textual_seeds = 0;
+    cfg.background.maximum_textual_seeds = 0;
+    ps.regions[0].anchor_referents.clear();
+    ps.constraints.clear();
+    let unit_id = synthetic_projection::unit("unit:capital:chapter-2:1");
+    let access = ScriptedProjectionActivationAccess {
+        results: vec![
+            (
+                exact_seed_probe(
+                    0,
+                    "unresolved seed expression",
+                    tension_expression_provenance(),
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Primary),
+                ),
+                empty_result(),
+            ),
+            (
+                exact_seed_probe(
+                    1,
+                    "candidate zero",
+                    tension_candidate_provenance(0),
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Primary),
+                ),
+                empty_result(),
+            ),
+            (
+                exact_seed_probe(
+                    2,
+                    "candidate one",
+                    tension_candidate_provenance(1),
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Primary),
+                ),
+                candidate_result(SemanticAddress::Unit(unit_id.clone())),
+            ),
+        ],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    let activated =
+        semantic_traversal_core::activate_projection(&projection, &ps, &u, &cfg, &access).unwrap();
+    let unit = activated
+        .activated_units
+        .iter()
+        .find(|record| record.unit_id == unit_id)
+        .unwrap();
+    assert!(
+        unit.activation_provenance
+            .contains(&ActivationProvenance::OpenTension {
+                tension_id: "tension:seed-order".into()
+            })
     );
-    assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+    assert!(
+        unit.activation_provenance
+            .contains(&ActivationProvenance::OpenTensionCandidate {
+                tension_id: "tension:seed-order".into(),
+                candidate_index: 1
+            })
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
+    assert!(
+        unit.activation_provenance
+            .contains(&ActivationProvenance::ProblemRegion {
+                region_id: "region:primary-order".into()
+            })
     );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 58,
-        "open_tension_candidate_exposure_preserves_candidate_index uses a scenario-specific expansion budget"
+    assert!(
+        unit.activation_provenance
+            .contains(&ActivationProvenance::AttentionBand {
+                region_id: "region:primary-order".into(),
+                band: ActivationBand::Primary
+            })
     );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn relation_guides_incidence_provenance_without_creating_relation() {
-    let scenario_name = "relation_guides_incidence_provenance_without_creating_relation";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "relation guides incidence provenance without creating relation",
-        63,
+    let mut cfg = config();
+    cfg.maximum_initial_relation_depth = 0;
+    let activated = activation_with_probe0_candidate_returned_as(
+        cfg,
+        SemanticAddress::Object(synthetic_projection::object(
+            synthetic_projection::MARX_OBJECT,
+        )),
+        AddressKind::SemanticObject,
     );
-    assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+    assert!(
+        activated
+            .edges
+            .iter()
+            .all(|edge| edge.transition_id != "relation:comparison")
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 63,
-        "relation_guides_incidence_provenance_without_creating_relation uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
+    let serialized = serde_json::to_string(&activated).unwrap();
+    assert!(!serialized.contains("corpus_relation"));
+    assert!(!serialized.contains("relation:comparison"));
 }
 
 #[test]
 fn attention_band_changes_breadth_not_identity() {
-    let scenario_name = "attention_band_changes_breadth_not_identity";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "attention band changes breadth not identity",
-        44,
+    let unit_id = synthetic_projection::unit("unit:capital:chapter-2:1");
+    let mut narrow = config();
+    narrow.unbanded.text_preview_character_limit = 4;
+    narrow.unbanded.maximum_structural_neighbors_per_record = 0;
+    narrow.unbanded.maximum_visible_units_per_region = 0;
+    let mut wide = config();
+    wide.unbanded.text_preview_character_limit = 12;
+    wide.unbanded.maximum_structural_neighbors_per_record = 4;
+    wide.unbanded.maximum_visible_units_per_region = 4;
+    let narrow_activation =
+        activation_with_probe0_candidate(narrow, SemanticAddress::Unit(unit_id.clone()));
+    let wide_activation =
+        activation_with_probe0_candidate(wide, SemanticAddress::Unit(unit_id.clone()));
+    assert_eq!(
+        narrow_activation.activated_units[0].unit_id,
+        wide_activation.activated_units[0].unit_id
     );
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        narrow_activation.activated_units[0].parent_object_id,
+        wide_activation.activated_units[0].parent_object_id
     );
     assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
+        narrow_activation.activated_units[0].parent_region_address,
+        wide_activation.activated_units[0].parent_region_address
     );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 44,
-        "attention_band_changes_breadth_not_identity uses a scenario-specific expansion budget"
+    assert_ne!(
+        narrow_activation.activated_units[0].text_preview,
+        wide_activation.activated_units[0].text_preview
     );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
+    assert_eq!(narrow_activation.activated_units.len(), 1);
+    assert_eq!(wide_activation.activated_units.len(), 1);
 }
 
 #[test]
 fn configured_defaults_add_only_the_three_accepted_policy_keys() {
-    let scenario_name = "configured_defaults_add_only_the_three_accepted_policy_keys";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "configured defaults add only the three accepted policy keys",
-        60,
+    let mut cfg = config();
+    cfg.unbanded.maximum_structural_neighbors_per_record = 0;
+    cfg.hub_degree_threshold = 1;
+    let activated = activation_with_probe0_candidate_returned_as(
+        cfg,
+        SemanticAddress::Object(synthetic_projection::object(
+            synthetic_projection::MARX_OBJECT,
+        )),
+        AddressKind::SemanticObject,
     );
+    let mut keys = std::collections::BTreeSet::new();
+    for provenance in activated
+        .telemetry
+        .iter()
+        .flat_map(|record| record.activation_provenance.iter())
+        .chain(
+            activated
+                .activated_objects
+                .iter()
+                .flat_map(|record| record.activation_provenance.iter()),
+        )
+        .chain(
+            activated
+                .activated_regions
+                .iter()
+                .flat_map(|record| record.activation_provenance.iter()),
+        )
+        .chain(
+            activated
+                .activated_units
+                .iter()
+                .flat_map(|record| record.activation_provenance.iter()),
+        )
+        .chain(
+            activated
+                .activated_identifier_assignments
+                .iter()
+                .flat_map(|record| record.activation_provenance.iter()),
+        )
+        .chain(
+            activated
+                .edges
+                .iter()
+                .flat_map(|record| record.activation_provenance.iter()),
+        )
+        .chain(
+            activated
+                .continuation_handles
+                .iter()
+                .flat_map(|record| record.activation_provenance.iter()),
+        )
+    {
+        if let ActivationProvenance::ConfiguredDefault { configuration_key } = provenance {
+            keys.insert(configuration_key.clone());
+        }
+    }
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
-    );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
+        keys,
+        [
+            "automatic_surface_fan_out",
+            "bounded_structural_context",
+            "high_degree_summary"
         ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect()
     );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 60,
-        "configured_defaults_add_only_the_three_accepted_policy_keys uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn configured_defaults_create_no_unrelated_root_candidates() {
-    let scenario_name = "configured_defaults_create_no_unrelated_root_candidates";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "configured defaults create no unrelated root candidates",
-        56,
-    );
-    assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
-    );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 56,
-        "configured_defaults_create_no_unrelated_root_candidates uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
+    let projection = synthetic_projection::tiny_projection();
+    let ps = problem_space();
+    let mut cfg = config();
+    cfg.unbanded.maximum_textual_seeds = 0;
+    cfg.primary.maximum_textual_seeds = 0;
+    cfg.secondary.maximum_textual_seeds = 0;
+    cfg.tertiary.maximum_textual_seeds = 0;
+    cfg.background.maximum_textual_seeds = 0;
+    let activated = semantic_traversal_core::activate_projection(
+        &projection,
+        &ps,
+        &utterance(),
+        &cfg,
+        &PanicProjectionActivationAccess,
+    )
+    .unwrap();
+    assert!(activated.activated_objects.is_empty());
+    assert!(activated.activated_regions.is_empty());
+    assert!(activated.activated_units.is_empty());
+    assert!(activated.activated_identifier_assignments.is_empty());
+    assert!(activated.activated_occurrences.is_empty());
+    assert!(activated.activated_temporal_anchors.is_empty());
+    assert!(activated.edges.is_empty());
+    assert!(activated.continuation_handles.is_empty());
+    assert!(activated.telemetry.is_empty());
 }
 
 #[test]
 fn unit_candidate_adds_parent_region_and_object() {
-    let scenario_name = "unit_candidate_adds_parent_region_and_object";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "unit candidate adds parent region and object",
-        45,
-    );
+    let unit_id = synthetic_projection::unit("unit:capital:chapter-2:1");
+    let activated =
+        activation_with_probe0_candidate(config(), SemanticAddress::Unit(unit_id.clone()));
+    assert_eq!(activated.activated_units.len(), 1);
+    assert_eq!(activated.activated_units[0].unit_id, unit_id);
+    assert_eq!(activated.activated_regions.len(), 1);
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        activated.activated_regions[0].address,
+        synthetic_projection::region(
+            &synthetic_projection::object(synthetic_projection::MARX_OBJECT),
+            "heading:Chapter 2"
+        )
     );
+    assert_eq!(activated.activated_objects.len(), 1);
     assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
+        activated.activated_objects[0].object_id,
+        synthetic_projection::object(synthetic_projection::MARX_OBJECT)
     );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 45,
-        "unit_candidate_adds_parent_region_and_object uses a scenario-specific expansion budget"
+    assert!(
+        activated.activated_units[0]
+            .activation_provenance
+            .iter()
+            .any(|p| matches!(p, ActivationProvenance::NewestUtterance { .. }))
     );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
+    assert!(activated.activated_objects[0].activation_provenance.iter().any(|p| matches!(p, ActivationProvenance::ConfiguredDefault { configuration_key } if configuration_key == "bounded_structural_context")));
+    assert_visible_references_resolve(&activated);
 }
 
 #[test]
 fn region_candidate_adds_parent_object() {
-    let scenario_name = "region_candidate_adds_parent_object";
-    let activated =
-        empty_probe_activation_for(scenario_name, "region candidate adds parent object", 36);
-    assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+    let region = synthetic_projection::region(
+        &synthetic_projection::object(synthetic_projection::MARX_OBJECT),
+        "heading:Chapter 2",
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
+    let activated = activation_with_probe0_candidate_returned_as(
+        config(),
+        SemanticAddress::Region(region.clone()),
+        AddressKind::SemanticRegion,
     );
+    assert_eq!(activated.activated_regions.len(), 1);
+    assert_eq!(activated.activated_regions[0].address, region);
+    assert_eq!(activated.activated_objects.len(), 1);
     assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 36,
-        "region_candidate_adds_parent_object uses a scenario-specific expansion budget"
+        activated.activated_objects[0].object_id,
+        synthetic_projection::object(synthetic_projection::MARX_OBJECT)
     );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
+    assert!(activated.activated_objects[0].activation_provenance.iter().any(|p| matches!(p, ActivationProvenance::ConfiguredDefault { configuration_key } if configuration_key == "bounded_structural_context")));
+    assert_visible_references_resolve(&activated);
 }
 
 #[test]
 fn identifier_candidate_adds_exact_assignment_and_subject() {
-    let scenario_name = "identifier_candidate_adds_exact_assignment_and_subject";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "identifier candidate adds exact assignment and subject",
-        55,
-    );
+    let address = SemanticAddress::Identifier(IdentifierAddress {
+        identifier_name: "title".into(),
+        represented_value: Some("Capital".into()),
+    });
+    let activated =
+        activation_with_probe0_candidate_returned_as(config(), address, AddressKind::Identifier);
+    let assignment = activated
+        .activated_identifier_assignments
+        .iter()
+        .find(|record| record.assignment_id == "assignment:marx:title")
+        .expect("direct identifier assignment is activated");
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        activated
+            .activated_identifier_assignments
+            .iter()
+            .filter(|record| record.identifier_name == "title")
+            .count(),
+        1
     );
+    assert_eq!(assignment.assignment_id, "assignment:marx:title");
+    assert_eq!(assignment.identifier_name, "title");
     assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
+        assignment.subject,
+        SemanticAddress::Object(synthetic_projection::object(
+            synthetic_projection::MARX_OBJECT
+        ))
     );
+    assert!(matches!(assignment.value, IdentifierValue::String(ref value) if value == "Capital"));
     assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 55,
-        "identifier_candidate_adds_exact_assignment_and_subject uses a scenario-specific expansion budget"
+        activated.activated_objects[0].object_id,
+        synthetic_projection::object(synthetic_projection::MARX_OBJECT)
     );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
+    assert!(
+        assignment
+            .activation_provenance
+            .iter()
+            .any(|p| matches!(p, ActivationProvenance::NewestUtterance { .. }))
+    );
 }
 
 #[test]
 fn temporal_anchor_candidate_adds_subject() {
-    let scenario_name = "temporal_anchor_candidate_adds_subject";
+    let mut projection = synthetic_projection::tiny_projection();
+    projection.retrieval_surfaces[0].returned_identity = AddressKind::TemporalAnchor;
+    let ps = problem_space();
+    let cfg = config();
+    let u = utterance();
+    let anchor = synthetic_projection::anchor("anchor:journal-one:2026-07-02");
+    let newest_provenance = vec![ActivationProvenance::NewestUtterance {
+        utterance_id: u.utterance_id.clone(),
+    }];
+    let mut temporal_provenance = newest_provenance.clone();
+    temporal_provenance.push(ActivationProvenance::ConfiguredDefault {
+        configuration_key: "automatic_surface_fan_out".into(),
+    });
+    let access = ScriptedProjectionActivationAccess {
+        results: vec![
+            (
+                text_probe(
+                    0,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "newest",
+                    newest_provenance.clone(),
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                candidate_result(SemanticAddress::TemporalAnchor(anchor.clone())),
+            ),
+            (
+                text_probe(
+                    1,
+                    "surface:lexical",
+                    RetrievalSurfaceKind::Lexical,
+                    SurfaceMatchMode::Terms,
+                    "newest",
+                    newest_provenance.clone(),
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    2,
+                    "surface:vector",
+                    RetrievalSurfaceKind::Vector,
+                    SurfaceMatchMode::NearestNeighbours,
+                    "newest",
+                    newest_provenance,
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                ProjectionActivationProbe {
+                    probe_id: "activation-probe:3".into(),
+                    band: ProjectionActivationProbeBand::Unbanded,
+                    surface_id: "surface:temporal".into(),
+                    surface_kind: RetrievalSurfaceKind::Temporal,
+                    match_mode: SurfaceMatchMode::Temporal,
+                    source: ProjectionActivationProbeSource::Temporal {
+                        address: SemanticAddress::TemporalAnchor(anchor.clone()),
+                    },
+                    candidate_limit: 2,
+                    current_depth: 0,
+                    activation_provenance: temporal_provenance,
+                },
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    4,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "whole constraint",
+                    vec![ActivationProvenance::Constraint {
+                        constraint_id: "constraint:whole".into(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    5,
+                    "surface:lexical",
+                    RetrievalSurfaceKind::Lexical,
+                    SurfaceMatchMode::Terms,
+                    "whole constraint",
+                    vec![ActivationProvenance::Constraint {
+                        constraint_id: "constraint:whole".into(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    6,
+                    "surface:vector",
+                    RetrievalSurfaceKind::Vector,
+                    SurfaceMatchMode::NearestNeighbours,
+                    "whole constraint",
+                    vec![ActivationProvenance::Constraint {
+                        constraint_id: "constraint:whole".into(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+        ],
+        failures: vec![],
+        declared_modes: vec![],
+    };
     let activated =
-        empty_probe_activation_for(scenario_name, "temporal anchor candidate adds subject", 39);
+        semantic_traversal_core::activate_projection(&projection, &ps, &u, &cfg, &access).unwrap();
+    assert_eq!(activated.activated_temporal_anchors.len(), 1);
+    let record = &activated.activated_temporal_anchors[0];
+    assert_eq!(record.anchor_id, anchor);
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        record.subject,
+        SemanticAddress::Object(synthetic_projection::object(
+            synthetic_projection::JOURNAL_ONE_OBJECT
+        ))
+    );
+    assert!(matches!(record.value, TemporalValue::Date(ref value) if value == "2026-07-02"));
+    assert!(
+        record
+            .available_surface_ids
+            .contains(&"surface:temporal".into())
     );
     assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
+        activated.activated_objects[0].object_id,
+        synthetic_projection::object(synthetic_projection::JOURNAL_ONE_OBJECT)
     );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 39,
-        "temporal_anchor_candidate_adds_subject uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn object_field_occurrence_adds_source_and_target() {
-    let scenario_name = "object_field_occurrence_adds_source_and_target";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "object field occurrence adds source and target",
-        47,
+    let occurrence = synthetic_projection::occurrence("occurrence:journal-one:capital-object");
+    let activated = activation_with_probe0_candidate_returned_as(
+        config(),
+        SemanticAddress::Occurrence(occurrence.clone()),
+        AddressKind::Occurrence,
     );
+    assert_eq!(activated.activated_occurrences.len(), 1);
+    let record = &activated.activated_occurrences[0];
+    assert_eq!(record.occurrence_id, occurrence);
+    assert!(matches!(
+        record.source,
+        OccurrenceSource::ObjectField { .. }
+    ));
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        record.resolved_target,
+        SemanticAddress::Object(synthetic_projection::object(
+            synthetic_projection::MARX_OBJECT
+        ))
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
+    assert!(
+        activated
+            .activated_objects
+            .iter()
+            .any(|object| object.object_id
+                == synthetic_projection::object(synthetic_projection::JOURNAL_ONE_OBJECT))
     );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 47,
-        "object_field_occurrence_adds_source_and_target uses a scenario-specific expansion budget"
+    assert!(
+        activated
+            .activated_objects
+            .iter()
+            .any(|object| object.object_id
+                == synthetic_projection::object(synthetic_projection::MARX_OBJECT))
     );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
+    assert!(!matches!(
+        record.source,
+        OccurrenceSource::SemanticUnit { .. }
+    ));
 }
 
 #[test]
 fn unit_occurrence_adds_source_unit_region_object_and_target() {
-    let scenario_name = "unit_occurrence_adds_source_unit_region_object_and_target";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "unit occurrence adds source unit region object and target",
-        58,
+    let occurrence = synthetic_projection::occurrence("occurrence:journal-two:capital-block");
+    let source_unit = synthetic_projection::unit("unit:journal:2026-07-15:1");
+    let target_unit = synthetic_projection::unit("unit:capital:chapter-2:2");
+    let activated = activation_with_probe0_candidate_returned_as(
+        config(),
+        SemanticAddress::Occurrence(occurrence.clone()),
+        AddressKind::Occurrence,
     );
-    assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+    assert!(
+        activated
+            .activated_occurrences
+            .iter()
+            .any(|record| record.occurrence_id == occurrence)
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
+    assert!(
+        activated
+            .activated_units
+            .iter()
+            .any(|record| record.unit_id == source_unit)
     );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 58,
-        "unit_occurrence_adds_source_unit_region_object_and_target uses a scenario-specific expansion budget"
+    assert!(
+        activated
+            .activated_units
+            .iter()
+            .any(|record| record.unit_id == target_unit)
     );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
+    assert!(
+        activated
+            .activated_regions
+            .iter()
+            .any(|record| record.address
+                == synthetic_projection::region(
+                    &synthetic_projection::object(synthetic_projection::JOURNAL_TWO_OBJECT),
+                    "root"
+                ))
+    );
+    assert!(
+        activated
+            .activated_objects
+            .iter()
+            .any(|record| record.object_id
+                == synthetic_projection::object(synthetic_projection::JOURNAL_TWO_OBJECT))
+    );
+    assert_visible_references_resolve(&activated);
 }
 
 #[test]
 fn candidate_bundle_is_omitted_atomically_when_required_context_cannot_fit() {
-    let scenario_name = "candidate_bundle_is_omitted_atomically_when_required_context_cannot_fit";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "candidate bundle is omitted atomically when required context cannot fit",
-        72,
+    let mut cfg = config();
+    cfg.maximum_activated_objects = 0;
+    let activated = activation_with_probe0_candidate(
+        cfg,
+        SemanticAddress::Unit(synthetic_projection::unit("unit:capital:chapter-2:1")),
     );
-    assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+    assert!(activated.activated_units.is_empty());
+    assert!(activated.activated_regions.is_empty());
+    assert!(activated.activated_objects.is_empty());
+    assert!(matches!(
+        activated.telemetry[0].truncation_state,
+        TruncationState::Bounded
+    ));
+    assert!(
+        activated
+            .telemetry
+            .iter()
+            .skip(1)
+            .all(|record| matches!(record.truncation_state, TruncationState::Complete))
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 72,
-        "candidate_bundle_is_omitted_atomically_when_required_context_cannot_fit uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn preview_vectors_never_reference_missing_records() {
-    let scenario_name = "preview_vectors_never_reference_missing_records";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "preview vectors never reference missing records",
-        48,
+    let activated = activation_with_probe0_candidate_returned_as(
+        config(),
+        SemanticAddress::Object(synthetic_projection::object(
+            synthetic_projection::MARX_OBJECT,
+        )),
+        AddressKind::SemanticObject,
     );
-    assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
-    );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 48,
-        "preview_vectors_never_reference_missing_records uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
+    assert_visible_references_resolve(&activated);
 }
 
 #[test]
 fn closure_only_records_do_not_trigger_surface_probes() {
-    let scenario_name = "closure_only_records_do_not_trigger_surface_probes";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "closure only records do not trigger surface probes",
-        51,
+    let mut cfg = config();
+    cfg.maximum_initial_relation_depth = 0;
+    let unit_id = synthetic_projection::unit("unit:capital:chapter-2:1");
+    let activated = activation_with_probe0_candidate(cfg, SemanticAddress::Unit(unit_id.clone()));
+    assert!(
+        activated
+            .activated_objects
+            .iter()
+            .any(|record| record.object_id
+                == synthetic_projection::object(synthetic_projection::MARX_OBJECT))
     );
-    assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+    assert!(
+        activated
+            .activated_regions
+            .iter()
+            .any(|record| record.address
+                == synthetic_projection::region(
+                    &synthetic_projection::object(synthetic_projection::MARX_OBJECT),
+                    "heading:Chapter 2"
+                ))
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
+    assert!(
+        activated
+            .telemetry
+            .iter()
+            .all(|record| record.current_depth == 0)
     );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 51,
-        "closure_only_records_do_not_trigger_surface_probes uses a scenario-specific expansion budget"
+    assert!(
+        activated
+            .telemetry
+            .iter()
+            .all(|record| record.probe_id != "activation-probe:6")
     );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn inline_preview_uses_normalized_text_not_authored_markdown() {
-    let scenario_name = "inline_preview_uses_normalized_text_not_authored_markdown";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "inline preview uses normalized text not authored markdown",
-        58,
+    let mut projection = synthetic_projection::tiny_projection();
+    let unit_id = synthetic_projection::unit("unit:capital:chapter-2:1");
+    projection
+        .units
+        .iter_mut()
+        .find(|record| record.unit_id == unit_id)
+        .unwrap()
+        .content = SemanticUnitContent::Inline {
+        authored_markdown: "**WRONG SOURCE**".into(),
+        normalized_text: "normalized preview text".into(),
+    };
+    let mut cfg = config();
+    cfg.unbanded.text_preview_character_limit = 64;
+    let activated = activation_with_custom_projection_candidate(
+        projection,
+        cfg,
+        SemanticAddress::Unit(unit_id),
+        AddressKind::SemanticUnit,
     );
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        activated.activated_units[0].text_preview,
+        semantic_traversal_core::ActivatedTextPreview::Inline {
+            text: "normalized preview text".into(),
+            truncated: false
+        }
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
+    assert!(
+        !serde_json::to_string(&activated.activated_units[0])
+            .unwrap()
+            .contains("WRONG SOURCE")
     );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 58,
-        "inline_preview_uses_normalized_text_not_authored_markdown uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn inline_preview_counts_unicode_scalars_not_bytes() {
-    let scenario_name = "inline_preview_counts_unicode_scalars_not_bytes";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "inline preview counts unicode scalars not bytes",
-        48,
+    let mut projection = synthetic_projection::tiny_projection();
+    let unit_id = synthetic_projection::unit("unit:capital:chapter-2:1");
+    projection
+        .units
+        .iter_mut()
+        .find(|record| record.unit_id == unit_id)
+        .unwrap()
+        .content = SemanticUnitContent::Inline {
+        authored_markdown: "ignored".into(),
+        normalized_text: "aé🦆z".into(),
+    };
+    let mut cfg = config();
+    cfg.unbanded.text_preview_character_limit = 3;
+    let activated = activation_with_custom_projection_candidate(
+        projection,
+        cfg,
+        SemanticAddress::Unit(unit_id),
+        AddressKind::SemanticUnit,
     );
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        activated.activated_units[0].text_preview,
+        semantic_traversal_core::ActivatedTextPreview::Inline {
+            text: "aé🦆".into(),
+            truncated: true
+        }
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 48,
-        "inline_preview_counts_unicode_scalars_not_bytes uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn zero_preview_limit_marks_nonempty_text_truncated() {
-    let scenario_name = "zero_preview_limit_marks_nonempty_text_truncated";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "zero preview limit marks nonempty text truncated",
-        49,
+    let mut projection = synthetic_projection::tiny_projection();
+    let unit_id = synthetic_projection::unit("unit:capital:chapter-2:1");
+    projection
+        .units
+        .iter_mut()
+        .find(|record| record.unit_id == unit_id)
+        .unwrap()
+        .content = SemanticUnitContent::Inline {
+        authored_markdown: "nonempty".into(),
+        normalized_text: "nonempty".into(),
+    };
+    let mut cfg = config();
+    cfg.unbanded.text_preview_character_limit = 0;
+    let activated = activation_with_custom_projection_candidate(
+        projection,
+        cfg,
+        SemanticAddress::Unit(unit_id),
+        AddressKind::SemanticUnit,
     );
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        activated.activated_units[0].text_preview,
+        semantic_traversal_core::ActivatedTextPreview::Inline {
+            text: "".into(),
+            truncated: true
+        }
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 49,
-        "zero_preview_limit_marks_nonempty_text_truncated uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn zero_preview_limit_preserves_empty_text_as_complete() {
-    let scenario_name = "zero_preview_limit_preserves_empty_text_as_complete";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "zero preview limit preserves empty text as complete",
-        52,
+    let mut projection = synthetic_projection::tiny_projection();
+    let unit_id = synthetic_projection::unit("unit:capital:chapter-2:1");
+    projection
+        .units
+        .iter_mut()
+        .find(|record| record.unit_id == unit_id)
+        .unwrap()
+        .content = SemanticUnitContent::Inline {
+        authored_markdown: "".into(),
+        normalized_text: "".into(),
+    };
+    let mut cfg = config();
+    cfg.unbanded.text_preview_character_limit = 0;
+    let activated = activation_with_custom_projection_candidate(
+        projection,
+        cfg,
+        SemanticAddress::Unit(unit_id),
+        AddressKind::SemanticUnit,
     );
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        activated.activated_units[0].text_preview,
+        semantic_traversal_core::ActivatedTextPreview::Inline {
+            text: "".into(),
+            truncated: false
+        }
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 52,
-        "zero_preview_limit_preserves_empty_text_as_complete uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn hydration_address_is_not_dereferenced_or_copied() {
-    let scenario_name = "hydration_address_is_not_dereferenced_or_copied";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "hydration address is not dereferenced or copied",
-        48,
+    let mut projection = synthetic_projection::tiny_projection();
+    let unit_id = synthetic_projection::unit("unit:capital:chapter-2:1");
+    projection
+        .units
+        .iter_mut()
+        .find(|record| record.unit_id == unit_id)
+        .unwrap()
+        .content = SemanticUnitContent::HydrationAddress {
+        address: "hydrate://secret-address".into(),
+        content_hash: "sha256-secret-hash".into(),
+    };
+    let activated = activation_with_custom_projection_candidate(
+        projection,
+        config(),
+        SemanticAddress::Unit(unit_id),
+        AddressKind::SemanticUnit,
     );
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        activated.activated_units[0].text_preview,
+        semantic_traversal_core::ActivatedTextPreview::UnavailableWithoutHydration
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 48,
-        "hydration_address_is_not_dereferenced_or_copied uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
+    let serialized = serde_json::to_string(&activated.activated_units[0]).unwrap();
+    assert!(!serialized.contains("hydrate://secret-address"));
+    assert!(!serialized.contains("sha256-secret-hash"));
 }
 
 #[test]
 fn later_larger_bound_monotonically_enriches_preview() {
-    let scenario_name = "later_larger_bound_monotonically_enriches_preview";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "later larger bound monotonically enriches preview",
-        50,
+    let unit_id = synthetic_projection::unit("unit:capital:chapter-2:1");
+    let mut narrow = config();
+    narrow.unbanded.text_preview_character_limit = 4;
+    let mut wide = config();
+    wide.unbanded.text_preview_character_limit = 12;
+    let narrow_activation =
+        activation_with_probe0_candidate(narrow, SemanticAddress::Unit(unit_id.clone()));
+    let wide_activation =
+        activation_with_probe0_candidate(wide, SemanticAddress::Unit(unit_id.clone()));
+    assert_eq!(narrow_activation.activated_units[0].unit_id, unit_id);
+    assert_eq!(wide_activation.activated_units[0].unit_id, unit_id);
+    assert_ne!(
+        narrow_activation.activated_units[0].text_preview,
+        wide_activation.activated_units[0].text_preview
     );
-    assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
-    );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 50,
-        "later_larger_bound_monotonically_enriches_preview uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
+    assert_eq!(wide_activation.activated_units.len(), 1);
+    assert_eq!(wide_activation.activated_objects.len(), 1);
+    assert_eq!(wide_activation.activated_regions.len(), 1);
 }
 
 #[test]
@@ -4569,6 +4818,169 @@ fn candidate_result(address: SemanticAddress) -> ProjectionActivationProbeResult
         identifier_type_distribution: vec![],
         temporal_anchor_count: 0,
         unresolved_target_count: 0,
+    }
+}
+
+fn activation_with_custom_projection_candidate(
+    mut projection: SemanticSpaceProjection,
+    cfg: ProjectionActivationConfig,
+    address: SemanticAddress,
+    returned_identity: AddressKind,
+) -> semantic_traversal_core::ActivatedProjection {
+    projection.retrieval_surfaces[0].returned_identity = returned_identity;
+    let ps = problem_space();
+    let u = utterance();
+    let access = ScriptedProjectionActivationAccess {
+        results: vec![
+            (
+                text_probe(
+                    0,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                candidate_result(address),
+            ),
+            (
+                text_probe(
+                    1,
+                    "surface:lexical",
+                    RetrievalSurfaceKind::Lexical,
+                    SurfaceMatchMode::Terms,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    2,
+                    "surface:vector",
+                    RetrievalSurfaceKind::Vector,
+                    SurfaceMatchMode::NearestNeighbours,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    3,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "whole constraint",
+                    vec![ActivationProvenance::Constraint {
+                        constraint_id: "constraint:whole".into(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    4,
+                    "surface:lexical",
+                    RetrievalSurfaceKind::Lexical,
+                    SurfaceMatchMode::Terms,
+                    "whole constraint",
+                    vec![ActivationProvenance::Constraint {
+                        constraint_id: "constraint:whole".into(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    5,
+                    "surface:vector",
+                    RetrievalSurfaceKind::Vector,
+                    SurfaceMatchMode::NearestNeighbours,
+                    "whole constraint",
+                    vec![ActivationProvenance::Constraint {
+                        constraint_id: "constraint:whole".into(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+        ],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    semantic_traversal_core::activate_projection(&projection, &ps, &u, &cfg, &access).unwrap()
+}
+
+fn assert_visible_references_resolve(activated: &semantic_traversal_core::ActivatedProjection) {
+    for object in &activated.activated_objects {
+        for region in &object.visible_region_addresses {
+            assert!(
+                activated
+                    .activated_regions
+                    .iter()
+                    .any(|record| &record.address == region)
+            );
+        }
+        for unit in &object.visible_unit_ids {
+            assert!(
+                activated
+                    .activated_units
+                    .iter()
+                    .any(|record| &record.unit_id == unit)
+            );
+        }
+        for assignment in &object.visible_identifier_assignment_ids {
+            assert!(
+                activated
+                    .activated_identifier_assignments
+                    .iter()
+                    .any(|record| &record.assignment_id == assignment)
+            );
+        }
+    }
+    for region in &activated.activated_regions {
+        for unit in &region.visible_unit_ids {
+            assert!(
+                activated
+                    .activated_units
+                    .iter()
+                    .any(|record| &record.unit_id == unit)
+            );
+        }
+        for assignment in &region.visible_identifier_assignment_ids {
+            assert!(
+                activated
+                    .activated_identifier_assignments
+                    .iter()
+                    .any(|record| &record.assignment_id == assignment)
+            );
+        }
+    }
+    for unit in &activated.activated_units {
+        for assignment in unit
+            .visible_inherited_identifier_assignment_ids
+            .iter()
+            .chain(unit.visible_unit_local_identifier_assignment_ids.iter())
+        {
+            assert!(
+                activated
+                    .activated_identifier_assignments
+                    .iter()
+                    .any(|record| &record.assignment_id == assignment)
+            );
+        }
     }
 }
 
