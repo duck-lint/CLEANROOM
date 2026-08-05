@@ -20,7 +20,7 @@ use semantic_traversal_core::{
     },
     projection::{
         IdentifierValue, OccurrenceSource, ProjectionValidationStatus, SemanticUnitContent,
-        SurfaceMatchMode, TemporalValue,
+        StructuralTransitionOperation, SurfaceMatchMode, TemporalValue,
     },
 };
 use support::{scripted_activation::ScriptedProjectionActivationAccess, synthetic_projection};
@@ -3146,44 +3146,181 @@ fn incidence_traversal_respects_relation_depth() {
 
 #[test]
 fn incidence_cycles_are_suppressed_per_root() {
+    let mut projection = synthetic_projection::tiny_projection();
+    let graph_index = projection
+        .retrieval_surfaces
+        .iter()
+        .position(|surface| surface.surface_id == "surface:graph")
+        .unwrap();
+    let mut graph_object_surface = projection.retrieval_surfaces[graph_index].clone();
+    {
+        let graph_surface = &mut projection.retrieval_surfaces[graph_index];
+        graph_surface.visible_address_kinds = vec![AddressKind::SemanticObject];
+        graph_surface.match_modes = vec![SurfaceMatchMode::Incidence];
+        graph_surface.returned_identity = AddressKind::Occurrence;
+    }
+    graph_object_surface.surface_id = "surface:graph-object".into();
+    graph_object_surface.visible_address_kinds = vec![AddressKind::Occurrence];
+    graph_object_surface.match_modes = vec![SurfaceMatchMode::Incidence];
+    graph_object_surface.returned_identity = AddressKind::SemanticObject;
+    graph_object_surface.kind = RetrievalSurfaceKind::Graph;
+    projection.retrieval_surfaces.push(graph_object_surface);
+    let occurrence_source = projection
+        .valid_transitions
+        .iter_mut()
+        .find(|transition| transition.transition_id == "transition:occurrence-object-source")
+        .unwrap();
+    assert_eq!(occurrence_source.from, AddressKind::Occurrence);
+    assert_eq!(
+        occurrence_source.operation,
+        StructuralTransitionOperation::Occurrence
+    );
+    assert_eq!(occurrence_source.direction, Direction::Incoming);
+    assert_eq!(occurrence_source.to, AddressKind::SemanticObject);
+    occurrence_source.retrieval_surface_id = Some("surface:graph-object".into());
+    let object_occurrence = projection
+        .valid_transitions
+        .iter()
+        .find(|transition| transition.transition_id == "transition:object-occurrence-outgoing")
+        .unwrap();
+    assert_eq!(
+        object_occurrence.retrieval_surface_id.as_deref(),
+        Some("surface:graph")
+    );
     let source = SemanticAddress::Object(synthetic_projection::object(
         synthetic_projection::JOURNAL_ONE_OBJECT,
     ));
     let occurrence = SemanticAddress::Occurrence(synthetic_projection::occurrence(
         "occurrence:journal-one:capital-object",
     ));
-    let occurrence_source_transition = "transition:occurrence-object-source";
-    assert_eq!(
-        occurrence_source_transition,
-        "transition:occurrence-object-source"
+    projection.retrieval_surfaces[0].returned_identity = AddressKind::SemanticObject;
+    let mut cfg = graph_config(3);
+    only_available_surfaces(
+        &mut projection,
+        &mut cfg,
+        &["surface:exact", "surface:graph", "surface:graph-object"],
     );
-    let activated = graph_root_activation(
-        3,
-        vec![
+    let graph_limits = cfg
+        .surface_limits
+        .iter()
+        .find(|limits| limits.surface_id == "surface:graph")
+        .unwrap()
+        .clone();
+    cfg.surface_limits.push(ProjectionActivationSurfaceConfig {
+        surface_id: "surface:graph-object".into(),
+        ..graph_limits
+    });
+    let u = ActivationUtterance {
+        utterance_id: "utterance:cycle-root".into(),
+        text: "cycle root".into(),
+    };
+    let provenance = newest_provenance(&u.utterance_id);
+    let mut graph_object_provenance = provenance.clone();
+    graph_object_provenance.push(ActivationProvenance::ConfiguredDefault {
+        configuration_key: "automatic_surface_fan_out".into(),
+    });
+    let graph_object_probe = ProjectionActivationProbe {
+        probe_id: "activation-probe:2".into(),
+        band: ProjectionActivationProbeBand::Unbanded,
+        surface_id: "surface:graph-object".into(),
+        surface_kind: RetrievalSurfaceKind::Graph,
+        match_mode: SurfaceMatchMode::Incidence,
+        source: ProjectionActivationProbeSource::Address {
+            address: occurrence.clone(),
+        },
+        candidate_limit: 2,
+        current_depth: 2,
+        activation_provenance: graph_object_provenance,
+    };
+    let mut ps = problem_space();
+    ps.constraints.clear();
+    ps.regions.clear();
+    ps.relations.clear();
+    ps.open_tensions.clear();
+    ps.attention_lens.primary_region_ids.clear();
+    ps.attention_lens.secondary_region_ids.clear();
+    ps.attention_lens.tertiary_region_ids.clear();
+    ps.attention_lens.background_region_ids.clear();
+    let access = ScriptedProjectionActivationAccess {
+        results: vec![
             (
-                source.clone(),
+                text_probe(
+                    0,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "cycle root",
+                    provenance.clone(),
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                candidate_result(source.clone()),
+            ),
+            (
+                graph_incidence_probe(
+                    1,
+                    source.clone(),
+                    provenance,
+                    ProjectionActivationProbeBand::Unbanded,
+                    1,
+                ),
                 incidence_result(
                     occurrence.clone(),
                     "transition:object-occurrence-outgoing",
                     Direction::Outgoing,
                 ),
             ),
-            (occurrence.clone(), incidence_result_many(vec![])),
+            (
+                graph_object_probe,
+                incidence_result(
+                    source.clone(),
+                    "transition:occurrence-object-source",
+                    Direction::Incoming,
+                ),
+            ),
         ],
-    );
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    let activated =
+        semantic_traversal_core::activate_projection(&projection, &ps, &u, &cfg, &access).unwrap();
     let graph = activated
         .telemetry
         .iter()
-        .filter(|record| record.surface_id == "surface:graph")
+        .filter(|record| record.surface_kind == RetrievalSurfaceKind::Graph)
         .collect::<Vec<_>>();
     assert_eq!(graph.len(), 2);
-    assert_eq!(graph[0].current_depth, 1);
-    assert_eq!(graph[1].current_depth, 2);
+    assert_eq!(
+        graph
+            .iter()
+            .map(|record| record.surface_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["surface:graph", "surface:graph-object"]
+    );
+    assert_eq!(
+        graph
+            .iter()
+            .map(|record| record.current_depth)
+            .collect::<Vec<_>>(),
+        vec![1, 2]
+    );
+    assert_eq!(
+        graph
+            .iter()
+            .map(|record| record.probe_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["activation-probe:1", "activation-probe:2"]
+    );
     assert!(activated.edges.iter().any(|edge| {
         edge.source == source
             && edge.target == occurrence
             && edge.transition_id == "transition:object-occurrence-outgoing"
             && edge.direction == Direction::Outgoing
+    }));
+    assert!(activated.edges.iter().any(|edge| {
+        edge.source == occurrence
+            && edge.target == source
+            && edge.transition_id == "transition:occurrence-object-source"
+            && edge.direction == Direction::Incoming
     }));
     assert_eq!(
         activated
@@ -3202,6 +3339,12 @@ fn incidence_cycles_are_suppressed_per_root() {
                 == synthetic_projection::occurrence("occurrence:journal-one:capital-object"))
             .count(),
         1
+    );
+    assert!(
+        activated
+            .telemetry
+            .iter()
+            .all(|record| record.probe_id != "activation-probe:3")
     );
 }
 
@@ -3412,46 +3555,160 @@ fn edge_bound_truncates_without_reordering_records() {
     let source = SemanticAddress::Object(synthetic_projection::object(
         synthetic_projection::JOURNAL_ONE_OBJECT,
     ));
+    let unrelated_anchor = SemanticAddress::TemporalAnchor(synthetic_projection::anchor(
+        "anchor:journal-two:2026-07-15",
+    ));
     let first = SemanticAddress::Occurrence(synthetic_projection::occurrence(
         "occurrence:journal-one:capital-object",
     ));
     let second = SemanticAddress::Occurrence(synthetic_projection::occurrence(
         "occurrence:journal-one:cleo",
     ));
-    let graph_results = || {
-        vec![(
-            source.clone(),
-            incidence_result_many(vec![
+    let run_with_edge_bound = |maximum_activated_edges| {
+        let mut projection = synthetic_projection::tiny_projection();
+        projection.retrieval_surfaces[0].returned_identity = AddressKind::TemporalAnchor;
+        if let Some(lexical) = projection
+            .retrieval_surfaces
+            .iter_mut()
+            .find(|surface| surface.surface_id == "surface:lexical")
+        {
+            lexical.returned_identity = AddressKind::SemanticObject;
+        }
+        if let Some(graph) = projection
+            .retrieval_surfaces
+            .iter_mut()
+            .find(|surface| surface.surface_id == "surface:graph")
+        {
+            graph.visible_address_kinds = vec![AddressKind::SemanticObject];
+            graph.match_modes = vec![SurfaceMatchMode::Incidence];
+            graph.returned_identity = AddressKind::Occurrence;
+        }
+        projection
+            .valid_transitions
+            .retain(|transition| transition.transition_id.contains("occurrence"));
+        let mut cfg = graph_config(1);
+        cfg.unbanded.maximum_textual_seeds = 2;
+        cfg.maximum_activated_edges = maximum_activated_edges;
+        only_available_surfaces(
+            &mut projection,
+            &mut cfg,
+            &["surface:exact", "surface:lexical", "surface:graph"],
+        );
+        let mut ps = problem_space();
+        ps.constraints = vec![ProblemConstraint {
+            constraint_id: "constraint:edge-bound-unrelated".into(),
+            expression: "unrelated root".into(),
+            applicability: ProblemConstraintApplicability::WholeProblemSpace,
+            source_contribution_id: "contribution:edge-bound".into(),
+            lifecycle: RecordLifecycle::Active,
+        }];
+        ps.regions.clear();
+        ps.relations.clear();
+        ps.open_tensions.clear();
+        ps.attention_lens.primary_region_ids.clear();
+        ps.attention_lens.secondary_region_ids.clear();
+        ps.attention_lens.tertiary_region_ids.clear();
+        ps.attention_lens.background_region_ids.clear();
+        let u = ActivationUtterance {
+            utterance_id: "utterance:edge-bound".into(),
+            text: "graph root".into(),
+        };
+        let provenance = newest_provenance(&u.utterance_id);
+        let access = ScriptedProjectionActivationAccess {
+            results: vec![
                 (
-                    first.clone(),
-                    "transition:object-occurrence-outgoing",
-                    Direction::Outgoing,
+                    text_probe(
+                        0,
+                        "surface:exact",
+                        RetrievalSurfaceKind::Exact,
+                        SurfaceMatchMode::Literal,
+                        "graph root",
+                        provenance.clone(),
+                        ProjectionActivationProbeBand::Unbanded,
+                    ),
+                    empty_result(),
                 ),
                 (
-                    second.clone(),
-                    "transition:object-occurrence-outgoing",
-                    Direction::Outgoing,
+                    text_probe(
+                        1,
+                        "surface:lexical",
+                        RetrievalSurfaceKind::Lexical,
+                        SurfaceMatchMode::Terms,
+                        "graph root",
+                        provenance.clone(),
+                        ProjectionActivationProbeBand::Unbanded,
+                    ),
+                    candidate_result(source.clone()),
                 ),
-            ]),
-        )]
+                (
+                    graph_incidence_probe(
+                        2,
+                        source.clone(),
+                        provenance,
+                        ProjectionActivationProbeBand::Unbanded,
+                        1,
+                    ),
+                    incidence_result_many(vec![
+                        (
+                            first.clone(),
+                            "transition:object-occurrence-outgoing",
+                            Direction::Outgoing,
+                        ),
+                        (
+                            second.clone(),
+                            "transition:object-occurrence-outgoing",
+                            Direction::Outgoing,
+                        ),
+                    ]),
+                ),
+                (
+                    text_probe(
+                        3,
+                        "surface:exact",
+                        RetrievalSurfaceKind::Exact,
+                        SurfaceMatchMode::Literal,
+                        "unrelated root",
+                        constraint_provenance("constraint:edge-bound-unrelated"),
+                        ProjectionActivationProbeBand::Unbanded,
+                    ),
+                    candidate_result(unrelated_anchor.clone()),
+                ),
+                (
+                    text_probe(
+                        4,
+                        "surface:lexical",
+                        RetrievalSurfaceKind::Lexical,
+                        SurfaceMatchMode::Terms,
+                        "unrelated root",
+                        constraint_provenance("constraint:edge-bound-unrelated"),
+                        ProjectionActivationProbeBand::Unbanded,
+                    ),
+                    empty_result(),
+                ),
+            ],
+            failures: vec![],
+            declared_modes: vec![],
+        };
+        semantic_traversal_core::activate_projection(&projection, &ps, &u, &cfg, &access).unwrap()
     };
-    let mut unbounded_cfg = graph_config(1);
-    unbounded_cfg.maximum_activated_edges = 2;
-    let unbounded = graph_activation_with_config(unbounded_cfg, graph_results());
-    let mut bounded_cfg = graph_config(1);
-    bounded_cfg.maximum_activated_edges = 1;
-    let bounded = graph_activation_with_config(bounded_cfg, graph_results());
-    assert_eq!(unbounded.edges.len(), 2);
-    assert_eq!(unbounded.edges[0].target, first);
-    assert_eq!(unbounded.edges[1].target, second);
+    let unbounded = run_with_edge_bound(4);
+    let bounded = run_with_edge_bound(1);
+    let unbounded_outgoing = unbounded
+        .edges
+        .iter()
+        .filter(|edge| edge.transition_id == "transition:object-occurrence-outgoing")
+        .collect::<Vec<_>>();
+    assert_eq!(unbounded_outgoing.len(), 2);
+    assert_eq!(unbounded_outgoing[0].target, first);
+    assert_eq!(unbounded_outgoing[1].target, second);
     assert_eq!(bounded.edges.len(), 1);
-    assert_eq!(bounded.edges[0].edge_id, unbounded.edges[0].edge_id);
-    assert_eq!(bounded.edges[0].source, unbounded.edges[0].source);
+    assert_eq!(bounded.edges[0].edge_id, unbounded_outgoing[0].edge_id);
+    assert_eq!(bounded.edges[0].source, unbounded_outgoing[0].source);
     assert_eq!(
         bounded.edges[0].transition_id,
-        unbounded.edges[0].transition_id
+        unbounded_outgoing[0].transition_id
     );
-    assert_eq!(bounded.edges[0].direction, unbounded.edges[0].direction);
+    assert_eq!(bounded.edges[0].direction, unbounded_outgoing[0].direction);
     assert_eq!(bounded.edges[0].target, first);
     assert_eq!(
         bounded
@@ -3514,14 +3771,19 @@ fn edge_bound_truncates_without_reordering_records() {
     let root_telemetry = bounded
         .telemetry
         .iter()
-        .find(|record| record.surface_id == "surface:exact")
+        .find(|record| {
+            record.surface_id == "surface:exact" && record.probe_id == "activation-probe:3"
+        })
         .unwrap();
+    assert_eq!(root_telemetry.probe_id, "activation-probe:3");
+    assert_eq!(root_telemetry.truncation_state, TruncationState::Complete);
     assert_eq!(root_telemetry.candidate_count, CandidateCount::Exact(1));
     let graph_telemetry = bounded
         .telemetry
         .iter()
         .find(|record| record.surface_id == "surface:graph")
         .unwrap();
+    assert_eq!(graph_telemetry.probe_id, "activation-probe:2");
     assert!(matches!(
         graph_telemetry.truncation_state,
         TruncationState::Bounded
