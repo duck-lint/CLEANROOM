@@ -18,7 +18,7 @@ pub mod synthesis;
 
 pub use activation::{
     ActivatedIdentifierAssignmentRecord, ActivatedOccurrenceRecord, ActivatedProjection,
-    ActivatedTemporalAnchorRecord, ActivationUtterance, ContinuationHandle,
+    ActivatedTemporalAnchorRecord, ActivatedTextPreview, ActivationUtterance, ContinuationHandle,
     ProjectionActivationConfig, ProjectionActivationViolation,
 };
 pub use conformance::ConformanceResult;

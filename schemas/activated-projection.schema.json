@@ -540,6 +540,53 @@
       },
       "additionalProperties": false
     },
+    "ActivatedTextPreview": {
+      "description": "Bounded activation-time visibility of one semantic unit's text.\n\nInline previews are planning material taken from represented normalized text. Unavailable content requires later typed hydration and is not read during activation.",
+      "oneOf": [
+        {
+          "description": "Bounded normalized text was available directly in the projection.",
+          "type": "object",
+          "required": [
+            "kind",
+            "text",
+            "truncated"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "inline"
+              ]
+            },
+            "text": {
+              "description": "Mechanically bounded normalized text.",
+              "type": "string"
+            },
+            "truncated": {
+              "description": "Whether represented normalized text continued beyond this preview.",
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "The projection carries only a deterministic hydration address.\n\nActivation does not dereference that address.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "unavailable_without_hydration"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
     "ActivatedUnitRecord": {
       "description": "Visible summary of one canonical semantic unit.\n\nIt exposes identity, bounded preview text, incidence summaries, anchors, and surfaces for planning. Full authored prose remains execution material; this record cannot admit or reject evidence.",
       "type": "object",
@@ -554,7 +601,6 @@
         "parent_region_address",
         "temporal_anchor_count",
         "text_preview",
-        "text_preview_truncated",
         "unit_id",
         "visible_inherited_identifier_assignment_ids",
         "visible_unit_local_identifier_assignment_ids"
@@ -620,12 +666,12 @@
           "minimum": 0.0
         },
         "text_preview": {
-          "description": "Bounded text preview used only for access planning.",
-          "type": "string"
-        },
-        "text_preview_truncated": {
-          "description": "Whether the text preview was mechanically truncated.",
-          "type": "boolean"
+          "description": "Activation-time text visibility without evidence hydration.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ActivatedTextPreview"
+            }
+          ]
         },
         "unit_id": {
           "description": "Canonical semantic-unit identity.",
@@ -1733,11 +1779,14 @@
         "continuation_available",
         "current_depth",
         "identifier_type_distribution",
+        "match_mode",
         "maximum_depth",
+        "probe_id",
         "remaining_expansion_budget",
         "returned_count",
         "surface_id",
         "surface_kind",
+        "telemetry_id",
         "temporal_anchor_count",
         "truncation_state",
         "unresolved_target_count"
@@ -1775,11 +1824,23 @@
             "$ref": "#/definitions/CountByLabel"
           }
         },
+        "match_mode": {
+          "description": "Exact projected surface match mode used by the probe.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/SurfaceMatchMode"
+            }
+          ]
+        },
         "maximum_depth": {
           "description": "Configured hard maximum depth.",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
+        },
+        "probe_id": {
+          "description": "Stable identity of the exact activation probe being measured.",
+          "type": "string"
         },
         "remaining_expansion_budget": {
           "description": "Remaining bounded expansion budget.",
@@ -1804,6 +1865,10 @@
               "$ref": "#/definitions/RetrievalSurfaceKind"
             }
           ]
+        },
+        "telemetry_id": {
+          "description": "Stable identity of this telemetry record.",
+          "type": "string"
         },
         "temporal_anchor_count": {
           "description": "Count of visible temporal anchors.",

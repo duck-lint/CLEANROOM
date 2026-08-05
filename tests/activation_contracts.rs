@@ -86,6 +86,7 @@ fn config() -> ProjectionActivationConfig {
             tertiary_candidate_limit: 4,
             background_candidate_limit: 5,
         }],
+        maximum_expansion_budget: 9,
         hub_degree_threshold: 10,
         maximum_initial_relation_depth: 1,
         continuation_page_limit: 10,
@@ -219,8 +220,10 @@ fn activated_projection() -> ActivatedProjection {
             heading_path: vec!["Capital".into()],
             visible_inherited_identifier_assignment_ids: vec!["assignment:title".into()],
             visible_unit_local_identifier_assignment_ids: vec![],
-            text_preview: "Capital preview".into(),
-            text_preview_truncated: true,
+            text_preview: ActivatedTextPreview::Inline {
+                text: "Capital preview".into(),
+                truncated: true,
+            },
             incoming_occurrence_count: 0,
             outgoing_occurrence_count: 1,
             temporal_anchor_count: 1,
@@ -239,13 +242,16 @@ fn activated_projection() -> ActivatedProjection {
             activation_provenance: prov(),
         }],
         telemetry: vec![ProjectionTelemetry {
+            telemetry_id: "activation-telemetry:0".into(),
+            probe_id: "activation-probe:0".into(),
+            match_mode: SurfaceMatchMode::Literal,
             surface_kind: RetrievalSurfaceKind::Exact,
             surface_id: "surface:exact".into(),
             candidate_count: CandidateCount::Exact(1),
             current_depth: 0,
             maximum_depth: 1,
             returned_count: 1,
-            remaining_expansion_budget: 0,
+            remaining_expansion_budget: 9,
             truncation_state: TruncationState::Bounded,
             identifier_type_distribution: vec![CountByLabel {
                 label: "title".into(),
@@ -284,6 +290,12 @@ fn projection_activation_config_round_trip() {
     assert_eq!(round(&c), c);
 }
 #[test]
+fn projection_activation_config_preserves_expansion_budget() {
+    let c = config();
+    assert_eq!(c.maximum_expansion_budget, 9);
+    assert_eq!(round(&c).maximum_expansion_budget, 9);
+}
+#[test]
 fn activation_config_requires_configuration_snapshot_identity() {
     let mut value = serde_json::to_value(config()).unwrap();
     value
@@ -291,6 +303,37 @@ fn activation_config_requires_configuration_snapshot_identity() {
         .unwrap()
         .remove("configuration_snapshot_id");
     assert!(serde_json::from_value::<ProjectionActivationConfig>(value).is_err());
+}
+#[test]
+fn activated_text_preview_inline_round_trip() {
+    let preview = ActivatedTextPreview::Inline {
+        text: "Capital preview".into(),
+        truncated: true,
+    };
+    assert_eq!(round(&preview), preview);
+    assert_eq!(
+        serde_json::to_value(&preview).unwrap(),
+        json!({"kind":"inline","text":"Capital preview","truncated":true})
+    );
+}
+#[test]
+fn activated_text_preview_unavailable_without_hydration_round_trip() {
+    let preview = ActivatedTextPreview::UnavailableWithoutHydration;
+    assert_eq!(round(&preview), preview);
+    assert_eq!(
+        serde_json::to_value(&preview).unwrap(),
+        json!({"kind":"unavailable_without_hydration"})
+    );
+}
+#[test]
+fn activated_text_preview_distinguishes_empty_from_unavailable() {
+    assert_ne!(
+        ActivatedTextPreview::Inline {
+            text: String::new(),
+            truncated: false,
+        },
+        ActivatedTextPreview::UnavailableWithoutHydration
+    );
 }
 #[test]
 fn activated_projection_preserves_input_snapshot_identity() {
@@ -367,9 +410,26 @@ fn activated_region_exposes_heading_and_identifier_structure() {
     assert_eq!(r.visible_identifier_assignment_ids, ["assignment:title"]);
 }
 #[test]
+fn projection_telemetry_preserves_probe_identity_and_match_mode() {
+    let telemetry = &activated_projection().telemetry[0];
+    assert_eq!(telemetry.telemetry_id, "activation-telemetry:0");
+    assert_eq!(telemetry.probe_id, "activation-probe:0");
+    assert_eq!(telemetry.match_mode, SurfaceMatchMode::Literal);
+    assert_eq!(
+        telemetry.remaining_expansion_budget,
+        config().maximum_expansion_budget
+    );
+}
+#[test]
 fn activated_unit_marks_truncated_preview() {
     let u = &activated_projection().activated_units[0];
-    assert!(u.text_preview_truncated);
+    assert_eq!(
+        u.text_preview,
+        ActivatedTextPreview::Inline {
+            text: "Capital preview".into(),
+            truncated: true,
+        }
+    );
     assert_eq!(u.authored_block_type, AuthoredBlockType::Paragraph);
 }
 #[test]
@@ -547,6 +607,11 @@ fn activation_violation_categories_round_trip() {
             requested: 2,
             hard_maximum: 1,
         },
+        ProjectionActivationViolation::SurfaceAccessFailed {
+            surface_id: "s".into(),
+            probe_id: "activation-probe:0".into(),
+            context: "scripted failure".into(),
+        },
         ProjectionActivationViolation::DuplicateActivatedIdentity {
             kind: ActivatedRecordKind::Object,
             identity: "o".into(),
@@ -580,12 +645,28 @@ fn activation_violation_categories_round_trip() {
             .is_err()
     );
 }
+#[test]
+fn surface_access_failure_violation_round_trip() {
+    let violation = ProjectionActivationViolation::SurfaceAccessFailed {
+        surface_id: "surface:exact".into(),
+        probe_id: "activation-probe:0".into(),
+        context: "declared mode unavailable".into(),
+    };
+    assert_eq!(round(&violation), violation);
+}
 fn schema(name: &str) -> String {
     schema_support::generated_schemas()
         .into_iter()
         .find(|(n, _)| *n == name)
         .unwrap()
         .1
+}
+#[test]
+fn activated_text_preview_schema_is_current() {
+    assert_eq!(
+        fs::read_to_string(PathBuf::from("schemas/activated-text-preview.schema.json")).unwrap(),
+        schema("activated-text-preview.schema.json")
+    );
 }
 #[test]
 fn activated_projection_schema_is_current() {
@@ -598,6 +679,7 @@ fn activated_projection_schema_is_current() {
 fn new_activation_schemas_are_current() {
     for name in [
         "activation-utterance.schema.json",
+        "activated-text-preview.schema.json",
         "projection-activation-config.schema.json",
         "projection-activation-violation.schema.json",
         "activated-identifier-assignment-record.schema.json",
@@ -623,6 +705,15 @@ fn invalid_activation_exchange_shapes_are_rejected() {
         )
         .is_err()
     );
+    assert!(serde_json::from_value::<ActivatedTextPreview>(json!({"kind":"bogus"})).is_err());
+    assert!(
+        serde_json::from_value::<ActivatedTextPreview>(json!({"kind":"inline","truncated":true}))
+            .is_err()
+    );
+    assert!(
+        serde_json::from_value::<ActivatedTextPreview>(json!({"kind":"inline","text":"x"}))
+            .is_err()
+    );
     assert!(serde_json::from_value::<ContinuationOrigin>(json!({"kind":"bogus"})).is_err());
     assert!(serde_json::from_value::<ContinuationFilter>(json!({"kind":"bogus"})).is_err());
     assert!(serde_json::from_value::<ContinuationAccess>(json!({"kind":"bogus"})).is_err());
@@ -639,6 +730,30 @@ fn invalid_activation_exchange_shapes_are_rejected() {
         .is_err()
     );
     assert!(serde_json::from_value::<ContinuationOrdering>(json!({"kind":"bogus"})).is_err());
+
+    for required_field in ["telemetry_id", "probe_id", "match_mode"] {
+        let mut value = serde_json::to_value(&activated_projection().telemetry[0]).unwrap();
+        value.as_object_mut().unwrap().remove(required_field);
+        assert!(serde_json::from_value::<ProjectionTelemetry>(value).is_err());
+    }
+
+    let mut missing_budget = serde_json::to_value(config()).unwrap();
+    missing_budget
+        .as_object_mut()
+        .unwrap()
+        .remove("maximum_expansion_budget");
+    assert!(serde_json::from_value::<ProjectionActivationConfig>(missing_budget).is_err());
+
+    for required_field in ["surface_id", "probe_id"] {
+        let mut value = serde_json::to_value(ProjectionActivationViolation::SurfaceAccessFailed {
+            surface_id: "surface:exact".into(),
+            probe_id: "activation-probe:0".into(),
+            context: "failure".into(),
+        })
+        .unwrap();
+        value.as_object_mut().unwrap().remove(required_field);
+        assert!(serde_json::from_value::<ProjectionActivationViolation>(value).is_err());
+    }
 
     let valid_handle = serde_json::to_value(handle(ContinuationOrigin::TextProbe {
         query_text: "Capital".into(),

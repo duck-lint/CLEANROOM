@@ -636,7 +636,7 @@ Canonical object, region, unit, assignment, occurrence, anchor, and edge identit
 
 Activated object records expose title, aliases, object class, bounded visible region addresses, bounded visible unit ids, visible identifier assignment ids, full contained counts, occurrence counts, available surfaces, and activation provenance. Aliases are discovery surfaces, not canonical identity. Object class is projected typing, not a generated ontology.
 
-Activated region records expose heading path, heading identity, visible inherited identifier assignment ids, bounded visible unit ids, full contained count, surfaces, and activation provenance. Activated unit records expose authored block type, heading path, inherited and unit-local identifier assignment ids, text preview, truncation flag, incidence counts, temporal-anchor count, surfaces, and activation provenance.
+Activated region records expose heading path, heading identity, visible inherited identifier assignment ids, bounded visible unit ids, full contained count, surfaces, and activation provenance. Activated unit records expose authored block type, heading path, inherited and unit-local identifier assignment ids, typed text preview, incidence counts, temporal-anchor count, surfaces, and activation provenance.
 
 Previews are planning material, not retrieved evidence. Full authored prose remains execution material. A truncated preview authorizes no claim about omitted text. Contained-record vectors are bounded previews, while count fields describe the full frozen projection record. Visible identifier, occurrence, and anchor records remain separate typed records.
 
@@ -652,7 +652,7 @@ Filters are typed as transition, source path prefix, object class, identifier, o
 
 ### Typed activation violations
 
-`ProjectionActivationViolation` is the closed Phase 4B error vocabulary. It covers empty required identities, projection validation status, configuration snapshot mismatch, missing/unknown/unavailable/duplicate surface configuration, invalid configuration values, candidate limits exceeding hard limits, duplicate activated identities, invalid activated references, invalid activation provenance, invalid continuation handles, invalid telemetry, activated-view bound overflow, and count overflow. PR 4A defines the vocabulary only; it does not implement validation behavior, `Display`, or `Error`.
+`ProjectionActivationViolation` is the closed Phase 4B error vocabulary. It covers empty required identities, projection validation status, configuration snapshot mismatch, missing/unknown/unavailable/duplicate surface configuration, invalid configuration values, candidate limits exceeding hard limits, atomic surface-access failure, duplicate activated identities, invalid activated references, invalid activation provenance, invalid continuation handles, invalid telemetry, activated-view bound overflow, and count overflow. PR 4A defines the vocabulary only; it does not implement validation behavior, `Display`, or `Error`.
 
 ### Exact PR boundary
 
@@ -668,3 +668,193 @@ PR 4B
     candidate exposure
     no semantic binding
 ```
+
+## 15. Accepted PR 4B deterministic runtime closure
+
+Status: accepted runtime closure to be implemented after the contract amendment.
+
+This amendment records representation and deterministic-runtime rules only. It does not implement `A_cfg(M_sigma, P_t, u_t, Lambda_t)`, activation-access adapters, retrieval, hydration, semantic binding, expansion execution, or partial-success activation.
+
+### Activation-access seam
+
+PR 4B will introduce a synchronous, read-only production trait approximately named `ProjectionActivationAccess`. Its request and result records are runtime-only and must not be exported as JSON schemas.
+
+The trait receives typed deterministic probe requests, returns canonical projected addresses, returns measured candidate counts, preserves deterministic result order, reports continuation facts, and may return a typed access failure. It never returns hydrated semantic-unit prose, relevance, confidence, truth, evidence admission, or problem-space binding.
+
+The test fixture supplies a deterministic scripted implementation. The contract-amendment PR adds no async behavior and no real exact, lexical, vector, graph, or temporal adapters.
+
+### Typed probe dispatch
+
+Future PR 4B dispatches compatible sources as follows:
+
+```text
+textual seed
+    → Literal
+    → Terms
+    → NearestNeighbours
+
+canonical projected address
+    → Incidence
+
+temporal subject or temporal anchor
+    → Temporal
+```
+
+Only modes declared by the concrete `RetrievalSurfaceDescriptor` may fire. Preserve seed-group order, seed order within each group, projection retrieval-surface vector order, descriptor match-mode vector order, and surface-returned candidate order. Do not sort modes alphabetically or by enum variant.
+
+`SurfaceMatchMode::Declared { name }` is valid only when the activation-access implementation explicitly supports that exact declared mode. Otherwise activation fails through `SurfaceAccessFailed`. A projection-declared mode must not be silently omitted.
+
+### Probe and candidate limit accounting
+
+Apply `maximum_textual_seeds` before surface fan-out. One accepted textual seed may therefore produce several probe invocations across configured surfaces and compatible modes.
+
+Each configured surface-band candidate limit applies separately to one probe × one surface × one match mode. It is not shared among all modes, all seeds, or the whole attention band. Total activated-view limits remain global across the final view.
+
+A zero candidate limit suppresses returned candidates for that invocation but still permits telemetry describing the bounded invocation. It makes no negative corpus claim.
+
+### Text-preview construction
+
+`SemanticUnitContent::Inline.normalized_text` supplies the activated text preview. Activation never uses `authored_markdown` as a second competing preview source.
+
+The preview bound counts Unicode scalar values, not bytes. Preserve the first configured number of Unicode scalar values. `truncated` is true exactly when additional scalar values were omitted. A zero preview limit produces an empty inline preview and `truncated == true` when normalized text was non-empty. Genuinely empty normalized text produces an empty inline preview and `truncated == false`.
+
+`SemanticUnitContent::HydrationAddress` produces `ActivatedTextPreview::UnavailableWithoutHydration`. Activation never dereferences the hydration address and does not copy the address into the activated preview. The semantic unit's canonical identity is sufficient for later typed hydration planning. An unavailable preview is not evidence absence and is not a negative corpus claim.
+
+### Per-probe telemetry identity
+
+A future `ProjectionTelemetry` record represents exactly one probe × one concrete surface × one declared match mode. It must not aggregate unrelated referents, constraints, tensions, utterance probes, or candidate expressions into one record.
+
+`activation_provenance` explains the problem-space or utterance source that caused the probe. `probe_id` is mechanical runtime identity. It is not a semantic binding, relevance score, or evidence identity.
+
+Future deterministic probe IDs use first-seen invocation order:
+
+```text
+activation-probe:0
+activation-probe:1
+activation-probe:2
+...
+```
+
+Telemetry IDs similarly use:
+
+```text
+activation-telemetry:0
+activation-telemetry:1
+activation-telemetry:2
+...
+```
+
+Neither ID is derived from text hashes, relevance values, or provider output.
+
+### Expansion-budget recording
+
+Initial `ProjectionTelemetry.remaining_expansion_budget` equals `ProjectionActivationConfig.maximum_expansion_budget`. Phase 4 initial activation does not decrement this value. The budget is later consumed only by typed Phase 5 expansion.
+
+A zero expansion budget is valid and means no later expansion is available. It does not limit the initial activation pass beyond the separate initial activation bounds. This amendment adds no expansion request or execution contracts.
+
+### Candidate-context closure
+
+A directly exposed candidate must enter the activated view with enough represented context to avoid dangling visible references.
+
+Required upward closure:
+
+```text
+activated unit
+    → parent region
+    → parent object
+
+activated region
+    → parent object
+
+activated identifier assignment
+    → represented subject
+
+activated temporal anchor
+    → represented subject
+
+activated occurrence
+    → represented source
+    → represented target
+```
+
+“Represented source” means the source object for an object-field occurrence, or the source semantic unit, its parent region, and its parent object for a semantic-unit occurrence.
+
+Downward context remains bounded: object region and unit previews obey view bounds; region unit previews obey the band bound; identifier, occurrence, and temporal-anchor vectors obey their total bounds; structural neighbours obey relation-depth and neighbour bounds.
+
+Any identity listed in a visible preview vector must have a corresponding activated record in the same `ActivatedProjection`. Do not emit dangling visible IDs.
+
+Candidate bundles are atomic for view-bound accounting:
+
+```text
+if required upward closure cannot fit
+    omit the whole new candidate bundle
+    do not partially insert it
+    record mechanical truncation or continuation facts
+```
+
+Previously activated shared context remains present. Omission caused by a bound means only `not activated under this configured bound`.
+
+### Hub summaries
+
+Do not add a new hub ontology or separate `HubSummary` exchange record. A high-degree summary is represented collectively by the activated canonical record, full mechanically known counts, bounded visible neighbours, per-probe surface telemetry, truncation state, and continuation handles.
+
+Degree means count of unique direct represented edge tuples before activated-view truncation. The unique edge tuple is `(source, transition_id, direction, target)`. The hub threshold is mechanical and not a semantic-importance score.
+
+### Activated-edge identity
+
+Deduplicate visible edges only by the exact tuple `(source, transition_id, direction, target)`. Preserve first-seen order. Aggregate unique activation provenance in first-seen order.
+
+Assign deterministic visible edge IDs by first insertion:
+
+```text
+activated-edge:0
+activated-edge:1
+activated-edge:2
+...
+```
+
+Do not derive activated-edge identity from title, aliases, text, similarity, or inferred relation equivalence.
+
+### Configured defaults
+
+Configured defaults are deterministic policy, not hidden semantic seed content. There is no configuration-owned list of preferred corpus objects, titles, paths, entities, or addresses. The final configured-default pass does not introduce unrelated new root candidates.
+
+`ActivationProvenance::ConfiguredDefault` is appended when an already-motivated activation path exposes additional structure because a deterministic default policy fired, including exactly these stable configuration keys in PR 4B:
+
+```text
+automatic_surface_fan_out
+bounded_structural_context
+high_degree_summary
+```
+
+For example, a referent expression motivates a candidate; automatic invocation of all compatible configured surfaces adds `ConfiguredDefault { configuration_key: "automatic_surface_fan_out" }` alongside the referent provenance. Required parent records or bounded child previews add `ConfiguredDefault { configuration_key: "bounded_structural_context" }`. Telemetry and continuation records emitted for a high-degree address add `ConfiguredDefault { configuration_key: "high_degree_summary" }`.
+
+Configured-default provenance does not replace the originating utterance, referent, constraint, tension, relation, region, or attention provenance. Configured defaults must not inject semantically preferred content.
+
+### Atomic surface-access failure and activation failure
+
+`SurfaceAccessFailed` covers scripted access returning a failure, a declared mode unavailable from the configured activation-access implementation, malformed deterministic surface output, and failure to inspect one required configured available surface.
+
+It does not mean no corpus result exists, the probe is irrelevant, the source expression was wrong, or the problem-space interpretation failed.
+
+Future PR 4B activation is atomic:
+
+```text
+required surface-access failure
+    → Err(SurfaceAccessFailed)
+    → no ActivatedProjection returned
+```
+
+Future PR 4B returns either:
+
+```text
+Ok(complete bounded ActivatedProjection)
+```
+
+or:
+
+```text
+Err(ProjectionActivationViolation)
+```
+
+No partially accepted working view is returned. Failures do not mutate the projection, problem-space state, utterance, configuration, or scripted-access fixture.

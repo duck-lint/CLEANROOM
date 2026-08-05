@@ -16,6 +16,7 @@
     "maximum_activated_temporal_anchors",
     "maximum_activated_units",
     "maximum_continuation_handles",
+    "maximum_expansion_budget",
     "maximum_initial_relation_depth",
     "maximum_telemetry_records",
     "primary",
@@ -95,6 +96,12 @@
       "description": "Total continuation-handle bound.",
       "type": "integer",
       "format": "uint32",
+      "minimum": 0.0
+    },
+    "maximum_expansion_budget": {
+      "description": "Total typed expansion budget available to the later semantic-access session.\n\nInitial activation records this budget but does not consume it. Expansion execution belongs to Phase 5.",
+      "type": "integer",
+      "format": "uint64",
       "minimum": 0.0
     },
     "maximum_initial_relation_depth": {
