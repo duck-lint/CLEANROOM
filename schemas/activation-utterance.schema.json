@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ActivationUtterance",
+  "description": "Newest conversational utterance supplied to deterministic activation.",
+  "type": "object",
+  "required": [
+    "text",
+    "utterance_id"
+  ],
+  "properties": {
+    "text": {
+      "description": "Complete newest utterance text supplied to deterministic activation.",
+      "type": "string"
+    },
+    "utterance_id": {
+      "description": "Stable identity of the newest user utterance.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}
