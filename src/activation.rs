@@ -48,6 +48,11 @@ pub struct ProjectionActivationConfig {
     pub background: ProjectionActivationBandConfig,
     /// Per-surface candidate limits for every available projected surface.
     pub surface_limits: Vec<ProjectionActivationSurfaceConfig>,
+    /// Total typed expansion budget available to the later semantic-access session.
+    ///
+    /// Initial activation records this budget but does not consume it. Expansion
+    /// execution belongs to Phase 5.
+    pub maximum_expansion_budget: u64,
     /// Degree at which a visible address is represented as a hub summary.
     pub hub_degree_threshold: u64,
     /// Maximum structural-transition depth during initial activation.
@@ -222,10 +227,8 @@ pub struct ActivatedUnitRecord {
     pub visible_inherited_identifier_assignment_ids: Vec<String>,
     /// Visible unit-local identifier assignments.
     pub visible_unit_local_identifier_assignment_ids: Vec<String>,
-    /// Bounded text preview used only for access planning.
-    pub text_preview: String,
-    /// Whether the text preview was mechanically truncated.
-    pub text_preview_truncated: bool,
+    /// Activation-time text visibility without evidence hydration.
+    pub text_preview: ActivatedTextPreview,
     /// Count of incoming authored occurrences.
     pub incoming_occurrence_count: u64,
     /// Count of outgoing authored occurrences.
@@ -257,6 +260,29 @@ pub struct ActivatedEdge {
     pub target: SemanticAddress,
     /// Provenance explaining visibility.
     pub activation_provenance: Vec<ActivationProvenance>,
+}
+
+/// Bounded activation-time visibility of one semantic unit's text.
+///
+/// Inline previews are planning material taken from represented normalized text.
+/// Unavailable content requires later typed hydration and is not read during
+/// activation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ActivatedTextPreview {
+    /// Bounded normalized text was available directly in the projection.
+    Inline {
+        /// Mechanically bounded normalized text.
+        text: String,
+
+        /// Whether represented normalized text continued beyond this preview.
+        truncated: bool,
+    },
+
+    /// The projection carries only a deterministic hydration address.
+    ///
+    /// Activation does not dereference that address.
+    UnavailableWithoutHydration,
 }
 
 /// Source of positive activation for one visible record or edge.
@@ -337,6 +363,12 @@ pub enum ActivationProvenance {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectionTelemetry {
+    /// Stable identity of this telemetry record.
+    pub telemetry_id: String,
+    /// Stable identity of the exact activation probe being measured.
+    pub probe_id: String,
+    /// Exact projected surface match mode used by the probe.
+    pub match_mode: SurfaceMatchMode,
     /// Retrieval surface family measured by this record.
     pub surface_kind: RetrievalSurfaceKind,
     /// Concrete surface identity.
@@ -628,6 +660,14 @@ pub enum ProjectionActivationViolation {
         surface_id: String,
         requested: u32,
         hard_maximum: u32,
+    },
+    SurfaceAccessFailed {
+        /// Concrete projected retrieval-surface identity.
+        surface_id: String,
+        /// Exact activation probe that failed.
+        probe_id: String,
+        /// Mechanical failure context.
+        context: String,
     },
     DuplicateActivatedIdentity {
         kind: ActivatedRecordKind,

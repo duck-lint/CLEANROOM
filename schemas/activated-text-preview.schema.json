@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ActivatedTextPreview",
+  "description": "Bounded activation-time visibility of one semantic unit's text.\n\nInline previews are planning material taken from represented normalized text. Unavailable content requires later typed hydration and is not read during activation.",
+  "oneOf": [
+    {
+      "description": "Bounded normalized text was available directly in the projection.",
+      "type": "object",
+      "required": [
+        "kind",
+        "text",
+        "truncated"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "inline"
+          ]
+        },
+        "text": {
+          "description": "Mechanically bounded normalized text.",
+          "type": "string"
+        },
+        "truncated": {
+          "description": "Whether represented normalized text continued beyond this preview.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "The projection carries only a deterministic hydration address.\n\nActivation does not dereference that address.",
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "unavailable_without_hydration"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

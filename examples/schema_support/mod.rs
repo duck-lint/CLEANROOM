@@ -1,11 +1,11 @@
 use schemars::{JsonSchema, schema_for};
 use semantic_traversal_core::{
     AcceptedBoundaryContribution, ActivatedIdentifierAssignmentRecord, ActivatedOccurrenceRecord,
-    ActivatedProjection, ActivatedTemporalAnchorRecord, ActivationUtterance, AttentionLens,
-    BoundaryContribution, BoundaryContributionLog, ConformanceResult, ContinuationHandle,
-    ExecutionLimits, OpenTension, ProblemRegion, ProblemRelation, ProblemSpaceState,
-    ProjectionActivationConfig, ProjectionActivationViolation, RetrievalResult, SemanticAccessPlan,
-    SemanticSpaceProjection, SynthesisInput,
+    ActivatedProjection, ActivatedTemporalAnchorRecord, ActivatedTextPreview, ActivationUtterance,
+    AttentionLens, BoundaryContribution, BoundaryContributionLog, ConformanceResult,
+    ContinuationHandle, ExecutionLimits, OpenTension, ProblemRegion, ProblemRelation,
+    ProblemSpaceState, ProjectionActivationConfig, ProjectionActivationViolation, RetrievalResult,
+    SemanticAccessPlan, SemanticSpaceProjection, SynthesisInput,
 };
 use serde::Serialize;
 
@@ -54,6 +54,10 @@ pub fn generated_schemas() -> Vec<(&'static str, String)> {
         (
             "activated-projection.schema.json",
             render_schema::<ActivatedProjection>(),
+        ),
+        (
+            "activated-text-preview.schema.json",
+            render_schema::<ActivatedTextPreview>(),
         ),
         (
             "activation-utterance.schema.json",

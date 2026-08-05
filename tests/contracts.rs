@@ -7,11 +7,11 @@ use serde::{Serialize, de::DeserializeOwned};
 use static_assertions::assert_type_ne_all;
 
 use semantic_traversal_core::{
-    AcceptedBoundaryContribution, ActivatedProjection, AttentionLens, BoundaryContribution,
-    BoundaryContributionLog, ConformanceResult, ExecutionLimits, OccurrenceId, OpenTension,
-    ProblemRegion, ProblemRelation, ProblemSpaceState, RetrievalResult, SemanticAccessPlan,
-    SemanticObjectId, SemanticRegionAddress, SemanticSpaceProjection, SemanticUnitId,
-    SynthesisInput, TemporalAnchorId, TransportSegmentId,
+    AcceptedBoundaryContribution, ActivatedProjection, ActivatedTextPreview, AttentionLens,
+    BoundaryContribution, BoundaryContributionLog, ConformanceResult, ExecutionLimits,
+    OccurrenceId, OpenTension, ProblemRegion, ProblemRelation, ProblemSpaceState, RetrievalResult,
+    SemanticAccessPlan, SemanticObjectId, SemanticRegionAddress, SemanticSpaceProjection,
+    SemanticUnitId, SynthesisInput, TemporalAnchorId, TransportSegmentId,
     activation::{
         ActivatedEdge, ActivatedIdentifierAssignmentRecord, ActivatedObjectRecord,
         ActivatedOccurrenceRecord, ActivatedRegionRecord, ActivatedTemporalAnchorRecord,
@@ -420,8 +420,10 @@ fn activated_projection() -> ActivatedProjection {
             heading_path: vec!["Capital".into()],
             visible_inherited_identifier_assignment_ids: vec!["assignment:note_type".into()],
             visible_unit_local_identifier_assignment_ids: vec![],
-            text_preview: "The commodity is...".into(),
-            text_preview_truncated: true,
+            text_preview: ActivatedTextPreview::Inline {
+                text: "The commodity is...".into(),
+                truncated: true,
+            },
             incoming_occurrence_count: 0,
             outgoing_occurrence_count: 1,
             temporal_anchor_count: 1,
@@ -476,6 +478,9 @@ fn activated_projection() -> ActivatedProjection {
             activation_provenance: provenance.clone(),
         }],
         telemetry: vec![ProjectionTelemetry {
+            telemetry_id: "activation-telemetry:0".into(),
+            probe_id: "activation-probe:0".into(),
+            match_mode: SurfaceMatchMode::Literal,
             surface_kind: RetrievalSurfaceKind::Exact,
             surface_id: "surface:exact".into(),
             candidate_count: CandidateCount::Exact(1),
