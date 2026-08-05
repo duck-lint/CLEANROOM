@@ -3555,9 +3555,6 @@ fn edge_bound_truncates_without_reordering_records() {
     let source = SemanticAddress::Object(synthetic_projection::object(
         synthetic_projection::JOURNAL_ONE_OBJECT,
     ));
-    let unrelated_anchor = SemanticAddress::TemporalAnchor(synthetic_projection::anchor(
-        "anchor:journal-two:2026-07-15",
-    ));
     let first = SemanticAddress::Occurrence(synthetic_projection::occurrence(
         "occurrence:journal-one:capital-object",
     ));
@@ -3566,7 +3563,6 @@ fn edge_bound_truncates_without_reordering_records() {
     ));
     let run_with_edge_bound = |maximum_activated_edges| {
         let mut projection = synthetic_projection::tiny_projection();
-        projection.retrieval_surfaces[0].returned_identity = AddressKind::TemporalAnchor;
         if let Some(lexical) = projection
             .retrieval_surfaces
             .iter_mut()
@@ -3671,7 +3667,7 @@ fn edge_bound_truncates_without_reordering_records() {
                         constraint_provenance("constraint:edge-bound-unrelated"),
                         ProjectionActivationProbeBand::Unbanded,
                     ),
-                    candidate_result(unrelated_anchor.clone()),
+                    empty_result(),
                 ),
                 (
                     text_probe(
@@ -3768,26 +3764,33 @@ fn edge_bound_truncates_without_reordering_records() {
                     _ => unreachable!(),
                 })
     );
-    let root_telemetry = bounded
+    let unrelated_telemetry = bounded
         .telemetry
         .iter()
         .find(|record| {
             record.surface_id == "surface:exact" && record.probe_id == "activation-probe:3"
         })
         .unwrap();
-    assert_eq!(root_telemetry.probe_id, "activation-probe:3");
-    assert_eq!(root_telemetry.truncation_state, TruncationState::Complete);
-    assert_eq!(root_telemetry.candidate_count, CandidateCount::Exact(1));
+    assert_eq!(unrelated_telemetry.probe_id, "activation-probe:3");
+    assert_eq!(
+        unrelated_telemetry.truncation_state,
+        TruncationState::Complete
+    );
+    assert_eq!(
+        unrelated_telemetry.candidate_count,
+        CandidateCount::Exact(0)
+    );
+    assert_eq!(unrelated_telemetry.returned_count, 0);
+    assert!(!unrelated_telemetry.continuation_available);
     let graph_telemetry = bounded
         .telemetry
         .iter()
-        .find(|record| record.surface_id == "surface:graph")
+        .find(|record| {
+            record.surface_id == "surface:graph" && record.probe_id == "activation-probe:2"
+        })
         .unwrap();
     assert_eq!(graph_telemetry.probe_id, "activation-probe:2");
-    assert!(matches!(
-        graph_telemetry.truncation_state,
-        TruncationState::Bounded
-    ));
+    assert_eq!(graph_telemetry.truncation_state, TruncationState::Bounded);
 }
 
 #[test]
