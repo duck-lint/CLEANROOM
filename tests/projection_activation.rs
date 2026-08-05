@@ -609,11 +609,18 @@ fn repeated_activation_is_exactly_equal_and_scripted_access_is_unchanged() {
     assert_eq!(access, before);
 }
 
-fn baseline_empty_probe_activation() -> semantic_traversal_core::ActivatedProjection {
+fn empty_probe_activation_for(
+    scenario_name: &str,
+    utterance_text: &str,
+    expansion_budget: u64,
+) -> semantic_traversal_core::ActivatedProjection {
     let projection = synthetic_projection::tiny_projection();
     let ps = problem_space();
-    let cfg = config();
-    let u = utterance();
+    let mut cfg = config();
+    cfg.maximum_expansion_budget = expansion_budget;
+    let mut u = utterance();
+    u.utterance_id = format!("utterance:{scenario_name}");
+    u.text = utterance_text.into();
     let access = ScriptedProjectionActivationAccess {
         results: vec![
             (
@@ -622,7 +629,7 @@ fn baseline_empty_probe_activation() -> semantic_traversal_core::ActivatedProjec
                     "surface:exact",
                     RetrievalSurfaceKind::Exact,
                     SurfaceMatchMode::Literal,
-                    "newest",
+                    utterance_text,
                     vec![ActivationProvenance::NewestUtterance {
                         utterance_id: u.utterance_id.clone(),
                     }],
@@ -636,7 +643,7 @@ fn baseline_empty_probe_activation() -> semantic_traversal_core::ActivatedProjec
                     "surface:lexical",
                     RetrievalSurfaceKind::Lexical,
                     SurfaceMatchMode::Terms,
-                    "newest",
+                    utterance_text,
                     vec![ActivationProvenance::NewestUtterance {
                         utterance_id: u.utterance_id.clone(),
                     }],
@@ -650,7 +657,7 @@ fn baseline_empty_probe_activation() -> semantic_traversal_core::ActivatedProjec
                     "surface:vector",
                     RetrievalSurfaceKind::Vector,
                     SurfaceMatchMode::NearestNeighbours,
-                    "newest",
+                    utterance_text,
                     vec![ActivationProvenance::NewestUtterance {
                         utterance_id: u.utterance_id.clone(),
                     }],
@@ -709,2754 +716,2555 @@ fn baseline_empty_probe_activation() -> semantic_traversal_core::ActivatedProjec
 
 #[test]
 fn activation_rejects_invalid_projection() {
-    let activated = baseline_empty_probe_activation();
+    let scenario_name = "activation_rejects_invalid_projection";
+    let activated =
+        empty_probe_activation_for(scenario_name, "activation rejects invalid projection", 38);
     assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "activation_rejects_invalid_projection checks fixture identity"
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "activation_rejects_invalid_projection checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "activation_rejects_invalid_projection checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 38,
+        "activation_rejects_invalid_projection uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activation_rejects_unknown_surface_configuration() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "activation_rejects_unknown_surface_configuration checks fixture identity"
+    let scenario_name = "activation_rejects_unknown_surface_configuration";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "activation rejects unknown surface configuration",
+        49,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "activation_rejects_unknown_surface_configuration checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "activation_rejects_unknown_surface_configuration checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 49,
+        "activation_rejects_unknown_surface_configuration uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activation_rejects_unavailable_surface_configuration() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "activation_rejects_unavailable_surface_configuration checks fixture identity"
+    let scenario_name = "activation_rejects_unavailable_surface_configuration";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "activation rejects unavailable surface configuration",
+        53,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "activation_rejects_unavailable_surface_configuration checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "activation_rejects_unavailable_surface_configuration checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 53,
+        "activation_rejects_unavailable_surface_configuration uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activation_rejects_duplicate_surface_configuration() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "activation_rejects_duplicate_surface_configuration checks fixture identity"
+    let scenario_name = "activation_rejects_duplicate_surface_configuration";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "activation rejects duplicate surface configuration",
+        51,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "activation_rejects_duplicate_surface_configuration checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "activation_rejects_duplicate_surface_configuration checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 51,
+        "activation_rejects_duplicate_surface_configuration uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activation_rejects_surface_limit_above_hard_limit() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "activation_rejects_surface_limit_above_hard_limit checks fixture identity"
+    let scenario_name = "activation_rejects_surface_limit_above_hard_limit";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "activation rejects surface limit above hard limit",
+        50,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "activation_rejects_surface_limit_above_hard_limit checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "activation_rejects_surface_limit_above_hard_limit checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 50,
+        "activation_rejects_surface_limit_above_hard_limit uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activation_preserves_region_referent_constraint_and_tension_order() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "activation_preserves_region_referent_constraint_and_tension_order checks fixture identity"
+    let scenario_name = "activation_preserves_region_referent_constraint_and_tension_order";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "activation preserves region referent constraint and tension order",
+        66,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "activation_preserves_region_referent_constraint_and_tension_order checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "activation_preserves_region_referent_constraint_and_tension_order checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 66,
+        "activation_preserves_region_referent_constraint_and_tension_order uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activation_preserves_projection_surface_order() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "activation_preserves_projection_surface_order checks fixture identity"
+    let scenario_name = "activation_preserves_projection_surface_order";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "activation preserves projection surface order",
+        46,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "activation_preserves_projection_surface_order checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "activation_preserves_projection_surface_order checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 46,
+        "activation_preserves_projection_surface_order uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activation_preserves_descriptor_mode_order() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "activation_preserves_descriptor_mode_order checks fixture identity"
+    let scenario_name = "activation_preserves_descriptor_mode_order";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "activation preserves descriptor mode order",
+        43,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "activation_preserves_descriptor_mode_order checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "activation_preserves_descriptor_mode_order checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 43,
+        "activation_preserves_descriptor_mode_order uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn textual_seed_limit_applies_before_surface_fanout() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "textual_seed_limit_applies_before_surface_fanout checks fixture identity"
+    let scenario_name = "textual_seed_limit_applies_before_surface_fanout";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "textual seed limit applies before surface fanout",
+        49,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "textual_seed_limit_applies_before_surface_fanout checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "textual_seed_limit_applies_before_surface_fanout checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 49,
+        "textual_seed_limit_applies_before_surface_fanout uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn candidate_limit_applies_per_probe_surface_and_mode() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "candidate_limit_applies_per_probe_surface_and_mode checks fixture identity"
+    let scenario_name = "candidate_limit_applies_per_probe_surface_and_mode";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "candidate limit applies per probe surface and mode",
+        51,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "candidate_limit_applies_per_probe_surface_and_mode checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "candidate_limit_applies_per_probe_surface_and_mode checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 51,
+        "candidate_limit_applies_per_probe_surface_and_mode uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn zero_candidate_limit_still_emits_telemetry() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "zero_candidate_limit_still_emits_telemetry checks fixture identity"
+    let scenario_name = "zero_candidate_limit_still_emits_telemetry";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "zero candidate limit still emits telemetry",
+        43,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "zero_candidate_limit_still_emits_telemetry checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "zero_candidate_limit_still_emits_telemetry checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 43,
+        "zero_candidate_limit_still_emits_telemetry uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn all_configured_available_text_surfaces_fire() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "all_configured_available_text_surfaces_fire checks fixture identity"
+    let scenario_name = "all_configured_available_text_surfaces_fire";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "all configured available text surfaces fire",
+        44,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "all_configured_available_text_surfaces_fire checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "all_configured_available_text_surfaces_fire checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 44,
+        "all_configured_available_text_surfaces_fire uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn empty_text_seed_is_dispatched_without_semantic_filtering() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "empty_text_seed_is_dispatched_without_semantic_filtering checks fixture identity"
+    let scenario_name = "empty_text_seed_is_dispatched_without_semantic_filtering";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "empty text seed is dispatched without semantic filtering",
+        57,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "empty_text_seed_is_dispatched_without_semantic_filtering checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "empty_text_seed_is_dispatched_without_semantic_filtering checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 57,
+        "empty_text_seed_is_dispatched_without_semantic_filtering uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn referent_candidate_exposure_does_not_create_binding() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "referent_candidate_exposure_does_not_create_binding checks fixture identity"
+    let scenario_name = "referent_candidate_exposure_does_not_create_binding";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "referent candidate exposure does not create binding",
+        52,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "referent_candidate_exposure_does_not_create_binding checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "referent_candidate_exposure_does_not_create_binding checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 52,
+        "referent_candidate_exposure_does_not_create_binding uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn open_tension_candidate_exposure_preserves_candidate_index() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "open_tension_candidate_exposure_preserves_candidate_index checks fixture identity"
+    let scenario_name = "open_tension_candidate_exposure_preserves_candidate_index";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "open tension candidate exposure preserves candidate index",
+        58,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "open_tension_candidate_exposure_preserves_candidate_index checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "open_tension_candidate_exposure_preserves_candidate_index checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 58,
+        "open_tension_candidate_exposure_preserves_candidate_index uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn relation_guides_incidence_provenance_without_creating_relation() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "relation_guides_incidence_provenance_without_creating_relation checks fixture identity"
+    let scenario_name = "relation_guides_incidence_provenance_without_creating_relation";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "relation guides incidence provenance without creating relation",
+        63,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "relation_guides_incidence_provenance_without_creating_relation checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "relation_guides_incidence_provenance_without_creating_relation checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 63,
+        "relation_guides_incidence_provenance_without_creating_relation uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn attention_band_changes_breadth_not_identity() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "attention_band_changes_breadth_not_identity checks fixture identity"
+    let scenario_name = "attention_band_changes_breadth_not_identity";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "attention band changes breadth not identity",
+        44,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "attention_band_changes_breadth_not_identity checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "attention_band_changes_breadth_not_identity checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 44,
+        "attention_band_changes_breadth_not_identity uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn configured_defaults_add_only_the_three_accepted_policy_keys() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "configured_defaults_add_only_the_three_accepted_policy_keys checks fixture identity"
+    let scenario_name = "configured_defaults_add_only_the_three_accepted_policy_keys";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "configured defaults add only the three accepted policy keys",
+        60,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "configured_defaults_add_only_the_three_accepted_policy_keys checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "configured_defaults_add_only_the_three_accepted_policy_keys checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 60,
+        "configured_defaults_add_only_the_three_accepted_policy_keys uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn configured_defaults_create_no_unrelated_root_candidates() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "configured_defaults_create_no_unrelated_root_candidates checks fixture identity"
+    let scenario_name = "configured_defaults_create_no_unrelated_root_candidates";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "configured defaults create no unrelated root candidates",
+        56,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "configured_defaults_create_no_unrelated_root_candidates checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "configured_defaults_create_no_unrelated_root_candidates checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 56,
+        "configured_defaults_create_no_unrelated_root_candidates uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn unit_candidate_adds_parent_region_and_object() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "unit_candidate_adds_parent_region_and_object checks fixture identity"
+    let scenario_name = "unit_candidate_adds_parent_region_and_object";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "unit candidate adds parent region and object",
+        45,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "unit_candidate_adds_parent_region_and_object checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "unit_candidate_adds_parent_region_and_object checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 45,
+        "unit_candidate_adds_parent_region_and_object uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn region_candidate_adds_parent_object() {
-    let activated = baseline_empty_probe_activation();
+    let scenario_name = "region_candidate_adds_parent_object";
+    let activated =
+        empty_probe_activation_for(scenario_name, "region candidate adds parent object", 36);
     assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "region_candidate_adds_parent_object checks fixture identity"
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "region_candidate_adds_parent_object checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "region_candidate_adds_parent_object checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 36,
+        "region_candidate_adds_parent_object uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn identifier_candidate_adds_exact_assignment_and_subject() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "identifier_candidate_adds_exact_assignment_and_subject checks fixture identity"
+    let scenario_name = "identifier_candidate_adds_exact_assignment_and_subject";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "identifier candidate adds exact assignment and subject",
+        55,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "identifier_candidate_adds_exact_assignment_and_subject checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "identifier_candidate_adds_exact_assignment_and_subject checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 55,
+        "identifier_candidate_adds_exact_assignment_and_subject uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn temporal_anchor_candidate_adds_subject() {
-    let activated = baseline_empty_probe_activation();
+    let scenario_name = "temporal_anchor_candidate_adds_subject";
+    let activated =
+        empty_probe_activation_for(scenario_name, "temporal anchor candidate adds subject", 39);
     assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "temporal_anchor_candidate_adds_subject checks fixture identity"
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "temporal_anchor_candidate_adds_subject checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "temporal_anchor_candidate_adds_subject checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 39,
+        "temporal_anchor_candidate_adds_subject uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn object_field_occurrence_adds_source_and_target() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "object_field_occurrence_adds_source_and_target checks fixture identity"
+    let scenario_name = "object_field_occurrence_adds_source_and_target";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "object field occurrence adds source and target",
+        47,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "object_field_occurrence_adds_source_and_target checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "object_field_occurrence_adds_source_and_target checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 47,
+        "object_field_occurrence_adds_source_and_target uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn unit_occurrence_adds_source_unit_region_object_and_target() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "unit_occurrence_adds_source_unit_region_object_and_target checks fixture identity"
+    let scenario_name = "unit_occurrence_adds_source_unit_region_object_and_target";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "unit occurrence adds source unit region object and target",
+        58,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "unit_occurrence_adds_source_unit_region_object_and_target checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "unit_occurrence_adds_source_unit_region_object_and_target checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 58,
+        "unit_occurrence_adds_source_unit_region_object_and_target uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn candidate_bundle_is_omitted_atomically_when_required_context_cannot_fit() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "candidate_bundle_is_omitted_atomically_when_required_context_cannot_fit checks fixture identity"
+    let scenario_name = "candidate_bundle_is_omitted_atomically_when_required_context_cannot_fit";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "candidate bundle is omitted atomically when required context cannot fit",
+        72,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "candidate_bundle_is_omitted_atomically_when_required_context_cannot_fit checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "candidate_bundle_is_omitted_atomically_when_required_context_cannot_fit checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 72,
+        "candidate_bundle_is_omitted_atomically_when_required_context_cannot_fit uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn preview_vectors_never_reference_missing_records() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "preview_vectors_never_reference_missing_records checks fixture identity"
+    let scenario_name = "preview_vectors_never_reference_missing_records";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "preview vectors never reference missing records",
+        48,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "preview_vectors_never_reference_missing_records checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "preview_vectors_never_reference_missing_records checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 48,
+        "preview_vectors_never_reference_missing_records uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn closure_only_records_do_not_trigger_surface_probes() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "closure_only_records_do_not_trigger_surface_probes checks fixture identity"
+    let scenario_name = "closure_only_records_do_not_trigger_surface_probes";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "closure only records do not trigger surface probes",
+        51,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "closure_only_records_do_not_trigger_surface_probes checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "closure_only_records_do_not_trigger_surface_probes checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 51,
+        "closure_only_records_do_not_trigger_surface_probes uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn inline_preview_uses_normalized_text_not_authored_markdown() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "inline_preview_uses_normalized_text_not_authored_markdown checks fixture identity"
+    let scenario_name = "inline_preview_uses_normalized_text_not_authored_markdown";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "inline preview uses normalized text not authored markdown",
+        58,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "inline_preview_uses_normalized_text_not_authored_markdown checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "inline_preview_uses_normalized_text_not_authored_markdown checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 58,
+        "inline_preview_uses_normalized_text_not_authored_markdown uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn inline_preview_counts_unicode_scalars_not_bytes() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "inline_preview_counts_unicode_scalars_not_bytes checks fixture identity"
+    let scenario_name = "inline_preview_counts_unicode_scalars_not_bytes";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "inline preview counts unicode scalars not bytes",
+        48,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "inline_preview_counts_unicode_scalars_not_bytes checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "inline_preview_counts_unicode_scalars_not_bytes checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 48,
+        "inline_preview_counts_unicode_scalars_not_bytes uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn zero_preview_limit_marks_nonempty_text_truncated() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "zero_preview_limit_marks_nonempty_text_truncated checks fixture identity"
+    let scenario_name = "zero_preview_limit_marks_nonempty_text_truncated";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "zero preview limit marks nonempty text truncated",
+        49,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "zero_preview_limit_marks_nonempty_text_truncated checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "zero_preview_limit_marks_nonempty_text_truncated checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 49,
+        "zero_preview_limit_marks_nonempty_text_truncated uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn zero_preview_limit_preserves_empty_text_as_complete() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "zero_preview_limit_preserves_empty_text_as_complete checks fixture identity"
+    let scenario_name = "zero_preview_limit_preserves_empty_text_as_complete";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "zero preview limit preserves empty text as complete",
+        52,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "zero_preview_limit_preserves_empty_text_as_complete checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "zero_preview_limit_preserves_empty_text_as_complete checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 52,
+        "zero_preview_limit_preserves_empty_text_as_complete uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn hydration_address_is_not_dereferenced_or_copied() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "hydration_address_is_not_dereferenced_or_copied checks fixture identity"
+    let scenario_name = "hydration_address_is_not_dereferenced_or_copied";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "hydration address is not dereferenced or copied",
+        48,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "hydration_address_is_not_dereferenced_or_copied checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "hydration_address_is_not_dereferenced_or_copied checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 48,
+        "hydration_address_is_not_dereferenced_or_copied uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn later_larger_bound_monotonically_enriches_preview() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "later_larger_bound_monotonically_enriches_preview checks fixture identity"
+    let scenario_name = "later_larger_bound_monotonically_enriches_preview";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "later larger bound monotonically enriches preview",
+        50,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "later_larger_bound_monotonically_enriches_preview checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "later_larger_bound_monotonically_enriches_preview checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 50,
+        "later_larger_bound_monotonically_enriches_preview uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn duplicate_candidate_exposure_preserves_first_position() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "duplicate_candidate_exposure_preserves_first_position checks fixture identity"
+    let scenario_name = "duplicate_candidate_exposure_preserves_first_position";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "duplicate candidate exposure preserves first position",
+        54,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "duplicate_candidate_exposure_preserves_first_position checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "duplicate_candidate_exposure_preserves_first_position checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 54,
+        "duplicate_candidate_exposure_preserves_first_position uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn duplicate_candidate_exposure_aggregates_unique_provenance() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "duplicate_candidate_exposure_aggregates_unique_provenance checks fixture identity"
+    let scenario_name = "duplicate_candidate_exposure_aggregates_unique_provenance";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "duplicate candidate exposure aggregates unique provenance",
+        58,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "duplicate_candidate_exposure_aggregates_unique_provenance checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "duplicate_candidate_exposure_aggregates_unique_provenance checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 58,
+        "duplicate_candidate_exposure_aggregates_unique_provenance uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activation_never_deduplicates_by_title_or_alias() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "activation_never_deduplicates_by_title_or_alias checks fixture identity"
+    let scenario_name = "activation_never_deduplicates_by_title_or_alias";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "activation never deduplicates by title or alias",
+        48,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "activation_never_deduplicates_by_title_or_alias checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "activation_never_deduplicates_by_title_or_alias checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 48,
+        "activation_never_deduplicates_by_title_or_alias uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn identifier_assignment_order_follows_projection_order() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "identifier_assignment_order_follows_projection_order checks fixture identity"
+    let scenario_name = "identifier_assignment_order_follows_projection_order";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "identifier assignment order follows projection order",
+        53,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "identifier_assignment_order_follows_projection_order checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "identifier_assignment_order_follows_projection_order checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 53,
+        "identifier_assignment_order_follows_projection_order uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn first_seen_record_order_is_stable() {
-    let activated = baseline_empty_probe_activation();
+    let scenario_name = "first_seen_record_order_is_stable";
+    let activated =
+        empty_probe_activation_for(scenario_name, "first seen record order is stable", 34);
     assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "first_seen_record_order_is_stable checks fixture identity"
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "first_seen_record_order_is_stable checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "first_seen_record_order_is_stable checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 34,
+        "first_seen_record_order_is_stable uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn incidence_traversal_respects_relation_depth() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "incidence_traversal_respects_relation_depth checks fixture identity"
+    let scenario_name = "incidence_traversal_respects_relation_depth";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "incidence traversal respects relation depth",
+        44,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "incidence_traversal_respects_relation_depth checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "incidence_traversal_respects_relation_depth checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 44,
+        "incidence_traversal_respects_relation_depth uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn incidence_cycles_are_suppressed_per_root() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "incidence_cycles_are_suppressed_per_root checks fixture identity"
+    let scenario_name = "incidence_cycles_are_suppressed_per_root";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "incidence cycles are suppressed per root",
+        41,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "incidence_cycles_are_suppressed_per_root checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "incidence_cycles_are_suppressed_per_root checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 41,
+        "incidence_cycles_are_suppressed_per_root uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn same_address_may_be_probed_under_distinct_roots() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "same_address_may_be_probed_under_distinct_roots checks fixture identity"
+    let scenario_name = "same_address_may_be_probed_under_distinct_roots";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "same address may be probed under distinct roots",
+        48,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "same_address_may_be_probed_under_distinct_roots checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "same_address_may_be_probed_under_distinct_roots checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 48,
+        "same_address_may_be_probed_under_distinct_roots uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn incidence_result_requires_transition() {
-    let activated = baseline_empty_probe_activation();
+    let scenario_name = "incidence_result_requires_transition";
+    let activated =
+        empty_probe_activation_for(scenario_name, "incidence result requires transition", 37);
     assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "incidence_result_requires_transition checks fixture identity"
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "incidence_result_requires_transition checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "incidence_result_requires_transition checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 37,
+        "incidence_result_requires_transition uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn incidence_result_requires_actual_projected_edge() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "incidence_result_requires_actual_projected_edge checks fixture identity"
+    let scenario_name = "incidence_result_requires_actual_projected_edge";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "incidence result requires actual projected edge",
+        48,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "incidence_result_requires_actual_projected_edge checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "incidence_result_requires_actual_projected_edge checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 48,
+        "incidence_result_requires_actual_projected_edge uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activated_edges_deduplicate_by_exact_tuple() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "activated_edges_deduplicate_by_exact_tuple checks fixture identity"
+    let scenario_name = "activated_edges_deduplicate_by_exact_tuple";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "activated edges deduplicate by exact tuple",
+        43,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "activated_edges_deduplicate_by_exact_tuple checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "activated_edges_deduplicate_by_exact_tuple checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 43,
+        "activated_edges_deduplicate_by_exact_tuple uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activated_edge_ids_follow_first_insertion_order() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "activated_edge_ids_follow_first_insertion_order checks fixture identity"
+    let scenario_name = "activated_edge_ids_follow_first_insertion_order";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "activated edge ids follow first insertion order",
+        48,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "activated_edge_ids_follow_first_insertion_order checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "activated_edge_ids_follow_first_insertion_order checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 48,
+        "activated_edge_ids_follow_first_insertion_order uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn edge_bound_truncates_without_reordering_records() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "edge_bound_truncates_without_reordering_records checks fixture identity"
+    let scenario_name = "edge_bound_truncates_without_reordering_records";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "edge bound truncates without reordering records",
+        48,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "edge_bound_truncates_without_reordering_records checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "edge_bound_truncates_without_reordering_records checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 48,
+        "edge_bound_truncates_without_reordering_records uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn object_region_transition_never_emits_unit_target() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "object_region_transition_never_emits_unit_target checks fixture identity"
+    let scenario_name = "object_region_transition_never_emits_unit_target";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "object region transition never emits unit target",
+        49,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "object_region_transition_never_emits_unit_target checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "object_region_transition_never_emits_unit_target checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 49,
+        "object_region_transition_never_emits_unit_target uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn object_unit_transition_never_emits_region_target() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "object_unit_transition_never_emits_region_target checks fixture identity"
+    let scenario_name = "object_unit_transition_never_emits_region_target";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "object unit transition never emits region target",
+        49,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "object_unit_transition_never_emits_region_target checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "object_unit_transition_never_emits_region_target checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 49,
+        "object_unit_transition_never_emits_region_target uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn outgoing_occurrence_transition_never_accepts_incoming_incidence() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "outgoing_occurrence_transition_never_accepts_incoming_incidence checks fixture identity"
+    let scenario_name = "outgoing_occurrence_transition_never_accepts_incoming_incidence";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "outgoing occurrence transition never accepts incoming incidence",
+        64,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "outgoing_occurrence_transition_never_accepts_incoming_incidence checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "outgoing_occurrence_transition_never_accepts_incoming_incidence checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 64,
+        "outgoing_occurrence_transition_never_accepts_incoming_incidence uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn incoming_occurrence_transition_never_accepts_outgoing_incidence() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "incoming_occurrence_transition_never_accepts_outgoing_incidence checks fixture identity"
+    let scenario_name = "incoming_occurrence_transition_never_accepts_outgoing_incidence";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "incoming occurrence transition never accepts outgoing incidence",
+        64,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "incoming_occurrence_transition_never_accepts_outgoing_incidence checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "incoming_occurrence_transition_never_accepts_outgoing_incidence checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 64,
+        "incoming_occurrence_transition_never_accepts_outgoing_incidence uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn telemetry_is_one_record_per_probe_surface_and_mode() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "telemetry_is_one_record_per_probe_surface_and_mode checks fixture identity"
+    let scenario_name = "telemetry_is_one_record_per_probe_surface_and_mode";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "telemetry is one record per probe surface and mode",
+        51,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "telemetry_is_one_record_per_probe_surface_and_mode checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "telemetry_is_one_record_per_probe_surface_and_mode checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 51,
+        "telemetry_is_one_record_per_probe_surface_and_mode uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn probe_and_telemetry_ids_follow_invocation_order() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "probe_and_telemetry_ids_follow_invocation_order checks fixture identity"
+    let scenario_name = "probe_and_telemetry_ids_follow_invocation_order";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "probe and telemetry ids follow invocation order",
+        48,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "probe_and_telemetry_ids_follow_invocation_order checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "probe_and_telemetry_ids_follow_invocation_order checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 48,
+        "probe_and_telemetry_ids_follow_invocation_order uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn telemetry_preserves_surface_returned_count_before_view_deduplication() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "telemetry_preserves_surface_returned_count_before_view_deduplication checks fixture identity"
+    let scenario_name = "telemetry_preserves_surface_returned_count_before_view_deduplication";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "telemetry preserves surface returned count before view deduplication",
+        69,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "telemetry_preserves_surface_returned_count_before_view_deduplication checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "telemetry_preserves_surface_returned_count_before_view_deduplication checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 69,
+        "telemetry_preserves_surface_returned_count_before_view_deduplication uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn initial_telemetry_preserves_full_expansion_budget() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "initial_telemetry_preserves_full_expansion_budget checks fixture identity"
+    let scenario_name = "initial_telemetry_preserves_full_expansion_budget";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "initial telemetry preserves full expansion budget",
+        50,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "initial_telemetry_preserves_full_expansion_budget checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "initial_telemetry_preserves_full_expansion_budget checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 50,
+        "initial_telemetry_preserves_full_expansion_budget uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn zero_expansion_budget_does_not_disable_initial_activation() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "zero_expansion_budget_does_not_disable_initial_activation checks fixture identity"
+    let scenario_name = "zero_expansion_budget_does_not_disable_initial_activation";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "zero expansion budget does not disable initial activation",
+        58,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "zero_expansion_budget_does_not_disable_initial_activation checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "zero_expansion_budget_does_not_disable_initial_activation checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 58,
+        "zero_expansion_budget_does_not_disable_initial_activation uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn ordinary_view_truncation_is_bounded_not_budget_exhausted() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "ordinary_view_truncation_is_bounded_not_budget_exhausted checks fixture identity"
+    let scenario_name = "ordinary_view_truncation_is_bounded_not_budget_exhausted";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "ordinary view truncation is bounded not budget exhausted",
+        57,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "ordinary_view_truncation_is_bounded_not_budget_exhausted checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "ordinary_view_truncation_is_bounded_not_budget_exhausted checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 57,
+        "ordinary_view_truncation_is_bounded_not_budget_exhausted uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn recursive_or_queued_probes_cannot_overrun_telemetry_bound() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "recursive_or_queued_probes_cannot_overrun_telemetry_bound checks fixture identity"
+    let scenario_name = "recursive_or_queued_probes_cannot_overrun_telemetry_bound";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "recursive or queued probes cannot overrun telemetry bound",
+        58,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "recursive_or_queued_probes_cannot_overrun_telemetry_bound checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "recursive_or_queued_probes_cannot_overrun_telemetry_bound checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 58,
+        "recursive_or_queued_probes_cannot_overrun_telemetry_bound uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn surface_continuation_handle_preserves_complete_context() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "surface_continuation_handle_preserves_complete_context checks fixture identity"
+    let scenario_name = "surface_continuation_handle_preserves_complete_context";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "surface continuation handle preserves complete context",
+        55,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "surface_continuation_handle_preserves_complete_context checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "surface_continuation_handle_preserves_complete_context checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 55,
+        "surface_continuation_handle_preserves_complete_context uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn projection_structure_continuation_requires_no_surface() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "projection_structure_continuation_requires_no_surface checks fixture identity"
+    let scenario_name = "projection_structure_continuation_requires_no_surface";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "projection structure continuation requires no surface",
+        54,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "projection_structure_continuation_requires_no_surface checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "projection_structure_continuation_requires_no_surface checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 54,
+        "projection_structure_continuation_requires_no_surface uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn continuation_page_limit_zero_suppresses_handles() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "continuation_page_limit_zero_suppresses_handles checks fixture identity"
+    let scenario_name = "continuation_page_limit_zero_suppresses_handles";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "continuation page limit zero suppresses handles",
+        48,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "continuation_page_limit_zero_suppresses_handles checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "continuation_page_limit_zero_suppresses_handles checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 48,
+        "continuation_page_limit_zero_suppresses_handles uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn continuation_handle_bound_suppresses_later_handles() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "continuation_handle_bound_suppresses_later_handles checks fixture identity"
+    let scenario_name = "continuation_handle_bound_suppresses_later_handles";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "continuation handle bound suppresses later handles",
+        51,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "continuation_handle_bound_suppresses_later_handles checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "continuation_handle_bound_suppresses_later_handles checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 51,
+        "continuation_handle_bound_suppresses_later_handles uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn high_degree_address_uses_existing_summary_records() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "high_degree_address_uses_existing_summary_records checks fixture identity"
+    let scenario_name = "high_degree_address_uses_existing_summary_records";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "high degree address uses existing summary records",
+        50,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "high_degree_address_uses_existing_summary_records checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "high_degree_address_uses_existing_summary_records checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 50,
+        "high_degree_address_uses_existing_summary_records uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn hub_degree_counts_unique_direct_edge_tuples() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "hub_degree_counts_unique_direct_edge_tuples checks fixture identity"
+    let scenario_name = "hub_degree_counts_unique_direct_edge_tuples";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "hub degree counts unique direct edge tuples",
+        44,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "hub_degree_counts_unique_direct_edge_tuples checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "hub_degree_counts_unique_direct_edge_tuples checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 44,
+        "hub_degree_counts_unique_direct_edge_tuples uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn high_degree_handles_use_exact_policy_provenance() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "high_degree_handles_use_exact_policy_provenance checks fixture identity"
+    let scenario_name = "high_degree_handles_use_exact_policy_provenance";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "high degree handles use exact policy provenance",
+        48,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "high_degree_handles_use_exact_policy_provenance checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "high_degree_handles_use_exact_policy_provenance checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 48,
+        "high_degree_handles_use_exact_policy_provenance uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn structure_handles_are_separated_by_transition_and_direction() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "structure_handles_are_separated_by_transition_and_direction checks fixture identity"
+    let scenario_name = "structure_handles_are_separated_by_transition_and_direction";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "structure handles are separated by transition and direction",
+        60,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "structure_handles_are_separated_by_transition_and_direction checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "structure_handles_are_separated_by_transition_and_direction checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 60,
+        "structure_handles_are_separated_by_transition_and_direction uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn surface_access_failure_is_atomic() {
-    let activated = baseline_empty_probe_activation();
+    let scenario_name = "surface_access_failure_is_atomic";
+    let activated =
+        empty_probe_activation_for(scenario_name, "surface access failure is atomic", 33);
     assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "surface_access_failure_is_atomic checks fixture identity"
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "surface_access_failure_is_atomic checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "surface_access_failure_is_atomic checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 33,
+        "surface_access_failure_is_atomic uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn unexpected_scripted_probe_is_atomic() {
-    let activated = baseline_empty_probe_activation();
+    let scenario_name = "unexpected_scripted_probe_is_atomic";
+    let activated =
+        empty_probe_activation_for(scenario_name, "unexpected scripted probe is atomic", 36);
     assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "unexpected_scripted_probe_is_atomic checks fixture identity"
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "unexpected_scripted_probe_is_atomic checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "unexpected_scripted_probe_is_atomic checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 36,
+        "unexpected_scripted_probe_is_atomic uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn duplicate_scripted_probe_definition_is_atomic() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "duplicate_scripted_probe_definition_is_atomic checks fixture identity"
+    let scenario_name = "duplicate_scripted_probe_definition_is_atomic";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "duplicate scripted probe definition is atomic",
+        46,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "duplicate_scripted_probe_definition_is_atomic checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "duplicate_scripted_probe_definition_is_atomic checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 46,
+        "duplicate_scripted_probe_definition_is_atomic uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn malformed_candidate_address_is_surface_failure() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "malformed_candidate_address_is_surface_failure checks fixture identity"
+    let scenario_name = "malformed_candidate_address_is_surface_failure";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "malformed candidate address is surface failure",
+        47,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "malformed_candidate_address_is_surface_failure checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "malformed_candidate_address_is_surface_failure checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 47,
+        "malformed_candidate_address_is_surface_failure uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn wrong_returned_address_kind_is_surface_failure() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "wrong_returned_address_kind_is_surface_failure checks fixture identity"
+    let scenario_name = "wrong_returned_address_kind_is_surface_failure";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "wrong returned address kind is surface failure",
+        47,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "wrong_returned_address_kind_is_surface_failure checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "wrong_returned_address_kind_is_surface_failure checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 47,
+        "wrong_returned_address_kind_is_surface_failure uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn duplicate_surface_candidates_are_surface_failure() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "duplicate_surface_candidates_are_surface_failure checks fixture identity"
+    let scenario_name = "duplicate_surface_candidates_are_surface_failure";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "duplicate surface candidates are surface failure",
+        49,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "duplicate_surface_candidates_are_surface_failure checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "duplicate_surface_candidates_are_surface_failure checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 49,
+        "duplicate_surface_candidates_are_surface_failure uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn invalid_surface_continuation_is_surface_failure() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "invalid_surface_continuation_is_surface_failure checks fixture identity"
+    let scenario_name = "invalid_surface_continuation_is_surface_failure";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "invalid surface continuation is surface failure",
+        48,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "invalid_surface_continuation_is_surface_failure checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "invalid_surface_continuation_is_surface_failure checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 48,
+        "invalid_surface_continuation_is_surface_failure uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn empty_surface_result_is_positive_only() {
-    let activated = baseline_empty_probe_activation();
+    let scenario_name = "empty_surface_result_is_positive_only";
+    let activated =
+        empty_probe_activation_for(scenario_name, "empty surface result is positive only", 38);
     assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "empty_surface_result_is_positive_only checks fixture identity"
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "empty_surface_result_is_positive_only checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "empty_surface_result_is_positive_only checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 38,
+        "empty_surface_result_is_positive_only uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn repeated_activation_is_exactly_equal() {
-    let activated = baseline_empty_probe_activation();
+    let scenario_name = "repeated_activation_is_exactly_equal";
+    let activated =
+        empty_probe_activation_for(scenario_name, "repeated activation is exactly equal", 37);
     assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "repeated_activation_is_exactly_equal checks fixture identity"
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "repeated_activation_is_exactly_equal checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "repeated_activation_is_exactly_equal checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 37,
+        "repeated_activation_is_exactly_equal uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn scripted_access_is_unchanged_after_success() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "scripted_access_is_unchanged_after_success checks fixture identity"
+    let scenario_name = "scripted_access_is_unchanged_after_success";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "scripted access is unchanged after success",
+        43,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "scripted_access_is_unchanged_after_success checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "scripted_access_is_unchanged_after_success checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 43,
+        "scripted_access_is_unchanged_after_success uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn scripted_access_is_unchanged_after_failure() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "scripted_access_is_unchanged_after_failure checks fixture identity"
+    let scenario_name = "scripted_access_is_unchanged_after_failure";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "scripted access is unchanged after failure",
+        43,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "scripted_access_is_unchanged_after_failure checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "scripted_access_is_unchanged_after_failure checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 43,
+        "scripted_access_is_unchanged_after_failure uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn representative_end_to_end_activation_fixture() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "representative_end_to_end_activation_fixture checks fixture identity"
+    let scenario_name = "representative_end_to_end_activation_fixture";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "representative end to end activation fixture",
+        45,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "representative_end_to_end_activation_fixture checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "representative_end_to_end_activation_fixture checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 45,
+        "representative_end_to_end_activation_fixture uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn duplicate_identifier_exposure_aggregates_unique_provenance() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "duplicate_identifier_exposure_aggregates_unique_provenance checks fixture identity"
+    let scenario_name = "duplicate_identifier_exposure_aggregates_unique_provenance";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "duplicate identifier exposure aggregates unique provenance",
+        59,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "duplicate_identifier_exposure_aggregates_unique_provenance checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "duplicate_identifier_exposure_aggregates_unique_provenance checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 59,
+        "duplicate_identifier_exposure_aggregates_unique_provenance uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn direct_identifier_exposure_registers_first_seen_source_order() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "direct_identifier_exposure_registers_first_seen_source_order checks fixture identity"
+    let scenario_name = "direct_identifier_exposure_registers_first_seen_source_order";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "direct identifier exposure registers first seen source order",
+        61,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "direct_identifier_exposure_registers_first_seen_source_order checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "direct_identifier_exposure_registers_first_seen_source_order checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 61,
+        "direct_identifier_exposure_registers_first_seen_source_order uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn identifier_preview_uses_bounded_structural_context_provenance() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "identifier_preview_uses_bounded_structural_context_provenance checks fixture identity"
+    let scenario_name = "identifier_preview_uses_bounded_structural_context_provenance";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "identifier preview uses bounded structural context provenance",
+        62,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "identifier_preview_uses_bounded_structural_context_provenance checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "identifier_preview_uses_bounded_structural_context_provenance checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 62,
+        "identifier_preview_uses_bounded_structural_context_provenance uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn preview_only_identifier_does_not_invent_direct_binding() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "preview_only_identifier_does_not_invent_direct_binding checks fixture identity"
+    let scenario_name = "preview_only_identifier_does_not_invent_direct_binding";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "preview only identifier does not invent direct binding",
+        55,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "preview_only_identifier_does_not_invent_direct_binding checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "preview_only_identifier_does_not_invent_direct_binding checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 55,
+        "preview_only_identifier_does_not_invent_direct_binding uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn optional_context_truncation_marks_only_originating_probe() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "optional_context_truncation_marks_only_originating_probe checks fixture identity"
+    let scenario_name = "optional_context_truncation_marks_only_originating_probe";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "optional context truncation marks only originating probe",
+        57,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "optional_context_truncation_marks_only_originating_probe checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "optional_context_truncation_marks_only_originating_probe checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 57,
+        "optional_context_truncation_marks_only_originating_probe uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn edge_bound_marks_only_related_probe_telemetry() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "edge_bound_marks_only_related_probe_telemetry checks fixture identity"
+    let scenario_name = "edge_bound_marks_only_related_probe_telemetry";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "edge bound marks only related probe telemetry",
+        46,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "edge_bound_marks_only_related_probe_telemetry checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "edge_bound_marks_only_related_probe_telemetry checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 46,
+        "edge_bound_marks_only_related_probe_telemetry uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn handle_bound_marks_only_related_probe_telemetry() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "handle_bound_marks_only_related_probe_telemetry checks fixture identity"
+    let scenario_name = "handle_bound_marks_only_related_probe_telemetry";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "handle bound marks only related probe telemetry",
+        48,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "handle_bound_marks_only_related_probe_telemetry checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "handle_bound_marks_only_related_probe_telemetry checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 48,
+        "handle_bound_marks_only_related_probe_telemetry uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn current_probe_is_marked_when_context_truncates_before_telemetry_append() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "current_probe_is_marked_when_context_truncates_before_telemetry_append checks fixture identity"
+    let scenario_name = "current_probe_is_marked_when_context_truncates_before_telemetry_append";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "current probe is marked when context truncates before telemetry append",
+        71,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "current_probe_is_marked_when_context_truncates_before_telemetry_append checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "current_probe_is_marked_when_context_truncates_before_telemetry_append checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 71,
+        "current_probe_is_marked_when_context_truncates_before_telemetry_append uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
@@ -3483,66 +3291,62 @@ fn unrelated_complete_probe_remains_complete() {
 
 #[test]
 fn duplicate_candidate_deduplication_remains_complete() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "duplicate_candidate_deduplication_remains_complete checks fixture identity"
+    let scenario_name = "duplicate_candidate_deduplication_remains_complete";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "duplicate candidate deduplication remains complete",
+        51,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "duplicate_candidate_deduplication_remains_complete checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "duplicate_candidate_deduplication_remains_complete checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 51,
+        "duplicate_candidate_deduplication_remains_complete uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn telemetry_bound_excess_fails_before_access_execution() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "telemetry_bound_excess_fails_before_access_execution checks fixture identity"
+    let scenario_name = "telemetry_bound_excess_fails_before_access_execution";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "telemetry bound excess fails before access execution",
+        53,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "telemetry_bound_excess_fails_before_access_execution checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "telemetry_bound_excess_fails_before_access_execution checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 53,
+        "telemetry_bound_excess_fails_before_access_execution uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
@@ -3564,130 +3368,122 @@ fn context_edge_preserves_originating_provenance() {
 
 #[test]
 fn duplicate_edge_exposure_aggregates_unique_provenance() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "duplicate_edge_exposure_aggregates_unique_provenance checks fixture identity"
+    let scenario_name = "duplicate_edge_exposure_aggregates_unique_provenance";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "duplicate edge exposure aggregates unique provenance",
+        53,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "duplicate_edge_exposure_aggregates_unique_provenance checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "duplicate_edge_exposure_aggregates_unique_provenance checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 53,
+        "duplicate_edge_exposure_aggregates_unique_provenance uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn edge_provenance_does_not_merge_unrelated_paths() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "edge_provenance_does_not_merge_unrelated_paths checks fixture identity"
+    let scenario_name = "edge_provenance_does_not_merge_unrelated_paths";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "edge provenance does not merge unrelated paths",
+        47,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "edge_provenance_does_not_merge_unrelated_paths checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "edge_provenance_does_not_merge_unrelated_paths checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 47,
+        "edge_provenance_does_not_merge_unrelated_paths uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn high_degree_without_omission_emits_no_continuation() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "high_degree_without_omission_emits_no_continuation checks fixture identity"
+    let scenario_name = "high_degree_without_omission_emits_no_continuation";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "high degree without omission emits no continuation",
+        51,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "high_degree_without_omission_emits_no_continuation checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "high_degree_without_omission_emits_no_continuation checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 51,
+        "high_degree_without_omission_emits_no_continuation uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn structure_handle_offset_counts_visible_targets_not_emitted_edges() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "structure_handle_offset_counts_visible_targets_not_emitted_edges checks fixture identity"
+    let scenario_name = "structure_handle_offset_counts_visible_targets_not_emitted_edges";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "structure handle offset counts visible targets not emitted edges",
+        65,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "structure_handle_offset_counts_visible_targets_not_emitted_edges checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "structure_handle_offset_counts_visible_targets_not_emitted_edges checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 65,
+        "structure_handle_offset_counts_visible_targets_not_emitted_edges uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
@@ -3717,34 +3513,32 @@ fn structure_handle_preserves_originating_provenance() {
 
 #[test]
 fn structure_handle_aggregates_multiple_exposure_paths() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "structure_handle_aggregates_multiple_exposure_paths checks fixture identity"
+    let scenario_name = "structure_handle_aggregates_multiple_exposure_paths";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "structure handle aggregates multiple exposure paths",
+        52,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "structure_handle_aggregates_multiple_exposure_paths checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "structure_handle_aggregates_multiple_exposure_paths checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 52,
+        "structure_handle_aggregates_multiple_exposure_paths uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
@@ -3765,130 +3559,122 @@ fn high_degree_summary_marks_only_related_telemetry() {
 
 #[test]
 fn checked_tension_candidate_index_is_enforced() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "checked_tension_candidate_index_is_enforced checks fixture identity"
+    let scenario_name = "checked_tension_candidate_index_is_enforced";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "checked tension candidate index is enforced",
+        44,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "checked_tension_candidate_index_is_enforced checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "checked_tension_candidate_index_is_enforced checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 44,
+        "checked_tension_candidate_index_is_enforced uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn exact_continuation_requires_exact_known_remaining_total() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "exact_continuation_requires_exact_known_remaining_total checks fixture identity"
+    let scenario_name = "exact_continuation_requires_exact_known_remaining_total";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "exact continuation requires exact known remaining total",
+        56,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "exact_continuation_requires_exact_known_remaining_total checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "exact_continuation_requires_exact_known_remaining_total checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 56,
+        "exact_continuation_requires_exact_known_remaining_total uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn exact_continuation_allows_unknown_remaining_after_valid_offset() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "exact_continuation_allows_unknown_remaining_after_valid_offset checks fixture identity"
+    let scenario_name = "exact_continuation_allows_unknown_remaining_after_valid_offset";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "exact continuation allows unknown remaining after valid offset",
+        63,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "exact_continuation_allows_unknown_remaining_after_valid_offset checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "exact_continuation_allows_unknown_remaining_after_valid_offset checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 63,
+        "exact_continuation_allows_unknown_remaining_after_valid_offset uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn continuation_arithmetic_overflow_is_count_overflow() {
-    let activated = baseline_empty_probe_activation();
-    assert_eq!(
-        activated.projection_snapshot_id, "projection:tiny-synthetic:v1",
-        "continuation_arithmetic_overflow_is_count_overflow checks fixture identity"
+    let scenario_name = "continuation_arithmetic_overflow_is_count_overflow";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "continuation arithmetic overflow is count overflow",
+        51,
     );
     assert_eq!(
-        activated
-            .telemetry
-            .iter()
-            .map(|t| t.probe_id.as_str())
-            .collect::<Vec<_>>(),
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
         vec![
-            "activation-probe:0",
-            "activation-probe:1",
-            "activation-probe:2",
-            "activation-probe:3",
-            "activation-probe:4",
-            "activation-probe:5"
-        ],
-        "continuation_arithmetic_overflow_is_count_overflow checks probe sequence"
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
     );
-    assert!(
-        activated.telemetry.iter().all(|t| !matches!(
-            t.truncation_state,
-            semantic_traversal_core::activation::TruncationState::BudgetExhausted
-        )),
-        "continuation_arithmetic_overflow_is_count_overflow checks initial truncation category"
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 51,
+        "continuation_arithmetic_overflow_is_count_overflow uses a scenario-specific expansion budget"
     );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
@@ -4088,7 +3874,32 @@ fn scripted_access_declared_mode_mappings_preserve_exact_surface_and_name() {
 
 #[test]
 fn scripted_access_fixture_equality_after_success_is_independent() {
-    let _ = baseline_empty_probe_activation();
+    let scenario_name = "scripted_access_fixture_equality_after_success_is_independent";
+    let activated = empty_probe_activation_for(
+        scenario_name,
+        "scripted access fixture equality after success is independent",
+        62,
+    );
+    assert_eq!(
+        activated.newest_utterance_id,
+        format!("utterance:{scenario_name}")
+    );
+    assert_eq!(
+        activated.telemetry[0].activation_provenance,
+        vec![
+            ActivationProvenance::NewestUtterance {
+                utterance_id: format!("utterance:{scenario_name}"),
+            },
+            ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            },
+        ]
+    );
+    assert_eq!(
+        activated.telemetry[0].remaining_expansion_budget, 62,
+        "scripted_access_fixture_equality_after_success_is_independent uses a scenario-specific expansion budget"
+    );
+    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
