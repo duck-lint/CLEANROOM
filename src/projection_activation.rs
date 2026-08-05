@@ -1,12 +1,16 @@
 //! Deterministic initial projection activation runtime.
-#![allow(clippy::collapsible_if, clippy::too_many_arguments)]
+#![allow(clippy::collapsible_if)]
 //!
 //! This module executes the frozen activation contracts against one validated
 //! [`SemanticSpaceProjection`]. It deliberately contains no retrieval provider:
 //! callers supply a synchronous, read-only [`ProjectionActivationAccess`] seam
 //! that receives typed probes and returns only mechanical projected identities.
 
-use std::{collections::HashSet, error::Error, fmt};
+use std::{
+    collections::{HashSet, VecDeque},
+    error::Error,
+    fmt,
+};
 
 use crate::{
     activation::{
@@ -18,7 +22,9 @@ use crate::{
         ProjectionActivationConfig, ProjectionActivationViolation, ProjectionTelemetry,
         TruncationState,
     },
-    model::{Direction, RetrievalSurfaceKind, SemanticAddress},
+    model::{
+        AddressKind, Direction, RetrievalSurfaceAddress, RetrievalSurfaceKind, SemanticAddress,
+    },
     problem_space::{
         ActivationBand, OpenTension, ProblemConstraintApplicability, ProblemSpaceState,
         RecordLifecycle, RegionPersistenceState, TensionLifecycle,
@@ -151,6 +157,11 @@ struct Work {
     handles: Vec<ContinuationHandle>,
     order: Vec<SemanticAddress>,
     bounded_probe_ids: HashSet<String>,
+    edge_provenance: Vec<(EdgeTuple, Vec<ActivationProvenance>)>,
+    probe_counter: u64,
+    telemetry_counter: u64,
+    continuation_counter: u64,
+    edge_counter: u64,
 }
 
 pub fn activate_projection<A>(
@@ -166,32 +177,24 @@ where
     preflight(projection, problem_space, utterance, config)?;
     let seeds = build_seeds(problem_space, utterance, config)?;
     let mut work = Work::default();
-    let mut probe_counter = 0u64;
-    let mut root_index = 0usize;
     for seed in seeds {
-        let mut root_seen_incidence = Vec::<SemanticAddress>::new();
-        let mut root_seen_temporal = Vec::<SemanticAddress>::new();
-        dispatch_source(
+        dispatch_root(
             projection,
             problem_space,
+            utterance,
             config,
             access,
             &mut work,
-            &mut probe_counter,
-            &seed,
-            ProjectionActivationProbeSource::Text {
-                text: seed.text.clone(),
-            },
-            0,
-            &mut root_seen_incidence,
-            &mut root_seen_temporal,
+            seed,
         )?;
-        root_index += 1;
-        if root_index == usize::MAX {
-            return Err(ProjectionActivationViolation::CountOverflow);
-        }
     }
-    build_visible_edges_and_structure_handles(projection, problem_space, config, &mut work)?;
+    build_visible_edges_and_structure_handles(
+        projection,
+        problem_space,
+        utterance,
+        config,
+        &mut work,
+    )?;
     Ok(ActivatedProjection {
         projection_snapshot_id: projection.projection_snapshot_id.clone(),
         configuration_snapshot_id: config.configuration_snapshot_id.clone(),
@@ -695,177 +698,255 @@ fn add_tension(
     }
 }
 
-fn dispatch_source<A: ProjectionActivationAccess + ?Sized>(
+#[derive(Clone)]
+struct QueuedSource {
+    seed: Seed,
+    source: ProjectionActivationProbeSource,
+    depth: u32,
+}
+
+fn dispatch_root<A: ProjectionActivationAccess + ?Sized>(
     p: &SemanticSpaceProjection,
     ps: &ProblemSpaceState,
+    u: &ActivationUtterance,
     c: &ProjectionActivationConfig,
     access: &A,
     w: &mut Work,
-    probe_counter: &mut u64,
-    seed: &Seed,
-    source: ProjectionActivationProbeSource,
-    depth: u32,
-    seen_i: &mut Vec<SemanticAddress>,
-    seen_t: &mut Vec<SemanticAddress>,
+    seed: Seed,
 ) -> Result<(), ProjectionActivationViolation> {
-    for s in p.retrieval_surfaces.iter().filter(|s| s.available) {
-        for mode in &s.match_modes {
-            if !compatible(access, &s.surface_id, mode, &source)? {
+    let mut queue = VecDeque::from([QueuedSource {
+        source: ProjectionActivationProbeSource::Text {
+            text: seed.text.clone(),
+        },
+        depth: 0,
+        seed,
+    }]);
+    let mut seen_incidence = Vec::<SemanticAddress>::new();
+    let mut seen_temporal = Vec::<SemanticAddress>::new();
+
+    while let Some(item) = queue.pop_front() {
+        let derived = dispatch_one_source(p, ps, u, c, access, w, &item)?;
+        for derived_item in derived {
+            match &derived_item.source {
+                ProjectionActivationProbeSource::Address { address } => {
+                    if !seen_incidence.contains(address) {
+                        seen_incidence.push(address.clone());
+                        queue.push_back(derived_item);
+                    }
+                }
+                ProjectionActivationProbeSource::Temporal { address } => {
+                    if !seen_temporal.contains(address) {
+                        seen_temporal.push(address.clone());
+                        queue.push_back(derived_item);
+                    }
+                }
+                ProjectionActivationProbeSource::Text { .. } => queue.push_back(derived_item),
+            }
+        }
+    }
+    Ok(())
+}
+
+fn dispatch_one_source<A: ProjectionActivationAccess + ?Sized>(
+    p: &SemanticSpaceProjection,
+    ps: &ProblemSpaceState,
+    u: &ActivationUtterance,
+    c: &ProjectionActivationConfig,
+    access: &A,
+    w: &mut Work,
+    item: &QueuedSource,
+) -> Result<Vec<QueuedSource>, ProjectionActivationViolation> {
+    let mut derived = Vec::new();
+    for surface in p.retrieval_surfaces.iter().filter(|s| s.available) {
+        for mode in &surface.match_modes {
+            let Some(source_kind) = compatible_or_declared_failure(
+                access,
+                &surface.surface_id,
+                mode,
+                &item.source,
+                &mut w.probe_counter,
+            )?
+            else {
+                continue;
+            };
+            if !capable(p, surface, &item.source) {
                 continue;
             }
-            if !capable(p, s, &source) {
-                continue;
+            let probe_id = next_id("activation-probe", &mut w.probe_counter)?;
+            let telemetry_id = reserve_telemetry(c, w)?;
+            let mut probe_provenance = item.seed.provenance.clone();
+            if matches!(source_kind, ProjectionActivationProbeSourceKind::Address)
+                && matches!(
+                    mode,
+                    SurfaceMatchMode::Incidence | SurfaceMatchMode::Declared { .. }
+                )
+            {
+                append_relation_provenance(&mut probe_provenance, ps, item.seed.region_id.as_ref());
             }
-            let probe_id = next_id("activation-probe", probe_counter)?;
-            let mut prov = seed.provenance.clone();
             push_unique(
-                &mut prov,
+                &mut probe_provenance,
                 ActivationProvenance::ConfiguredDefault {
                     configuration_key: "automatic_surface_fan_out".into(),
                 },
             );
             let probe = ProjectionActivationProbe {
                 probe_id: probe_id.clone(),
-                band: seed.band.clone(),
-                surface_id: s.surface_id.clone(),
-                surface_kind: s.kind.clone(),
+                band: item.seed.band.clone(),
+                surface_id: surface.surface_id.clone(),
+                surface_kind: surface.kind.clone(),
                 match_mode: mode.clone(),
-                source: source.clone(),
-                candidate_limit: surface_limit(c, &s.surface_id, &seed.band),
-                current_depth: depth,
-                activation_provenance: prov.clone(),
+                source: item.source.clone(),
+                candidate_limit: surface_limit(c, &surface.surface_id, &item.seed.band),
+                current_depth: item.depth,
+                activation_provenance: probe_provenance.clone(),
             };
-            if w.telemetry.len() as u32 >= c.maximum_telemetry_records {
-                return Err(ProjectionActivationViolation::ActivatedViewBoundExceeded {
-                    kind: ActivatedRecordKind::Telemetry,
-                    actual: w.telemetry.len() as u64 + 1,
-                    maximum: c.maximum_telemetry_records,
-                });
-            }
-            let res = access.execute_probe(p, &probe).map_err(|e| {
+            let result = access.execute_probe(p, &probe).map_err(|e| {
                 ProjectionActivationViolation::SurfaceAccessFailed {
-                    surface_id: s.surface_id.clone(),
+                    surface_id: surface.surface_id.clone(),
                     probe_id: probe_id.clone(),
                     context: e.context,
                 }
             })?;
-            validate_result(p, s, &probe, &res)?;
-            let before = count_records(w);
-            let mut bounded = false;
-            let returned = res.candidates.len() as u64;
-            for cand in &res.candidates {
-                let mut cp = prov.clone();
-                if let Some(reg) = &seed.region_id {
-                    for rel in ps.relations.iter().filter(|r| {
-                        r.lifecycle == RecordLifecycle::Active
-                            && (r.source_region_id == *reg
-                                || r.target_region_id.as_ref() == Some(reg))
-                    }) {
-                        if matches!(source, ProjectionActivationProbeSource::Address { .. }) {
-                            push_unique(
-                                &mut cp,
-                                ActivationProvenance::ProblemRelation {
-                                    relation_id: rel.relation_id.clone(),
-                                },
-                            );
-                        }
-                    }
-                }
-                if !insert_bundle(p, c, w, &cand.address, &cp)? {
+            validate_result(p, surface, &probe, &result)?;
+            let mut bounded = result.continuation.is_some()
+                || candidate_count_value(&result.candidate_count) > result.candidates.len() as u64;
+            let returned_count = u64::try_from(result.candidates.len())
+                .map_err(|_| ProjectionActivationViolation::CountOverflow)?;
+            for candidate in &result.candidates {
+                if !insert_bundle(
+                    p,
+                    c,
+                    w,
+                    &candidate.address,
+                    &probe_provenance,
+                    &item.seed.band,
+                )? {
                     bounded = true;
+                    w.bounded_probe_ids.insert(probe_id.clone());
                     continue;
                 }
-                if matches!(source, ProjectionActivationProbeSource::Text { .. })
-                    || matches!(source, ProjectionActivationProbeSource::Address { .. })
+                if let Some(transition) = &candidate.transition {
+                    let source = match &probe.source {
+                        ProjectionActivationProbeSource::Address { address } => address.clone(),
+                        _ => candidate.address.clone(),
+                    };
+                    remember_edge_provenance(
+                        w,
+                        EdgeTuple {
+                            source,
+                            transition_id: transition.transition_id.clone(),
+                            direction: transition.direction.clone(),
+                            target: candidate.address.clone(),
+                        },
+                        &probe_provenance,
+                    );
+                }
+                if matches!(
+                    item.source,
+                    ProjectionActivationProbeSource::Text { .. }
+                        | ProjectionActivationProbeSource::Address { .. }
+                ) && item.depth < c.maximum_initial_relation_depth
                 {
-                    if depth < c.maximum_initial_relation_depth && !seen_i.contains(&cand.address) {
-                        seen_i.push(cand.address.clone());
-                        dispatch_source(
-                            p,
-                            ps,
-                            c,
-                            access,
-                            w,
-                            probe_counter,
-                            seed,
-                            ProjectionActivationProbeSource::Address {
-                                address: cand.address.clone(),
-                            },
-                            depth + 1,
-                            seen_i,
-                            seen_t,
-                        )?;
-                    }
-                    if is_temporal_probe_root(&cand.address) && !seen_t.contains(&cand.address) {
-                        seen_t.push(cand.address.clone());
-                        dispatch_source(
-                            p,
-                            ps,
-                            c,
-                            access,
-                            w,
-                            probe_counter,
-                            seed,
-                            ProjectionActivationProbeSource::Temporal {
-                                address: cand.address.clone(),
-                            },
-                            depth,
-                            seen_i,
-                            seen_t,
-                        )?;
-                    }
+                    derived.push(QueuedSource {
+                        seed: item.seed.clone(),
+                        source: ProjectionActivationProbeSource::Address {
+                            address: candidate.address.clone(),
+                        },
+                        depth: item
+                            .depth
+                            .checked_add(1)
+                            .ok_or(ProjectionActivationViolation::CountOverflow)?,
+                    });
+                }
+                if matches!(
+                    item.source,
+                    ProjectionActivationProbeSource::Text { .. }
+                        | ProjectionActivationProbeSource::Address { .. }
+                ) && is_temporal_probe_root(&candidate.address)
+                {
+                    derived.push(QueuedSource {
+                        seed: item.seed.clone(),
+                        source: ProjectionActivationProbeSource::Temporal {
+                            address: candidate.address.clone(),
+                        },
+                        depth: item.depth,
+                    });
                 }
             }
-            let handle_emitted = add_surface_handle(p, ps, c, w, &probe, &res)?;
-            if res.continuation.is_some() && !handle_emitted {
+            let handle_emitted = add_surface_handle(p, ps, u, c, w, &probe, &result)?;
+            if result.continuation.is_some() && !handle_emitted {
                 bounded = true;
+                w.bounded_probe_ids.insert(probe_id.clone());
             }
-            if count_records(w) == before && returned > 0 {
-                bounded = true;
-            }
-            let state = if bounded || w.bounded_probe_ids.contains(&probe_id) {
-                TruncationState::Bounded
-            } else {
-                TruncationState::Complete
-            };
-            let tid = format!("activation-telemetry:{}", w.telemetry.len());
             w.telemetry.push(ProjectionTelemetry {
-                telemetry_id: tid,
-                probe_id,
+                telemetry_id,
+                probe_id: probe_id.clone(),
                 match_mode: probe.match_mode,
                 surface_kind: probe.surface_kind,
                 surface_id: probe.surface_id,
-                candidate_count: res.candidate_count,
-                current_depth: depth,
+                candidate_count: result.candidate_count,
+                current_depth: item.depth,
                 maximum_depth: c.maximum_initial_relation_depth,
-                returned_count: returned,
+                returned_count,
                 remaining_expansion_budget: c.maximum_expansion_budget,
-                truncation_state: state,
-                identifier_type_distribution: res.identifier_type_distribution,
-                temporal_anchor_count: res.temporal_anchor_count,
-                unresolved_target_count: res.unresolved_target_count,
+                truncation_state: if bounded {
+                    TruncationState::Bounded
+                } else {
+                    TruncationState::Complete
+                },
+                identifier_type_distribution: result.identifier_type_distribution,
+                temporal_anchor_count: result.temporal_anchor_count,
+                unresolved_target_count: result.unresolved_target_count,
                 continuation_available: handle_emitted,
                 activation_provenance: probe.activation_provenance,
             });
         }
     }
-    Ok(())
+    Ok(derived)
 }
-fn count_records(w: &Work) -> usize {
-    w.objects.len()
-        + w.regions.len()
-        + w.units.len()
-        + w.assignments.len()
-        + w.occurrences.len()
-        + w.anchors.len()
+
+fn reserve_telemetry(
+    c: &ProjectionActivationConfig,
+    w: &mut Work,
+) -> Result<String, ProjectionActivationViolation> {
+    let next_actual = u64::try_from(w.telemetry.len())
+        .map_err(|_| ProjectionActivationViolation::CountOverflow)?
+        .checked_add(1)
+        .ok_or(ProjectionActivationViolation::CountOverflow)?;
+    if next_actual > u64::from(c.maximum_telemetry_records) {
+        return Err(ProjectionActivationViolation::ActivatedViewBoundExceeded {
+            kind: ActivatedRecordKind::Telemetry,
+            actual: next_actual,
+            maximum: c.maximum_telemetry_records,
+        });
+    }
+    next_id("activation-telemetry", &mut w.telemetry_counter)
 }
-fn compatible<A: ProjectionActivationAccess + ?Sized>(
-    access: &A,
-    sid: &str,
-    m: &SurfaceMatchMode,
-    src: &ProjectionActivationProbeSource,
-) -> Result<bool, ProjectionActivationViolation> {
-    let k = match src {
+
+fn append_relation_provenance(
+    provenance: &mut Vec<ActivationProvenance>,
+    ps: &ProblemSpaceState,
+    region_id: Option<&String>,
+) {
+    let Some(region_id) = region_id else {
+        return;
+    };
+    for relation in ps.relations.iter().filter(|relation| {
+        relation.lifecycle == RecordLifecycle::Active
+            && (relation.source_region_id == *region_id
+                || relation.target_region_id.as_ref() == Some(region_id))
+    }) {
+        push_unique(
+            provenance,
+            ActivationProvenance::ProblemRelation {
+                relation_id: relation.relation_id.clone(),
+            },
+        );
+    }
+}
+
+fn source_kind(src: &ProjectionActivationProbeSource) -> ProjectionActivationProbeSourceKind {
+    match src {
         ProjectionActivationProbeSource::Text { .. } => ProjectionActivationProbeSourceKind::Text,
         ProjectionActivationProbeSource::Address { .. } => {
             ProjectionActivationProbeSourceKind::Address
@@ -873,8 +954,18 @@ fn compatible<A: ProjectionActivationAccess + ?Sized>(
         ProjectionActivationProbeSource::Temporal { .. } => {
             ProjectionActivationProbeSourceKind::Temporal
         }
-    };
-    Ok(match (m, &k) {
+    }
+}
+
+fn compatible_or_declared_failure<A: ProjectionActivationAccess + ?Sized>(
+    access: &A,
+    surface_id: &str,
+    mode: &SurfaceMatchMode,
+    src: &ProjectionActivationProbeSource,
+    probe_counter: &mut u64,
+) -> Result<Option<ProjectionActivationProbeSourceKind>, ProjectionActivationViolation> {
+    let current = source_kind(src);
+    let compatible = match (mode, &current) {
         (
             SurfaceMatchMode::Literal
             | SurfaceMatchMode::Terms
@@ -883,12 +974,27 @@ fn compatible<A: ProjectionActivationAccess + ?Sized>(
         ) => true,
         (SurfaceMatchMode::Incidence, ProjectionActivationProbeSourceKind::Address) => true,
         (SurfaceMatchMode::Temporal, ProjectionActivationProbeSourceKind::Temporal) => true,
-        (SurfaceMatchMode::Declared { name }, _) => access
-            .declared_mode_source(sid, name)
-            .is_some_and(|dk| dk == k),
+        (SurfaceMatchMode::Declared { name }, _) => {
+            match access.declared_mode_source(surface_id, name) {
+                Some(kind) if kind == current => true,
+                Some(_) => false,
+                None => {
+                    let probe_id = next_id("activation-probe", probe_counter)?;
+                    return Err(ProjectionActivationViolation::SurfaceAccessFailed {
+                        surface_id: surface_id.to_owned(),
+                        probe_id,
+                        context: format!(
+                            "declared match mode {name} is unsupported for surface {surface_id}"
+                        ),
+                    });
+                }
+            }
+        }
         _ => false,
-    })
+    };
+    Ok(compatible.then_some(current))
 }
+
 fn capable(
     p: &SemanticSpaceProjection,
     s: &crate::projection::RetrievalSurfaceDescriptor,
@@ -903,6 +1009,7 @@ fn capable(
         }
     }
 }
+
 fn record_surfaces<'a>(
     p: &'a SemanticSpaceProjection,
     a: &SemanticAddress,
@@ -931,6 +1038,7 @@ fn record_surfaces<'a>(
         _ => None,
     }
 }
+
 fn next_id(prefix: &str, c: &mut u64) -> Result<String, ProjectionActivationViolation> {
     let id = format!("{prefix}:{}", *c);
     *c = c
@@ -938,11 +1046,13 @@ fn next_id(prefix: &str, c: &mut u64) -> Result<String, ProjectionActivationViol
         .ok_or(ProjectionActivationViolation::CountOverflow)?;
     Ok(id)
 }
+
 fn candidate_count_value(c: &CandidateCount) -> u64 {
     match c {
         CandidateCount::Exact(v) | CandidateCount::Estimated(v) => *v,
     }
 }
+
 fn validate_result(
     p: &SemanticSpaceProjection,
     s: &crate::projection::RetrievalSurfaceDescriptor,
@@ -954,43 +1064,80 @@ fn validate_result(
         probe_id: probe.probe_id.clone(),
         context: ctx,
     };
-    if res.candidates.len() as u32 > probe.candidate_limit {
+    if u32::try_from(res.candidates.len())
+        .map_err(|_| ProjectionActivationViolation::CountOverflow)?
+        > probe.candidate_limit
+    {
         return Err(fail("returned candidate count exceeds probe limit".into()));
     }
     if probe.candidate_limit == 0 && !res.candidates.is_empty() {
         return Err(fail("zero-limit probe returned candidates".into()));
     }
-    if candidate_count_value(&res.candidate_count) < res.candidates.len() as u64 {
+    if candidate_count_value(&res.candidate_count)
+        < u64::try_from(res.candidates.len())
+            .map_err(|_| ProjectionActivationViolation::CountOverflow)?
+    {
         return Err(fail(
             "candidate count smaller than returned candidates".into(),
         ));
     }
-    let mut seen = HashSet::new();
+    let mut seen = Vec::<SemanticAddress>::new();
     for cand in &res.candidates {
-        if !seen.insert(format!("{:?}", cand.address)) {
+        if seen.contains(&cand.address) {
             return Err(fail("duplicate candidate address".into()));
         }
+        seen.push(cand.address.clone());
         if cand.address.kind() != s.returned_identity {
             return Err(fail("returned address kind mismatch".into()));
         }
-        if !address_exists(p, &cand.address) {
-            return Err(fail(
-                "candidate address does not exist in projection".into(),
-            ));
-        }
-        let inc = matches!(probe.match_mode, SurfaceMatchMode::Incidence);
-        if inc != cand.transition.is_some() {
+        validate_candidate_address_exists(p, &cand.address).map_err(&fail)?;
+        let incidence = matches!(probe.match_mode, SurfaceMatchMode::Incidence)
+            || matches!(
+                (&probe.match_mode, &probe.source),
+                (
+                    SurfaceMatchMode::Declared { .. },
+                    ProjectionActivationProbeSource::Address { .. }
+                )
+            );
+        if incidence != cand.transition.is_some() {
             return Err(fail("incidence transition presence mismatch".into()));
         }
-        if let Some(tr) = &cand.transition {
+        if let Some(returned) = &cand.transition {
+            let ProjectionActivationProbeSource::Address { address: source } = &probe.source else {
+                return Err(fail(
+                    "incidence candidate requires address probe source".into(),
+                ));
+            };
+            let transition = p
+                .valid_transitions
+                .iter()
+                .find(|t| t.transition_id == returned.transition_id)
+                .ok_or_else(|| {
+                    fail(format!(
+                        "unknown incidence transition {}",
+                        returned.transition_id
+                    ))
+                })?;
+            if transition.from != source.kind()
+                || transition.to != cand.address.kind()
+                || transition.direction != returned.direction
+            {
+                return Err(fail("incidence transition shape mismatch".into()));
+            }
+            if transition
+                .retrieval_surface_id
+                .as_ref()
+                .is_some_and(|required| required != &s.surface_id)
+            {
+                return Err(fail(
+                    "incidence transition requires a different surface".into(),
+                ));
+            }
             if !edge_exists(
                 p,
-                &match &probe.source {
-                    ProjectionActivationProbeSource::Address { address } => address.clone(),
-                    _ => cand.address.clone(),
-                },
-                &tr.transition_id,
-                &tr.direction,
+                source,
+                &returned.transition_id,
+                &returned.direction,
                 &cand.address,
             ) {
                 return Err(fail(
@@ -1006,50 +1153,98 @@ fn validate_result(
         if cont.ordering_key.is_empty() {
             return Err(fail("continuation ordering key is empty".into()));
         }
-        if cont.next_offset != res.candidates.len() as u64 {
+        let returned = u64::try_from(res.candidates.len())
+            .map_err(|_| ProjectionActivationViolation::CountOverflow)?;
+        if cont.next_offset != returned {
             return Err(fail("initial continuation next_offset mismatch".into()));
         }
         if let CandidateCount::Exact(total) = res.candidate_count {
-            if total < cont.next_offset + cont.remaining_count.unwrap_or(0) {
+            let known = cont
+                .next_offset
+                .checked_add(cont.remaining_count.unwrap_or(0))
+                .ok_or(ProjectionActivationViolation::CountOverflow)?;
+            if total < known {
                 return Err(fail("exact total incompatible with continuation".into()));
             }
         }
     }
     Ok(())
 }
-fn address_exists(p: &SemanticSpaceProjection, a: &SemanticAddress) -> bool {
+
+fn validate_candidate_address_exists(
+    p: &SemanticSpaceProjection,
+    a: &SemanticAddress,
+) -> Result<(), String> {
     match a {
-        SemanticAddress::Object(id) => p.objects.iter().any(|r| &r.object_id == id),
-        SemanticAddress::Region(id) => p.regions.iter().any(|r| &r.address == id),
-        SemanticAddress::Unit(id) => p.units.iter().any(|r| &r.unit_id == id),
-        SemanticAddress::Occurrence(id) => p.occurrences.iter().any(|r| &r.occurrence_id == id),
-        SemanticAddress::TemporalAnchor(id) => {
-            p.temporal_anchors.iter().any(|r| &r.anchor_id == id)
+        SemanticAddress::Object(id) if p.objects.iter().any(|r| &r.object_id == id) => Ok(()),
+        SemanticAddress::Region(id) if p.regions.iter().any(|r| &r.address == id) => Ok(()),
+        SemanticAddress::Unit(id) if p.units.iter().any(|r| &r.unit_id == id) => Ok(()),
+        SemanticAddress::Occurrence(id) if p.occurrences.iter().any(|r| &r.occurrence_id == id) => {
+            Ok(())
         }
-        SemanticAddress::Identifier(ia) => {
-            p.identifier_assignments
-                .iter()
-                .filter(|x| {
-                    x.identifier_name == ia.identifier_name
-                        && ia
-                            .represented_value
-                            .as_ref()
-                            .is_none_or(|v| identifier_value_string(&x.value).as_ref() == Some(v))
-                })
-                .count()
-                == 1
+        SemanticAddress::TemporalAnchor(id)
+            if p.temporal_anchors.iter().any(|r| &r.anchor_id == id) =>
+        {
+            Ok(())
         }
-        SemanticAddress::RetrievalSurface(_) => false,
+        SemanticAddress::Identifier(_) => resolve_identifier_assignment(p, a).map(|_| ()),
+        SemanticAddress::RetrievalSurface(_) => {
+            Err("retrieval surface candidates are not representable in activated projection".into())
+        }
+        _ => Err("candidate address does not exist in projection".into()),
     }
 }
+
+fn resolve_identifier_assignment<'a>(
+    p: &'a SemanticSpaceProjection,
+    a: &SemanticAddress,
+) -> Result<&'a crate::projection::IdentifierAssignment, String> {
+    let SemanticAddress::Identifier(ia) = a else {
+        return Err("address is not an identifier".into());
+    };
+    let mut matches = p.identifier_assignments.iter().filter(|assignment| {
+        assignment.identifier_name == ia.identifier_name
+            && ia
+                .represented_value
+                .as_ref()
+                .is_none_or(|value| identifier_value_matches(&assignment.value, value))
+    });
+    let Some(first) = matches.next() else {
+        return Err("identifier address resolved zero assignments".into());
+    };
+    if matches.next().is_some() {
+        return Err("identifier address resolved multiple assignments".into());
+    }
+    Ok(first)
+}
+
+fn identifier_value_matches(value: &IdentifierValue, represented: &str) -> bool {
+    match value {
+        IdentifierValue::String(s) => s == represented,
+        IdentifierValue::Integer(i) => i.to_string() == represented,
+        IdentifierValue::Boolean(b) => b.to_string() == represented,
+        IdentifierValue::SemanticAddress(address) => format!("{address:?}") == represented,
+        IdentifierValue::Strings(values) => values.len() == 1 && values[0] == represented,
+        IdentifierValue::SemanticAddresses(values) => {
+            values.len() == 1 && format!("{:?}", values[0]) == represented
+        }
+    }
+}
+
 fn identifier_value_string(v: &IdentifierValue) -> Option<String> {
     match v {
         IdentifierValue::String(s) => Some(s.clone()),
         IdentifierValue::Integer(i) => Some(i.to_string()),
         IdentifierValue::Boolean(b) => Some(b.to_string()),
+        IdentifierValue::SemanticAddress(address) => Some(format!("{address:?}")),
+        IdentifierValue::Strings(values) if values.len() == 1 => Some(values[0].clone()),
+        IdentifierValue::SemanticAddresses(values) if values.len() == 1 => {
+            Some(format!("{:?}", values[0]))
+        }
         _ => None,
     }
 }
+
 fn is_temporal_probe_root(a: &SemanticAddress) -> bool {
     matches!(
         a,
@@ -1064,63 +1259,105 @@ fn push_unique<T: PartialEq>(v: &mut Vec<T>, x: T) {
         v.push(x)
     }
 }
+fn merge<T: Clone + PartialEq>(v: &mut Vec<T>, add: &[T]) {
+    for x in add {
+        push_unique(v, x.clone());
+    }
+}
+fn with_context(prov: &[ActivationProvenance]) -> Vec<ActivationProvenance> {
+    let mut p = prov.to_vec();
+    push_unique(
+        &mut p,
+        ActivationProvenance::ConfiguredDefault {
+            configuration_key: "bounded_structural_context".into(),
+        },
+    );
+    p
+}
 
 fn insert_bundle(
     p: &SemanticSpaceProjection,
     c: &ProjectionActivationConfig,
     w: &mut Work,
-    a: &SemanticAddress,
+    direct: &SemanticAddress,
     prov: &[ActivationProvenance],
+    band: &ProjectionActivationProbeBand,
 ) -> Result<bool, ProjectionActivationViolation> {
-    let mut need = Vec::new();
-    closure_addresses(p, a, &mut need)?;
-    let no = need
-        .iter()
-        .filter(|x| matches!(x, SemanticAddress::Object(_)) && !has_object(w, x))
-        .count();
-    let nr = need
-        .iter()
-        .filter(|x| matches!(x, SemanticAddress::Region(_)) && !has_region(w, x))
-        .count();
-    let nu = need
-        .iter()
-        .filter(|x| matches!(x, SemanticAddress::Unit(_)) && !has_unit(w, x))
-        .count();
-    let ni = need
-        .iter()
-        .filter(|x| matches!(x, SemanticAddress::Identifier(_)) && !has_assignment(w, x, p))
-        .count();
-    let noc = need
-        .iter()
-        .filter(|x| matches!(x, SemanticAddress::Occurrence(_)) && !has_occurrence(w, x))
-        .count();
-    let na = need
-        .iter()
-        .filter(|x| matches!(x, SemanticAddress::TemporalAnchor(_)) && !has_anchor(w, x))
-        .count();
-    if w.objects.len() + no > c.maximum_activated_objects as usize
-        || w.regions.len() + nr > c.maximum_activated_regions as usize
-        || w.units.len() + nu > c.maximum_activated_units as usize
-        || w.assignments.len() + ni > c.maximum_activated_identifier_assignments as usize
-        || w.occurrences.len() + noc > c.maximum_activated_occurrences as usize
-        || w.anchors.len() + na > c.maximum_activated_temporal_anchors as usize
+    let mut required = Vec::new();
+    closure_addresses(p, direct, &mut required)?;
+    let contextual = with_context(prov);
+    let mut no = 0usize;
+    let mut nr = 0usize;
+    let mut nu = 0usize;
+    let mut ni = 0usize;
+    let mut noc = 0usize;
+    let mut na = 0usize;
+    for addr in &required {
+        match addr {
+            SemanticAddress::Object(_) if !has_object(w, addr) => no += 1,
+            SemanticAddress::Region(_) if !has_region(w, addr) => nr += 1,
+            SemanticAddress::Unit(_) if !has_unit(w, addr) => nu += 1,
+            SemanticAddress::Identifier(_) if !has_assignment(w, addr, p) => ni += 1,
+            SemanticAddress::Occurrence(_) if !has_occurrence(w, addr) => noc += 1,
+            SemanticAddress::TemporalAnchor(_) if !has_anchor(w, addr) => na += 1,
+            _ => {}
+        }
+    }
+    if w.objects
+        .len()
+        .checked_add(no)
+        .ok_or(ProjectionActivationViolation::CountOverflow)?
+        > c.maximum_activated_objects as usize
+        || w.regions
+            .len()
+            .checked_add(nr)
+            .ok_or(ProjectionActivationViolation::CountOverflow)?
+            > c.maximum_activated_regions as usize
+        || w.units
+            .len()
+            .checked_add(nu)
+            .ok_or(ProjectionActivationViolation::CountOverflow)?
+            > c.maximum_activated_units as usize
+        || w.assignments
+            .len()
+            .checked_add(ni)
+            .ok_or(ProjectionActivationViolation::CountOverflow)?
+            > c.maximum_activated_identifier_assignments as usize
+        || w.occurrences
+            .len()
+            .checked_add(noc)
+            .ok_or(ProjectionActivationViolation::CountOverflow)?
+            > c.maximum_activated_occurrences as usize
+        || w.anchors
+            .len()
+            .checked_add(na)
+            .ok_or(ProjectionActivationViolation::CountOverflow)?
+            > c.maximum_activated_temporal_anchors as usize
     {
         return Ok(false);
     }
-    for addr in need {
-        insert_one(p, c, w, &addr, prov)?;
+    for addr in &required {
+        let provenance = if addr == direct {
+            prov
+        } else {
+            contextual.as_slice()
+        };
+        insert_one(p, c, w, addr, provenance, band)?;
     }
+    add_optional_context(p, c, w, direct, &contextual, band)?;
     Ok(true)
 }
+
 fn closure_addresses(
     p: &SemanticSpaceProjection,
     a: &SemanticAddress,
     out: &mut Vec<SemanticAddress>,
 ) -> Result<(), ProjectionActivationViolation> {
-    push_unique(out, a.clone());
     match a {
+        SemanticAddress::Object(_) => push_unique(out, a.clone()),
         SemanticAddress::Region(r) => {
-            push_unique(out, SemanticAddress::Object(r.object_id.clone()))
+            push_unique(out, SemanticAddress::Object(r.object_id.clone()));
+            push_unique(out, a.clone());
         }
         SemanticAddress::Unit(id) => {
             let u = p.units.iter().find(|u| &u.unit_id == id).ok_or_else(|| {
@@ -1133,26 +1370,17 @@ fn closure_addresses(
                 out,
                 SemanticAddress::Region(u.parent_region_address.clone()),
             );
+            push_unique(out, a.clone());
         }
-        SemanticAddress::Identifier(ia) => {
-            let ass =
-                p.identifier_assignments
-                    .iter()
-                    .find(|x| {
-                        x.identifier_name == ia.identifier_name
-                            && ia.represented_value.as_ref().is_none_or(|v| {
-                                identifier_value_string(&x.value).as_ref() == Some(v)
-                            })
-                    })
-                    .ok_or_else(
-                        || ProjectionActivationViolation::InvalidActivatedReference {
-                            context: "identifier assignment missing".into(),
-                        },
-                    )?;
-            closure_addresses(p, &ass.subject.clone(), out)?;
+        SemanticAddress::Identifier(_) => {
+            let assignment = resolve_identifier_assignment(p, a).map_err(|context| {
+                ProjectionActivationViolation::InvalidActivatedReference { context }
+            })?;
+            closure_addresses(p, &assignment.subject, out)?;
+            push_unique(out, a.clone());
         }
         SemanticAddress::TemporalAnchor(id) => {
-            let ta = p
+            let anchor = p
                 .temporal_anchors
                 .iter()
                 .find(|x| &x.anchor_id == id)
@@ -1161,10 +1389,11 @@ fn closure_addresses(
                         context: "temporal anchor missing".into(),
                     },
                 )?;
-            closure_addresses(p, &ta.subject.clone(), out)?;
+            closure_addresses(p, &anchor.subject, out)?;
+            push_unique(out, a.clone());
         }
         SemanticAddress::Occurrence(id) => {
-            let o = p
+            let occurrence = p
                 .occurrences
                 .iter()
                 .find(|o| &o.occurrence_id == id)
@@ -1173,32 +1402,34 @@ fn closure_addresses(
                         context: "occurrence missing".into(),
                     },
                 )?;
-            match &o.source {
+            match &occurrence.source {
                 OccurrenceSource::ObjectField { object_id, .. } => {
-                    push_unique(out, SemanticAddress::Object(object_id.clone()))
+                    closure_addresses(p, &SemanticAddress::Object(object_id.clone()), out)?
                 }
                 OccurrenceSource::SemanticUnit { unit_id } => {
                     closure_addresses(p, &SemanticAddress::Unit(unit_id.clone()), out)?
                 }
-            };
-            closure_addresses(p, &o.resolved_target.clone(), out)?;
+            }
+            closure_addresses(p, &occurrence.resolved_target, out)?;
+            push_unique(out, a.clone());
         }
-        _ => {}
+        SemanticAddress::RetrievalSurface(_) => {}
     }
     Ok(())
 }
+
 fn insert_one(
     p: &SemanticSpaceProjection,
     c: &ProjectionActivationConfig,
     w: &mut Work,
     a: &SemanticAddress,
     prov: &[ActivationProvenance],
+    band: &ProjectionActivationProbeBand,
 ) -> Result<(), ProjectionActivationViolation> {
     match a {
         SemanticAddress::Object(id) => {
-            if let Some(r) = w.objects.iter_mut().find(|r| &r.object_id == id) {
-                merge(&mut r.activation_provenance, prov);
-                enrich_object(p, w, id, c, prov)?;
+            if let Some(record) = w.objects.iter_mut().find(|r| &r.object_id == id) {
+                merge(&mut record.activation_provenance, prov);
             } else {
                 let o = p.objects.iter().find(|o| &o.object_id == id).unwrap();
                 w.order.push(a.clone());
@@ -1219,13 +1450,12 @@ fn insert_one(
                     available_surface_ids: o.retrieval_surface_ids.clone(),
                     activation_provenance: prov.to_vec(),
                 });
-                enrich_object(p, w, id, c, prov)?;
             }
+            enrich_object(p, c, w, id, prov, band)?;
         }
         SemanticAddress::Region(id) => {
-            if let Some(r) = w.regions.iter_mut().find(|r| &r.address == id) {
-                merge(&mut r.activation_provenance, prov);
-                enrich_region(p, w, id, c, prov)?;
+            if let Some(record) = w.regions.iter_mut().find(|r| &r.address == id) {
+                merge(&mut record.activation_provenance, prov);
             } else {
                 let r = p.regions.iter().find(|r| &r.address == id).unwrap();
                 w.order.push(a.clone());
@@ -1239,12 +1469,22 @@ fn insert_one(
                     available_surface_ids: r.retrieval_surface_ids.clone(),
                     activation_provenance: prov.to_vec(),
                 });
-                enrich_region(p, w, id, c, prov)?;
             }
+            enrich_region(p, c, w, id, prov, band)?;
         }
         SemanticAddress::Unit(id) => {
-            if let Some(r) = w.units.iter_mut().find(|r| &r.unit_id == id) {
-                merge(&mut r.activation_provenance, prov);
+            if let Some(record) = w.units.iter_mut().find(|r| &r.unit_id == id) {
+                merge(&mut record.activation_provenance, prov);
+                record.text_preview = larger_preview(
+                    record.text_preview.clone(),
+                    p.units
+                        .iter()
+                        .find(|u| &u.unit_id == id)
+                        .unwrap()
+                        .content
+                        .clone(),
+                    band_config(c, band).text_preview_character_limit,
+                );
             } else {
                 let u = p.units.iter().find(|u| &u.unit_id == id).unwrap();
                 w.order.push(a.clone());
@@ -1258,8 +1498,7 @@ fn insert_one(
                     visible_unit_local_identifier_assignment_ids: vec![],
                     text_preview: preview(
                         &u.content,
-                        band_config(c, &ProjectionActivationProbeBand::Unbanded)
-                            .text_preview_character_limit,
+                        band_config(c, band).text_preview_character_limit,
                     ),
                     incoming_occurrence_count: u.incoming_occurrence_ids.len() as u64,
                     outgoing_occurrence_count: u.outgoing_occurrence_ids.len() as u64,
@@ -1268,34 +1507,12 @@ fn insert_one(
                     activation_provenance: prov.to_vec(),
                 });
             }
+            enrich_unit_identifiers(p, c, w, id, prov)?;
         }
-        SemanticAddress::Identifier(ia) => {
-            if !has_assignment(w, a, p) {
-                let ass = p
-                    .identifier_assignments
-                    .iter()
-                    .find(|x| {
-                        x.identifier_name == ia.identifier_name
-                            && ia.represented_value.as_ref().is_none_or(|v| {
-                                identifier_value_string(&x.value).as_ref() == Some(v)
-                            })
-                    })
-                    .unwrap();
-                w.order.push(a.clone());
-                w.assignments.push(ActivatedIdentifierAssignmentRecord {
-                    assignment_id: ass.assignment_id.clone(),
-                    identifier_name: ass.identifier_name.clone(),
-                    subject: ass.subject.clone(),
-                    value: ass.value.clone(),
-                    record_provenance: ass.provenance.clone(),
-                    available_surface_ids: record_surfaces(p, a).cloned().unwrap_or_default(),
-                    activation_provenance: prov.to_vec(),
-                });
-            }
-        }
+        SemanticAddress::Identifier(_) => insert_assignment_address(p, c, w, a, prov)?,
         SemanticAddress::Occurrence(id) => {
-            if let Some(r) = w.occurrences.iter_mut().find(|r| &r.occurrence_id == id) {
-                merge(&mut r.activation_provenance, prov);
+            if let Some(record) = w.occurrences.iter_mut().find(|r| &r.occurrence_id == id) {
+                merge(&mut record.activation_provenance, prov);
             } else {
                 let o = p
                     .occurrences
@@ -1312,14 +1529,14 @@ fn insert_one(
                     presentation_mode: o.presentation_mode.clone(),
                     direction: o.direction.clone(),
                     source_span: o.source_span.clone(),
-                    available_surface_ids: vec![],
+                    available_surface_ids: capable_surface_ids(p, AddressKind::Occurrence),
                     activation_provenance: prov.to_vec(),
                 });
             }
         }
         SemanticAddress::TemporalAnchor(id) => {
-            if let Some(r) = w.anchors.iter_mut().find(|r| &r.anchor_id == id) {
-                merge(&mut r.activation_provenance, prov);
+            if let Some(record) = w.anchors.iter_mut().find(|r| &r.anchor_id == id) {
+                merge(&mut record.activation_provenance, prov);
             } else {
                 let t = p
                     .temporal_anchors
@@ -1332,7 +1549,7 @@ fn insert_one(
                     subject: t.subject.clone(),
                     value: t.value.clone(),
                     record_provenance: t.provenance.clone(),
-                    available_surface_ids: vec![],
+                    available_surface_ids: capable_surface_ids(p, AddressKind::TemporalAnchor),
                     activation_provenance: prov.to_vec(),
                 });
             }
@@ -1341,11 +1558,22 @@ fn insert_one(
     }
     Ok(())
 }
-fn merge<T: Clone + PartialEq>(v: &mut Vec<T>, add: &[T]) {
-    for x in add {
-        push_unique(v, x.clone());
+
+fn larger_preview(
+    existing: ActivatedTextPreview,
+    content: SemanticUnitContent,
+    limit: u32,
+) -> ActivatedTextPreview {
+    let candidate = preview(&content, limit);
+    match (&existing, &candidate) {
+        (
+            ActivatedTextPreview::Inline { text: old, .. },
+            ActivatedTextPreview::Inline { text: new, .. },
+        ) if old.chars().count() >= new.chars().count() => existing,
+        _ => candidate,
     }
 }
+
 fn preview(content: &SemanticUnitContent, limit: u32) -> ActivatedTextPreview {
     match content {
         SemanticUnitContent::Inline {
@@ -1360,165 +1588,307 @@ fn preview(content: &SemanticUnitContent, limit: u32) -> ActivatedTextPreview {
         }
     }
 }
-fn has_object(w: &Work, a: &SemanticAddress) -> bool {
-    matches!(a,SemanticAddress::Object(id) if w.objects.iter().any(|r|&r.object_id==id))
+
+fn capable_surface_ids(p: &SemanticSpaceProjection, kind: AddressKind) -> Vec<String> {
+    p.retrieval_surfaces
+        .iter()
+        .filter(|surface| surface.available && surface.visible_address_kinds.contains(&kind))
+        .map(|surface| surface.surface_id.clone())
+        .collect()
 }
-fn has_region(w: &Work, a: &SemanticAddress) -> bool {
-    matches!(a,SemanticAddress::Region(id) if w.regions.iter().any(|r|&r.address==id))
-}
-fn has_unit(w: &Work, a: &SemanticAddress) -> bool {
-    matches!(a,SemanticAddress::Unit(id) if w.units.iter().any(|r|&r.unit_id==id))
-}
-fn has_occurrence(w: &Work, a: &SemanticAddress) -> bool {
-    matches!(a,SemanticAddress::Occurrence(id) if w.occurrences.iter().any(|r|&r.occurrence_id==id))
-}
-fn has_anchor(w: &Work, a: &SemanticAddress) -> bool {
-    matches!(a,SemanticAddress::TemporalAnchor(id) if w.anchors.iter().any(|r|&r.anchor_id==id))
-}
-fn has_assignment(w: &Work, a: &SemanticAddress, p: &SemanticSpaceProjection) -> bool {
-    if let SemanticAddress::Identifier(ia) = a {
-        if let Some(ass) = p.identifier_assignments.iter().find(|x| {
-            x.identifier_name == ia.identifier_name
-                && ia
-                    .represented_value
-                    .as_ref()
-                    .is_none_or(|v| identifier_value_string(&x.value).as_ref() == Some(v))
-        }) {
-            return w
-                .assignments
-                .iter()
-                .any(|r| r.assignment_id == ass.assignment_id);
-        }
-    }
-    false
-}
-fn enrich_object(
+
+fn insert_assignment_id(
     p: &SemanticSpaceProjection,
-    w: &mut Work,
-    id: &crate::model::SemanticObjectId,
     c: &ProjectionActivationConfig,
+    w: &mut Work,
+    assignment_id: &str,
+    prov: &[ActivationProvenance],
+) -> Result<bool, ProjectionActivationViolation> {
+    if w.assignments
+        .iter()
+        .any(|record| record.assignment_id == assignment_id)
+    {
+        return Ok(true);
+    }
+    if w.assignments.len() >= c.maximum_activated_identifier_assignments as usize {
+        return Ok(false);
+    }
+    let assignment = p
+        .identifier_assignments
+        .iter()
+        .find(|a| a.assignment_id == assignment_id)
+        .ok_or_else(
+            || ProjectionActivationViolation::InvalidActivatedReference {
+                context: format!("assignment {assignment_id} missing"),
+            },
+        )?;
+    w.assignments.push(ActivatedIdentifierAssignmentRecord {
+        assignment_id: assignment.assignment_id.clone(),
+        identifier_name: assignment.identifier_name.clone(),
+        subject: assignment.subject.clone(),
+        value: assignment.value.clone(),
+        record_provenance: assignment.provenance.clone(),
+        available_surface_ids: p
+            .identifier_descriptors
+            .iter()
+            .find(|d| d.identifier_name == assignment.identifier_name)
+            .map(|d| d.retrieval_surface_ids.clone())
+            .unwrap_or_default(),
+        activation_provenance: prov.to_vec(),
+    });
+    Ok(true)
+}
+
+fn insert_assignment_address(
+    p: &SemanticSpaceProjection,
+    c: &ProjectionActivationConfig,
+    w: &mut Work,
+    address: &SemanticAddress,
     prov: &[ActivationProvenance],
 ) -> Result<(), ProjectionActivationViolation> {
-    let o = p.objects.iter().find(|o| &o.object_id == id).unwrap();
-    let limit = c.unbanded.maximum_structural_neighbors_per_record as usize;
-    let mut visible_regions = Vec::new();
-    let mut visible_units = Vec::new();
-    let mut used = 0;
-    for r in &o.region_addresses {
+    let assignment_id = resolve_identifier_assignment(p, address)
+        .map_err(|context| ProjectionActivationViolation::InvalidActivatedReference { context })?
+        .assignment_id
+        .clone();
+    let _ = insert_assignment_id(p, c, w, &assignment_id, prov)?;
+    Ok(())
+}
+
+fn add_optional_context(
+    p: &SemanticSpaceProjection,
+    c: &ProjectionActivationConfig,
+    w: &mut Work,
+    direct: &SemanticAddress,
+    prov: &[ActivationProvenance],
+    band: &ProjectionActivationProbeBand,
+) -> Result<(), ProjectionActivationViolation> {
+    match direct {
+        SemanticAddress::Object(id) => materialize_object_children(p, c, w, id, prov, band)?,
+        SemanticAddress::Region(id) => materialize_region_units(p, c, w, id, prov, band)?,
+        _ => {}
+    }
+    Ok(())
+}
+
+fn materialize_object_children(
+    p: &SemanticSpaceProjection,
+    c: &ProjectionActivationConfig,
+    w: &mut Work,
+    id: &crate::model::SemanticObjectId,
+    prov: &[ActivationProvenance],
+    band: &ProjectionActivationProbeBand,
+) -> Result<(), ProjectionActivationViolation> {
+    let Some(object) = p.objects.iter().find(|o| &o.object_id == id) else {
+        return Ok(());
+    };
+    let limit = band_config(c, band).maximum_structural_neighbors_per_record as usize;
+    let mut used = w
+        .objects
+        .iter()
+        .find(|o| &o.object_id == id)
+        .map(|o| o.visible_region_addresses.len() + o.visible_unit_ids.len())
+        .unwrap_or(0);
+    for region in &object.region_addresses {
         if used >= limit {
             break;
         }
-        if w.regions.iter().any(|x| &x.address == r) {
-            visible_regions.push(r.clone());
-            used += 1;
-        }
-    }
-    for u in &o.unit_ids {
-        if used >= limit {
-            break;
-        }
-        if w.units.iter().any(|x| &x.unit_id == u) {
-            visible_units.push(u.clone());
-            used += 1;
-        }
-    }
-    if let Some(rec) = w.objects.iter_mut().find(|r| &r.object_id == id) {
-        for r in visible_regions {
-            push_unique(&mut rec.visible_region_addresses, r)
-        }
-        for u in visible_units {
-            push_unique(&mut rec.visible_unit_ids, u)
-        }
-    }
-    for aid in &o.identifier_assignment_ids {
-        if w.assignments.len() >= c.maximum_activated_identifier_assignments as usize {
-            break;
-        }
-        if let Some(ass) = p
-            .identifier_assignments
-            .iter()
-            .find(|a| &a.assignment_id == aid)
-        {
-            insert_one(
-                p,
-                c,
-                w,
-                &SemanticAddress::Identifier(crate::model::IdentifierAddress {
-                    identifier_name: ass.identifier_name.clone(),
-                    represented_value: identifier_value_string(&ass.value),
-                }),
-                &with_context(prov),
-            )?;
-            if let Some(rec) = w.objects.iter_mut().find(|r| &r.object_id == id) {
-                push_unique(&mut rec.visible_identifier_assignment_ids, aid.clone())
+        if insert_bundle(
+            p,
+            c,
+            w,
+            &SemanticAddress::Region(region.clone()),
+            prov,
+            band,
+        )? {
+            if let Some(record) = w.objects.iter_mut().find(|o| &o.object_id == id) {
+                push_unique(&mut record.visible_region_addresses, region.clone());
             }
+            used += 1;
+        } else {
+            w.bounded_probe_ids
+                .extend(w.telemetry.iter().map(|t| t.probe_id.clone()));
+            break;
+        }
+    }
+    for unit in &object.unit_ids {
+        if used >= limit {
+            break;
+        }
+        if insert_bundle(p, c, w, &SemanticAddress::Unit(unit.clone()), prov, band)? {
+            if let Some(record) = w.objects.iter_mut().find(|o| &o.object_id == id) {
+                push_unique(&mut record.visible_unit_ids, unit.clone());
+            }
+            used += 1;
+        } else {
+            w.bounded_probe_ids
+                .extend(w.telemetry.iter().map(|t| t.probe_id.clone()));
+            break;
+        }
+    }
+    enrich_object(p, c, w, id, prov, band)
+}
+
+fn materialize_region_units(
+    p: &SemanticSpaceProjection,
+    c: &ProjectionActivationConfig,
+    w: &mut Work,
+    id: &crate::model::SemanticRegionAddress,
+    prov: &[ActivationProvenance],
+    band: &ProjectionActivationProbeBand,
+) -> Result<(), ProjectionActivationViolation> {
+    let Some(region) = p.regions.iter().find(|r| &r.address == id) else {
+        return Ok(());
+    };
+    let limit = band_config(c, band).maximum_visible_units_per_region as usize;
+    let mut visible = w
+        .regions
+        .iter()
+        .find(|r| &r.address == id)
+        .map(|r| r.visible_unit_ids.len())
+        .unwrap_or(0);
+    for unit in &region.contained_unit_ids {
+        if visible >= limit {
+            break;
+        }
+        if insert_bundle(p, c, w, &SemanticAddress::Unit(unit.clone()), prov, band)? {
+            if let Some(record) = w.regions.iter_mut().find(|r| &r.address == id) {
+                push_unique(&mut record.visible_unit_ids, unit.clone());
+            }
+            visible += 1;
+        } else {
+            break;
+        }
+    }
+    enrich_region(p, c, w, id, prov, band)
+}
+
+fn enrich_object(
+    p: &SemanticSpaceProjection,
+    c: &ProjectionActivationConfig,
+    w: &mut Work,
+    id: &crate::model::SemanticObjectId,
+    prov: &[ActivationProvenance],
+    _band: &ProjectionActivationProbeBand,
+) -> Result<(), ProjectionActivationViolation> {
+    let Some(object) = p.objects.iter().find(|o| &o.object_id == id) else {
+        return Ok(());
+    };
+    for assignment_id in &object.identifier_assignment_ids {
+        if insert_assignment_id(p, c, w, assignment_id, prov)? {
+            if let Some(record) = w.objects.iter_mut().find(|o| &o.object_id == id) {
+                push_unique(
+                    &mut record.visible_identifier_assignment_ids,
+                    assignment_id.clone(),
+                );
+            }
+        } else {
+            break;
         }
     }
     Ok(())
 }
 fn enrich_region(
     p: &SemanticSpaceProjection,
+    c: &ProjectionActivationConfig,
     w: &mut Work,
     id: &crate::model::SemanticRegionAddress,
-    c: &ProjectionActivationConfig,
     prov: &[ActivationProvenance],
+    _band: &ProjectionActivationProbeBand,
 ) -> Result<(), ProjectionActivationViolation> {
-    let r = p.regions.iter().find(|r| &r.address == id).unwrap();
-    let mut ids = Vec::new();
-    for uid in r
-        .contained_unit_ids
-        .iter()
-        .take(c.unbanded.maximum_visible_units_per_region as usize)
-    {
-        if w.units.iter().any(|u| &u.unit_id == uid) {
-            ids.push(uid.clone())
-        }
-    }
-    if let Some(rec) = w.regions.iter_mut().find(|x| &x.address == id) {
-        for uid in ids {
-            push_unique(&mut rec.visible_unit_ids, uid)
-        }
-    }
-    for aid in &r.inherited_identifier_assignment_ids {
-        if w.assignments.len() >= c.maximum_activated_identifier_assignments as usize {
-            break;
-        }
-        if let Some(ass) = p
-            .identifier_assignments
-            .iter()
-            .find(|a| &a.assignment_id == aid)
-        {
-            insert_one(
-                p,
-                c,
-                w,
-                &SemanticAddress::Identifier(crate::model::IdentifierAddress {
-                    identifier_name: ass.identifier_name.clone(),
-                    represented_value: identifier_value_string(&ass.value),
-                }),
-                &with_context(prov),
-            )?;
-            if let Some(rec) = w.regions.iter_mut().find(|x| &x.address == id) {
-                push_unique(&mut rec.visible_identifier_assignment_ids, aid.clone())
+    let Some(region) = p.regions.iter().find(|r| &r.address == id) else {
+        return Ok(());
+    };
+    for assignment_id in &region.inherited_identifier_assignment_ids {
+        if insert_assignment_id(p, c, w, assignment_id, prov)? {
+            if let Some(record) = w.regions.iter_mut().find(|r| &r.address == id) {
+                push_unique(
+                    &mut record.visible_identifier_assignment_ids,
+                    assignment_id.clone(),
+                );
             }
+        } else {
+            break;
         }
     }
     Ok(())
 }
-fn with_context(prov: &[ActivationProvenance]) -> Vec<ActivationProvenance> {
-    let mut p = prov.to_vec();
-    push_unique(
-        &mut p,
-        ActivationProvenance::ConfiguredDefault {
-            configuration_key: "bounded_structural_context".into(),
-        },
-    );
-    p
+fn enrich_unit_identifiers(
+    p: &SemanticSpaceProjection,
+    c: &ProjectionActivationConfig,
+    w: &mut Work,
+    id: &crate::model::SemanticUnitId,
+    prov: &[ActivationProvenance],
+) -> Result<(), ProjectionActivationViolation> {
+    let Some(unit) = p.units.iter().find(|u| &u.unit_id == id) else {
+        return Ok(());
+    };
+    for assignment_id in &unit.inherited_identifier_assignment_ids {
+        if insert_assignment_id(p, c, w, assignment_id, prov)? {
+            if let Some(record) = w.units.iter_mut().find(|u| &u.unit_id == id) {
+                push_unique(
+                    &mut record.visible_inherited_identifier_assignment_ids,
+                    assignment_id.clone(),
+                );
+            }
+        } else {
+            break;
+        }
+    }
+    for assignment_id in &unit.unit_local_identifier_assignment_ids {
+        if insert_assignment_id(p, c, w, assignment_id, prov)? {
+            if let Some(record) = w.units.iter_mut().find(|u| &u.unit_id == id) {
+                push_unique(
+                    &mut record.visible_unit_local_identifier_assignment_ids,
+                    assignment_id.clone(),
+                );
+            }
+        } else {
+            break;
+        }
+    }
+    Ok(())
+}
+
+fn has_object(w: &Work, a: &SemanticAddress) -> bool {
+    matches!(a, SemanticAddress::Object(id) if w.objects.iter().any(|r| &r.object_id == id))
+}
+fn has_region(w: &Work, a: &SemanticAddress) -> bool {
+    matches!(a, SemanticAddress::Region(id) if w.regions.iter().any(|r| &r.address == id))
+}
+fn has_unit(w: &Work, a: &SemanticAddress) -> bool {
+    matches!(a, SemanticAddress::Unit(id) if w.units.iter().any(|r| &r.unit_id == id))
+}
+fn has_occurrence(w: &Work, a: &SemanticAddress) -> bool {
+    matches!(a, SemanticAddress::Occurrence(id) if w.occurrences.iter().any(|r| &r.occurrence_id == id))
+}
+fn has_anchor(w: &Work, a: &SemanticAddress) -> bool {
+    matches!(a, SemanticAddress::TemporalAnchor(id) if w.anchors.iter().any(|r| &r.anchor_id == id))
+}
+fn has_assignment(w: &Work, a: &SemanticAddress, p: &SemanticSpaceProjection) -> bool {
+    resolve_identifier_assignment(p, a).is_ok_and(|assignment| {
+        w.assignments
+            .iter()
+            .any(|r| r.assignment_id == assignment.assignment_id)
+    })
+}
+fn visible(p: &SemanticSpaceProjection, w: &Work, a: &SemanticAddress) -> bool {
+    match a {
+        SemanticAddress::RetrievalSurface(_) => false,
+        SemanticAddress::Identifier(_) => has_assignment(w, a, p),
+        _ => {
+            has_object(w, a)
+                || has_region(w, a)
+                || has_unit(w, a)
+                || has_occurrence(w, a)
+                || has_anchor(w, a)
+        }
+    }
 }
 
 fn add_surface_handle(
     p: &SemanticSpaceProjection,
     ps: &ProblemSpaceState,
+    u: &ActivationUtterance,
     c: &ProjectionActivationConfig,
     w: &mut Work,
     probe: &ProjectionActivationProbe,
@@ -1527,12 +1897,10 @@ fn add_surface_handle(
     let Some(cont) = &res.continuation else {
         return Ok(false);
     };
-    if c.continuation_page_limit == 0 {
+    if c.continuation_page_limit == 0 || w.handles.len() >= c.maximum_continuation_handles as usize
+    {
         return Ok(false);
-    };
-    if w.handles.len() >= c.maximum_continuation_handles as usize {
-        return Ok(false);
-    };
+    }
     let origin = match &probe.source {
         ProjectionActivationProbeSource::Text { text } => ContinuationOrigin::TextProbe {
             query_text: text.clone(),
@@ -1550,24 +1918,14 @@ fn add_surface_handle(
             end: None,
         },
     };
-    let handle_id = format!("activation-continuation:{}", w.handles.len());
+    let handle_id = next_id("activation-continuation", &mut w.continuation_counter)?;
     w.handles.push(ContinuationHandle {
         handle_id,
         projection_snapshot_id: p.projection_snapshot_id.clone(),
         configuration_snapshot_id: c.configuration_snapshot_id.clone(),
         problem_space_thread_id: ps.thread_id.clone(),
         problem_space_version: ps.version,
-        newest_utterance_id: probe
-            .activation_provenance
-            .iter()
-            .find_map(|x| {
-                if let ActivationProvenance::NewestUtterance { utterance_id } = x {
-                    Some(utterance_id.clone())
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_default(),
+        newest_utterance_id: u.utterance_id.clone(),
         origin,
         access: ContinuationAccess::RetrievalSurface {
             surface_id: probe.surface_id.clone(),
@@ -1585,115 +1943,148 @@ fn add_surface_handle(
     Ok(true)
 }
 
+fn remember_edge_provenance(w: &mut Work, edge: EdgeTuple, provenance: &[ActivationProvenance]) {
+    if let Some((_, existing)) = w
+        .edge_provenance
+        .iter_mut()
+        .find(|(known, _)| known == &edge)
+    {
+        merge(existing, provenance);
+    } else {
+        w.edge_provenance.push((edge, provenance.to_vec()));
+    }
+}
+fn provenance_for_edge(w: &Work, edge: &EdgeTuple) -> Vec<ActivationProvenance> {
+    w.edge_provenance
+        .iter()
+        .find(|(known, _)| known == edge)
+        .map(|(_, provenance)| provenance.clone())
+        .unwrap_or_else(|| {
+            vec![ActivationProvenance::ConfiguredDefault {
+                configuration_key: "bounded_structural_context".into(),
+            }]
+        })
+}
+
 fn build_visible_edges_and_structure_handles(
     p: &SemanticSpaceProjection,
     ps: &ProblemSpaceState,
+    u: &ActivationUtterance,
     c: &ProjectionActivationConfig,
     w: &mut Work,
 ) -> Result<(), ProjectionActivationViolation> {
-    let order = w.order.clone();
-    let mut tuples = Vec::new();
-    for source in order {
-        for e in enumerate_edges(p, &source) {
-            if visible(w, &e.source) && visible(w, &e.target) && !tuples.contains(&e) {
-                tuples.push(e)
+    let mut visible_edges = Vec::<EdgeTuple>::new();
+    for source in w.order.clone() {
+        for edge in enumerate_edges(p, &source) {
+            if visible(p, w, &edge.source)
+                && visible(p, w, &edge.target)
+                && !matches!(edge.target, SemanticAddress::RetrievalSurface(_))
+                && !visible_edges.contains(&edge)
+            {
+                visible_edges.push(edge);
             }
         }
     }
-    for e in tuples {
+    for edge in &visible_edges {
         if w.edges.len() >= c.maximum_activated_edges as usize {
+            w.bounded_probe_ids
+                .extend(w.telemetry.iter().map(|t| t.probe_id.clone()));
             break;
         }
-        let id = format!("activated-edge:{}", w.edges.len());
+        let edge_id = next_id("activated-edge", &mut w.edge_counter)?;
         w.edges.push(ActivatedEdge {
-            edge_id: id,
-            source: e.source,
-            transition_id: e.transition_id,
-            direction: e.direction,
-            target: e.target,
-            activation_provenance: vec![ActivationProvenance::ConfiguredDefault {
-                configuration_key: "bounded_structural_context".into(),
-            }],
+            edge_id,
+            source: edge.source.clone(),
+            transition_id: edge.transition_id.clone(),
+            direction: edge.direction.clone(),
+            target: edge.target.clone(),
+            activation_provenance: provenance_for_edge(w, edge),
         });
     }
     if c.continuation_page_limit > 0 {
         for source in w.order.clone() {
             let all = enumerate_edges(p, &source);
-            let visible_count = all
-                .iter()
-                .filter(|e| visible(w, &e.source) && visible(w, &e.target))
-                .count() as u64;
-            if all.len() as u64 > visible_count
-                && w.handles.len() < c.maximum_continuation_handles as usize
-            {
-                if let Some(e) = all.first() {
-                    let degree = all.len() as u64;
-                    let key = if degree >= c.hub_degree_threshold {
-                        "high_degree_summary"
-                    } else {
-                        "bounded_structural_context"
-                    };
-                    let id = format!("activation-continuation:{}", w.handles.len());
-                    w.handles.push(ContinuationHandle {
-                        handle_id: id,
-                        projection_snapshot_id: p.projection_snapshot_id.clone(),
-                        configuration_snapshot_id: c.configuration_snapshot_id.clone(),
-                        problem_space_thread_id: ps.thread_id.clone(),
-                        problem_space_version: ps.version,
-                        newest_utterance_id: String::new(),
-                        origin: ContinuationOrigin::StructuralNeighbourhood {
-                            subject: source.clone(),
-                            transition_id: Some(e.transition_id.clone()),
-                            direction: Some(e.direction.clone()),
-                        },
-                        access: ContinuationAccess::ProjectionStructure,
-                        filters: vec![ContinuationFilter::Transition {
-                            transition_id: e.transition_id.clone(),
-                        }],
-                        ordering: ContinuationOrdering::ProjectionVectorOrder,
-                        next_offset: visible_count,
-                        remaining_count: Some(all.len() as u64 - visible_count),
-                        next_page_limit: c.continuation_page_limit,
-                        activation_provenance: vec![ActivationProvenance::ConfiguredDefault {
-                            configuration_key: key.into(),
-                        }],
-                    });
+            let degree = u64::try_from(all.len())
+                .map_err(|_| ProjectionActivationViolation::CountOverflow)?;
+            let mut grouped: Vec<(&String, &Direction, Vec<&EdgeTuple>)> = Vec::new();
+            for edge in &all {
+                if let Some((_, _, targets)) = grouped
+                    .iter_mut()
+                    .find(|(tid, dir, _)| *tid == &edge.transition_id && *dir == &edge.direction)
+                {
+                    targets.push(edge);
+                } else {
+                    grouped.push((&edge.transition_id, &edge.direction, vec![edge]));
                 }
             }
+            for (transition_id, direction, group) in grouped {
+                let visible_count_usize = group
+                    .iter()
+                    .filter(|edge| {
+                        visible(p, w, &edge.source)
+                            && visible(p, w, &edge.target)
+                            && w.edges.iter().any(|activated| {
+                                activated.source == edge.source
+                                    && activated.transition_id == edge.transition_id
+                                    && activated.direction == edge.direction
+                                    && activated.target == edge.target
+                            })
+                    })
+                    .count();
+                if visible_count_usize >= group.len() && degree < c.hub_degree_threshold {
+                    continue;
+                }
+                if w.handles.len() >= c.maximum_continuation_handles as usize {
+                    w.bounded_probe_ids
+                        .extend(w.telemetry.iter().map(|t| t.probe_id.clone()));
+                    break;
+                }
+                let visible_count = u64::try_from(visible_count_usize)
+                    .map_err(|_| ProjectionActivationViolation::CountOverflow)?;
+                let total = u64::try_from(group.len())
+                    .map_err(|_| ProjectionActivationViolation::CountOverflow)?;
+                let remaining = total.saturating_sub(visible_count);
+                let key = if degree >= c.hub_degree_threshold {
+                    "high_degree_summary"
+                } else {
+                    "bounded_structural_context"
+                };
+                let handle_id = next_id("activation-continuation", &mut w.continuation_counter)?;
+                w.handles.push(ContinuationHandle {
+                    handle_id,
+                    projection_snapshot_id: p.projection_snapshot_id.clone(),
+                    configuration_snapshot_id: c.configuration_snapshot_id.clone(),
+                    problem_space_thread_id: ps.thread_id.clone(),
+                    problem_space_version: ps.version,
+                    newest_utterance_id: u.utterance_id.clone(),
+                    origin: ContinuationOrigin::StructuralNeighbourhood {
+                        subject: source.clone(),
+                        transition_id: Some(transition_id.clone()),
+                        direction: Some(direction.clone()),
+                    },
+                    access: ContinuationAccess::ProjectionStructure,
+                    filters: vec![ContinuationFilter::Transition {
+                        transition_id: transition_id.clone(),
+                    }],
+                    ordering: ContinuationOrdering::ProjectionVectorOrder,
+                    next_offset: visible_count,
+                    remaining_count: Some(remaining),
+                    next_page_limit: c.continuation_page_limit,
+                    activation_provenance: vec![ActivationProvenance::ConfiguredDefault {
+                        configuration_key: key.into(),
+                    }],
+                });
+            }
+        }
+    }
+    for telemetry in &mut w.telemetry {
+        if w.bounded_probe_ids.contains(&telemetry.probe_id) {
+            telemetry.truncation_state = TruncationState::Bounded;
         }
     }
     Ok(())
 }
-fn visible(w: &Work, a: &SemanticAddress) -> bool {
-    has_object(w, a)
-        || has_region(w, a)
-        || has_unit(w, a)
-        || has_assignment(
-            w,
-            a,
-            &SemanticSpaceProjection {
-                projection_snapshot_id: String::new(),
-                ingest_identity: String::new(),
-                schema_version: String::new(),
-                logical_hash: String::new(),
-                corpus_snapshot_identity: String::new(),
-                configuration_snapshot_id: String::new(),
-                validation_status: ProjectionValidationStatus::Validated,
-                object_classes: vec![],
-                objects: vec![],
-                regions: vec![],
-                units: vec![],
-                identifier_descriptors: vec![],
-                identifier_assignments: vec![],
-                occurrences: vec![],
-                temporal_anchors: vec![],
-                retrieval_surfaces: vec![],
-                valid_transitions: vec![],
-            },
-        )
-        || has_occurrence(w, a)
-        || has_anchor(w, a)
-}
+
 fn edge_exists(
     p: &SemanticSpaceProjection,
     source: &SemanticAddress,
@@ -1707,69 +2098,119 @@ fn edge_exists(
 }
 fn enumerate_edges(p: &SemanticSpaceProjection, source: &SemanticAddress) -> Vec<EdgeTuple> {
     let mut out = Vec::new();
-    for t in &p.valid_transitions {
-        if t.from != source.kind() {
-            continue;
+    for transition in &p.valid_transitions {
+        if transition.from == source.kind() {
+            append_transition_edges(p, source, transition, &mut out);
         }
-        append_transition_edges(p, source, t, &mut out);
     }
     out
 }
 fn add_edge(
     out: &mut Vec<EdgeTuple>,
     source: &SemanticAddress,
-    t: &StructuralTransition,
+    transition: &StructuralTransition,
     target: SemanticAddress,
 ) {
-    let e = EdgeTuple {
+    if source.kind() != transition.from || target.kind() != transition.to {
+        return;
+    }
+    let edge = EdgeTuple {
         source: source.clone(),
-        transition_id: t.transition_id.clone(),
-        direction: t.direction.clone(),
+        transition_id: transition.transition_id.clone(),
+        direction: transition.direction.clone(),
         target,
     };
-    if !out.contains(&e) {
-        out.push(e)
+    if !out.contains(&edge) {
+        out.push(edge);
     }
 }
 fn append_transition_edges(
     p: &SemanticSpaceProjection,
     source: &SemanticAddress,
+    transition: &StructuralTransition,
+    out: &mut Vec<EdgeTuple>,
+) {
+    match transition.operation {
+        StructuralTransitionOperation::Containment => {
+            append_containment_edges(p, source, transition, out)
+        }
+        StructuralTransitionOperation::Parent => append_parent_edges(p, source, transition, out),
+        StructuralTransitionOperation::Occurrence => {
+            append_occurrence_edges(p, source, transition, out)
+        }
+        StructuralTransitionOperation::Identifier => {
+            append_identifier_edges(p, source, transition, out)
+        }
+        StructuralTransitionOperation::TemporalAnchor => {
+            append_temporal_edges(p, source, transition, out)
+        }
+        StructuralTransitionOperation::Hydration => {
+            append_hydration_edges(p, source, transition, out)
+        }
+        StructuralTransitionOperation::RetrievalSurface => {
+            append_retrieval_surface_edges(source, transition, out)
+        }
+    }
+}
+fn append_containment_edges(
+    p: &SemanticSpaceProjection,
+    source: &SemanticAddress,
     t: &StructuralTransition,
     out: &mut Vec<EdgeTuple>,
 ) {
-    match t.operation {
-        StructuralTransitionOperation::Containment => match source {
-            SemanticAddress::Object(id) => {
-                if let Some(o) = p.objects.iter().find(|o| &o.object_id == id) {
-                    for r in &o.region_addresses {
-                        add_edge(out, source, t, SemanticAddress::Region(r.clone()))
+    match source {
+        SemanticAddress::Object(id) => {
+            if let Some(o) = p.objects.iter().find(|o| &o.object_id == id) {
+                match t.to {
+                    AddressKind::SemanticRegion => {
+                        for r in &o.region_addresses {
+                            add_edge(out, source, t, SemanticAddress::Region(r.clone()));
+                        }
                     }
-                    for u in &o.unit_ids {
-                        add_edge(out, source, t, SemanticAddress::Unit(u.clone()))
+                    AddressKind::SemanticUnit => {
+                        for u in &o.unit_ids {
+                            add_edge(out, source, t, SemanticAddress::Unit(u.clone()));
+                        }
                     }
+                    _ => {}
                 }
             }
-            SemanticAddress::Region(id) => {
-                if let Some(r) = p.regions.iter().find(|r| &r.address == id) {
-                    for cr in &r.child_region_addresses {
-                        add_edge(out, source, t, SemanticAddress::Region(cr.clone()))
+        }
+        SemanticAddress::Region(id) => {
+            if let Some(r) = p.regions.iter().find(|r| &r.address == id) {
+                match t.to {
+                    AddressKind::SemanticRegion => {
+                        for r in &r.child_region_addresses {
+                            add_edge(out, source, t, SemanticAddress::Region(r.clone()));
+                        }
                     }
-                    for u in &r.contained_unit_ids {
-                        add_edge(out, source, t, SemanticAddress::Unit(u.clone()))
+                    AddressKind::SemanticUnit => {
+                        for u in &r.contained_unit_ids {
+                            add_edge(out, source, t, SemanticAddress::Unit(u.clone()));
+                        }
                     }
+                    AddressKind::SemanticObject => add_edge(
+                        out,
+                        source,
+                        t,
+                        SemanticAddress::Object(id.object_id.clone()),
+                    ),
+                    _ => {}
                 }
             }
-            _ => {}
-        },
-        StructuralTransitionOperation::Parent => match source {
-            SemanticAddress::Unit(id) => {
-                if let Some(u) = p.units.iter().find(|u| &u.unit_id == id) {
+        }
+        SemanticAddress::Unit(id)
+            if t.to == AddressKind::SemanticObject || t.to == AddressKind::SemanticRegion =>
+        {
+            if let Some(u) = p.units.iter().find(|u| &u.unit_id == id) {
+                if t.to == AddressKind::SemanticObject {
                     add_edge(
                         out,
                         source,
                         t,
                         SemanticAddress::Object(u.parent_object_id.clone()),
                     );
+                } else {
                     add_edge(
                         out,
                         source,
@@ -1778,88 +2219,230 @@ fn append_transition_edges(
                     );
                 }
             }
-            SemanticAddress::Region(id) => add_edge(
-                out,
-                source,
-                t,
-                SemanticAddress::Object(id.object_id.clone()),
-            ),
-            _ => {}
-        },
-        StructuralTransitionOperation::Occurrence => match source {
-            SemanticAddress::Object(id) => {
-                if let Some(o) = p.objects.iter().find(|o| &o.object_id == id) {
-                    for oid in o
-                        .object_field_occurrence_ids
-                        .iter()
-                        .chain(o.body_occurrence_ids.iter())
-                        .chain(o.incoming_occurrence_ids.iter())
-                    {
-                        add_edge(out, source, t, SemanticAddress::Occurrence(oid.clone()))
-                    }
-                }
-            }
-            SemanticAddress::Unit(id) => {
-                if let Some(u) = p.units.iter().find(|u| &u.unit_id == id) {
-                    for oid in u
-                        .outgoing_occurrence_ids
-                        .iter()
-                        .chain(u.incoming_occurrence_ids.iter())
-                    {
-                        add_edge(out, source, t, SemanticAddress::Occurrence(oid.clone()))
-                    }
-                }
-            }
-            SemanticAddress::Occurrence(id) => {
-                if let Some(o) = p.occurrences.iter().find(|o| &o.occurrence_id == id) {
-                    add_edge(out, source, t, o.resolved_target.clone());
-                    match &o.source {
-                        OccurrenceSource::ObjectField { object_id, .. } => {
-                            add_edge(out, source, t, SemanticAddress::Object(object_id.clone()))
-                        }
-                        OccurrenceSource::SemanticUnit { unit_id } => {
-                            add_edge(out, source, t, SemanticAddress::Unit(unit_id.clone()))
-                        }
-                    }
-                }
-            }
-            _ => {}
-        },
-        StructuralTransitionOperation::Identifier => {
-            for ass in &p.identifier_assignments {
-                if &ass.subject == source {
-                    add_edge(
+        }
+        _ => {}
+    }
+}
+fn append_parent_edges(
+    p: &SemanticSpaceProjection,
+    source: &SemanticAddress,
+    t: &StructuralTransition,
+    out: &mut Vec<EdgeTuple>,
+) {
+    match source {
+        SemanticAddress::Unit(id) => {
+            if let Some(u) = p.units.iter().find(|u| &u.unit_id == id) {
+                match t.to {
+                    AddressKind::SemanticObject => add_edge(
                         out,
                         source,
                         t,
-                        SemanticAddress::Identifier(crate::model::IdentifierAddress {
-                            identifier_name: ass.identifier_name.clone(),
-                            represented_value: identifier_value_string(&ass.value),
-                        }),
-                    );
+                        SemanticAddress::Object(u.parent_object_id.clone()),
+                    ),
+                    AddressKind::SemanticRegion => add_edge(
+                        out,
+                        source,
+                        t,
+                        SemanticAddress::Region(u.parent_region_address.clone()),
+                    ),
+                    _ => {}
                 }
             }
         }
-        StructuralTransitionOperation::TemporalAnchor => match source {
-            SemanticAddress::Object(_) | SemanticAddress::Unit(_) => {
-                for a in p.temporal_anchors.iter().filter(|a| &a.subject == source) {
-                    add_edge(
-                        out,
-                        source,
-                        t,
-                        SemanticAddress::TemporalAnchor(a.anchor_id.clone()),
-                    )
+        SemanticAddress::Region(id) if t.to == AddressKind::SemanticObject => add_edge(
+            out,
+            source,
+            t,
+            SemanticAddress::Object(id.object_id.clone()),
+        ),
+        SemanticAddress::Object(id) => {
+            if let Some(o) = p.objects.iter().find(|o| &o.object_id == id) {
+                match t.to {
+                    AddressKind::SemanticRegion => {
+                        for r in &o.region_addresses {
+                            add_edge(out, source, t, SemanticAddress::Region(r.clone()));
+                        }
+                    }
+                    AddressKind::SemanticUnit => {
+                        for u in &o.unit_ids {
+                            add_edge(out, source, t, SemanticAddress::Unit(u.clone()));
+                        }
+                    }
+                    _ => {}
                 }
             }
-            SemanticAddress::TemporalAnchor(id) => {
-                if let Some(a) = p.temporal_anchors.iter().find(|a| &a.anchor_id == id) {
-                    add_edge(out, source, t, a.subject.clone())
+        }
+        _ => {}
+    }
+}
+fn append_occurrence_edges(
+    p: &SemanticSpaceProjection,
+    source: &SemanticAddress,
+    t: &StructuralTransition,
+    out: &mut Vec<EdgeTuple>,
+) {
+    match (source, &t.direction) {
+        (SemanticAddress::Object(id), Direction::Outgoing) => {
+            if let Some(o) = p.objects.iter().find(|o| &o.object_id == id) {
+                for oid in o
+                    .object_field_occurrence_ids
+                    .iter()
+                    .chain(o.body_occurrence_ids.iter())
+                {
+                    add_edge(out, source, t, SemanticAddress::Occurrence(oid.clone()));
                 }
             }
-            _ => {}
-        },
-        StructuralTransitionOperation::Hydration => {}
-        StructuralTransitionOperation::RetrievalSurface => {}
+        }
+        (SemanticAddress::Object(id), Direction::Incoming) => {
+            if let Some(o) = p.objects.iter().find(|o| &o.object_id == id) {
+                for oid in &o.incoming_occurrence_ids {
+                    add_edge(out, source, t, SemanticAddress::Occurrence(oid.clone()));
+                }
+            }
+        }
+        (SemanticAddress::Region(id), Direction::Incoming) => {
+            if let Some(r) = p.regions.iter().find(|r| &r.address == id) {
+                for oid in &r.incoming_occurrence_ids {
+                    add_edge(out, source, t, SemanticAddress::Occurrence(oid.clone()));
+                }
+            }
+        }
+        (SemanticAddress::Unit(id), Direction::Outgoing) => {
+            if let Some(u) = p.units.iter().find(|u| &u.unit_id == id) {
+                for oid in &u.outgoing_occurrence_ids {
+                    add_edge(out, source, t, SemanticAddress::Occurrence(oid.clone()));
+                }
+            }
+        }
+        (SemanticAddress::Unit(id), Direction::Incoming) => {
+            if let Some(u) = p.units.iter().find(|u| &u.unit_id == id) {
+                for oid in &u.incoming_occurrence_ids {
+                    add_edge(out, source, t, SemanticAddress::Occurrence(oid.clone()));
+                }
+            }
+        }
+        (SemanticAddress::Occurrence(id), Direction::Outgoing) => {
+            if let Some(o) = p.occurrences.iter().find(|o| &o.occurrence_id == id) {
+                add_edge(out, source, t, o.resolved_target.clone());
+            }
+        }
+        (SemanticAddress::Occurrence(id), Direction::Incoming) => {
+            if let Some(o) = p.occurrences.iter().find(|o| &o.occurrence_id == id) {
+                match &o.source {
+                    OccurrenceSource::ObjectField { object_id, .. } => {
+                        add_edge(out, source, t, SemanticAddress::Object(object_id.clone()))
+                    }
+                    OccurrenceSource::SemanticUnit { unit_id } => {
+                        add_edge(out, source, t, SemanticAddress::Unit(unit_id.clone()))
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+}
+fn append_identifier_edges(
+    p: &SemanticSpaceProjection,
+    source: &SemanticAddress,
+    t: &StructuralTransition,
+    out: &mut Vec<EdgeTuple>,
+) {
+    match source {
+        SemanticAddress::Identifier(_) => {
+            if let Ok(assignment) = resolve_identifier_assignment(p, source) {
+                add_edge(out, source, t, assignment.subject.clone());
+            }
+        }
+        _ => {
+            for assignment in p
+                .identifier_assignments
+                .iter()
+                .filter(|assignment| &assignment.subject == source)
+            {
+                add_edge(
+                    out,
+                    source,
+                    t,
+                    SemanticAddress::Identifier(crate::model::IdentifierAddress {
+                        identifier_name: assignment.identifier_name.clone(),
+                        represented_value: identifier_value_string(&assignment.value),
+                    }),
+                );
+            }
+        }
+    }
+}
+fn append_temporal_edges(
+    p: &SemanticSpaceProjection,
+    source: &SemanticAddress,
+    t: &StructuralTransition,
+    out: &mut Vec<EdgeTuple>,
+) {
+    match source {
+        SemanticAddress::Object(_) | SemanticAddress::Unit(_) => {
+            for anchor in p
+                .temporal_anchors
+                .iter()
+                .filter(|anchor| &anchor.subject == source)
+            {
+                add_edge(
+                    out,
+                    source,
+                    t,
+                    SemanticAddress::TemporalAnchor(anchor.anchor_id.clone()),
+                );
+            }
+        }
+        SemanticAddress::TemporalAnchor(id) => {
+            if let Some(anchor) = p
+                .temporal_anchors
+                .iter()
+                .find(|anchor| &anchor.anchor_id == id)
+            {
+                add_edge(out, source, t, anchor.subject.clone());
+            }
+        }
+        _ => {}
+    }
+}
+fn append_hydration_edges(
+    p: &SemanticSpaceProjection,
+    source: &SemanticAddress,
+    t: &StructuralTransition,
+    out: &mut Vec<EdgeTuple>,
+) {
+    match source {
+        SemanticAddress::Occurrence(id) => {
+            if let Some(occurrence) = p
+                .occurrences
+                .iter()
+                .find(|occurrence| &occurrence.occurrence_id == id)
+            {
+                if matches!(occurrence.resolved_target, SemanticAddress::Unit(_)) {
+                    add_edge(out, source, t, occurrence.resolved_target.clone());
+                }
+            }
+        }
+        SemanticAddress::Unit(id) => add_edge(out, source, t, SemanticAddress::Unit(id.clone())),
+        _ => {}
+    }
+}
+fn append_retrieval_surface_edges(
+    source: &SemanticAddress,
+    t: &StructuralTransition,
+    out: &mut Vec<EdgeTuple>,
+) {
+    if t.to == AddressKind::RetrievalSurface {
+        if let Some(surface_id) = &t.retrieval_surface_id {
+            add_edge(
+                out,
+                source,
+                t,
+                SemanticAddress::RetrievalSurface(RetrievalSurfaceAddress {
+                    surface_id: surface_id.clone(),
+                }),
+            );
+        }
     }
 }
 
