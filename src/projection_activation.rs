@@ -832,26 +832,33 @@ fn dispatch_one_source<A: ProjectionActivationAccess + ?Sized>(
                 activation_provenance: probe_provenance.clone(),
             };
             for candidate in &result.candidates {
-                if !insert_bundle(p, c, w, &candidate.address, &exposure, &item.seed.band)? {
-                    bounded = true;
-                    w.bounded_probe_ids.insert(probe_id.clone());
-                    continue;
-                }
-                if let Some(transition) = &candidate.transition {
+                let direct_edge = candidate.transition.as_ref().map(|transition| {
                     let source = match &probe.source {
                         ProjectionActivationProbeSource::Address { address } => address.clone(),
                         _ => candidate.address.clone(),
                     };
-                    remember_edge_provenance(
-                        w,
-                        EdgeTuple {
-                            source,
-                            transition_id: transition.transition_id.clone(),
-                            direction: transition.direction.clone(),
-                            target: candidate.address.clone(),
-                        },
-                        &exposure,
-                    );
+                    EdgeTuple {
+                        source,
+                        transition_id: transition.transition_id.clone(),
+                        direction: transition.direction.clone(),
+                        target: candidate.address.clone(),
+                    }
+                });
+                if !insert_bundle(
+                    p,
+                    c,
+                    w,
+                    &candidate.address,
+                    &exposure,
+                    &item.seed.band,
+                    direct_edge.as_ref(),
+                )? {
+                    bounded = true;
+                    w.bounded_probe_ids.insert(probe_id.clone());
+                    continue;
+                }
+                if let Some(edge) = direct_edge {
+                    remember_edge_provenance(w, edge, &exposure);
                 }
                 if matches!(
                     item.source,
@@ -1298,6 +1305,7 @@ fn insert_bundle(
     direct: &SemanticAddress,
     exposure: &ExposureContext,
     band: &ProjectionActivationProbeBand,
+    direct_edge_to_skip: Option<&EdgeTuple>,
 ) -> Result<bool, ProjectionActivationViolation> {
     let mut required = Vec::new();
     closure_addresses(p, direct, &mut required)?;
@@ -1363,7 +1371,7 @@ fn insert_bundle(
         };
         insert_one(p, c, w, addr, provenance, band)?;
     }
-    register_context_edges(p, w, &required, &contextual);
+    register_context_edges(p, w, &required, &contextual, direct_edge_to_skip);
     add_optional_context(p, c, w, direct, &contextual, band)?;
     Ok(true)
 }
@@ -1373,12 +1381,14 @@ fn register_context_edges(
     w: &mut Work,
     addresses: &[SemanticAddress],
     exposure: &ExposureContext,
+    direct_edge_to_skip: Option<&EdgeTuple>,
 ) {
     for source in addresses {
         for edge in enumerate_edges(p, source) {
             if addresses.contains(&edge.target)
                 && visible(p, w, &edge.source)
                 && visible(p, w, &edge.target)
+                && direct_edge_to_skip != Some(&edge)
             {
                 remember_edge_provenance(w, edge, exposure);
             }
@@ -1793,6 +1803,13 @@ fn materialize_object_children(
         .map(|o| o.visible_region_addresses.len() + o.visible_unit_ids.len())
         .unwrap_or(0);
     for region in &object.region_addresses {
+        if w.objects
+            .iter()
+            .find(|o| &o.object_id == id)
+            .is_some_and(|record| record.visible_region_addresses.contains(region))
+        {
+            continue;
+        }
         if used >= limit {
             w.bounded_probe_ids.insert(exposure.probe_id.clone());
             break;
@@ -1804,6 +1821,7 @@ fn materialize_object_children(
             &SemanticAddress::Region(region.clone()),
             exposure,
             band,
+            None,
         )? {
             if let Some(record) = w.objects.iter_mut().find(|o| &o.object_id == id) {
                 push_unique(&mut record.visible_region_addresses, region.clone());
@@ -1811,10 +1829,17 @@ fn materialize_object_children(
             used += 1;
         } else {
             w.bounded_probe_ids.insert(exposure.probe_id.clone());
-            break;
+            return Ok(());
         }
     }
     for unit in &object.unit_ids {
+        if w.objects
+            .iter()
+            .find(|o| &o.object_id == id)
+            .is_some_and(|record| record.visible_unit_ids.contains(unit))
+        {
+            continue;
+        }
         if used >= limit {
             w.bounded_probe_ids.insert(exposure.probe_id.clone());
             break;
@@ -1826,6 +1851,7 @@ fn materialize_object_children(
             &SemanticAddress::Unit(unit.clone()),
             exposure,
             band,
+            None,
         )? {
             if let Some(record) = w.objects.iter_mut().find(|o| &o.object_id == id) {
                 push_unique(&mut record.visible_unit_ids, unit.clone());
@@ -1858,6 +1884,13 @@ fn materialize_region_units(
         .map(|r| r.visible_unit_ids.len())
         .unwrap_or(0);
     for unit in &region.contained_unit_ids {
+        if w.regions
+            .iter()
+            .find(|r| &r.address == id)
+            .is_some_and(|record| record.visible_unit_ids.contains(unit))
+        {
+            continue;
+        }
         if visible >= limit {
             w.bounded_probe_ids.insert(exposure.probe_id.clone());
             break;
@@ -1869,6 +1902,7 @@ fn materialize_region_units(
             &SemanticAddress::Unit(unit.clone()),
             exposure,
             band,
+            None,
         )? {
             if let Some(record) = w.regions.iter_mut().find(|r| &r.address == id) {
                 push_unique(&mut record.visible_unit_ids, unit.clone());
@@ -1981,7 +2015,7 @@ fn enrich_unit_identifiers(
             }
         } else {
             w.bounded_probe_ids.insert(exposure.probe_id.clone());
-            break;
+            return Ok(());
         }
     }
     for assignment_id in &unit.unit_local_identifier_assignment_ids {
@@ -2169,24 +2203,6 @@ fn exposure_for_edge(w: &Work, edge: &EdgeTuple) -> Option<ExposureAggregate> {
         .find(|(known, _)| known == edge)
         .map(|(_, exposure)| exposure.clone())
 }
-fn provenance_for_edge(
-    w: &Work,
-    edge: &EdgeTuple,
-) -> Result<Vec<ActivationProvenance>, ProjectionActivationViolation> {
-    let provenance = exposure_for_edge(w, edge)
-        .map(|exposure| exposure.activation_provenance)
-        .unwrap_or_default();
-    if provenance.is_empty() {
-        return Err(ProjectionActivationViolation::InvalidActivatedReference {
-            context: format!(
-                "activated edge has no exposure provenance: source={:?} transition={} direction={:?} target={:?}",
-                edge.source, edge.transition_id, edge.direction, edge.target
-            ),
-        });
-    }
-    Ok(provenance)
-}
-
 fn build_visible_edges_and_structure_handles(
     p: &SemanticSpaceProjection,
     ps: &ProblemSpaceState,
@@ -2207,11 +2223,25 @@ fn build_visible_edges_and_structure_handles(
         }
     }
     for edge in &visible_edges {
+        let exposure = exposure_for_edge(w, edge).ok_or_else(|| {
+            ProjectionActivationViolation::InvalidActivatedReference {
+                context: format!(
+                    "visible edge has no exposure provenance: source={:?} transition={} direction={:?} target={:?}",
+                    edge.source, edge.transition_id, edge.direction, edge.target
+                ),
+            }
+        })?;
+        if exposure.activation_provenance.is_empty() {
+            return Err(ProjectionActivationViolation::InvalidActivatedReference {
+                context: format!(
+                    "visible edge has empty exposure provenance: source={:?} transition={} direction={:?} target={:?}",
+                    edge.source, edge.transition_id, edge.direction, edge.target
+                ),
+            });
+        }
         if w.edges.len() >= c.maximum_activated_edges as usize {
-            if let Some(exposure) = exposure_for_edge(w, edge) {
-                for probe_id in exposure.probe_ids {
-                    w.bounded_probe_ids.insert(probe_id);
-                }
+            for probe_id in exposure.probe_ids {
+                w.bounded_probe_ids.insert(probe_id);
             }
             continue;
         }
@@ -2222,7 +2252,7 @@ fn build_visible_edges_and_structure_handles(
             transition_id: edge.transition_id.clone(),
             direction: edge.direction.clone(),
             target: edge.target.clone(),
-            activation_provenance: provenance_for_edge(w, edge)?,
+            activation_provenance: exposure.activation_provenance,
         });
     }
     for source in w.order.clone() {
@@ -2286,6 +2316,9 @@ fn build_visible_edges_and_structure_handles(
             for probe_id in &related.probe_ids {
                 w.bounded_probe_ids.insert(probe_id.clone());
             }
+            related
+                .activation_provenance
+                .retain(|provenance| !is_summary_policy_marker(provenance));
             push_unique(
                 &mut related.activation_provenance,
                 ActivationProvenance::ConfiguredDefault {
@@ -2345,6 +2378,15 @@ fn build_visible_edges_and_structure_handles(
         }
     }
     Ok(())
+}
+
+fn is_summary_policy_marker(provenance: &ActivationProvenance) -> bool {
+    matches!(
+        provenance,
+        ActivationProvenance::ConfiguredDefault { configuration_key }
+            if configuration_key == "bounded_structural_context"
+                || configuration_key == "high_degree_summary"
+    )
 }
 
 fn edge_exists(

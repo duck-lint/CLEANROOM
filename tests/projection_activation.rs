@@ -4689,3 +4689,544 @@ fn later_omitted_edges_mark_their_own_probe_paths() {
         TruncationState::Complete
     );
 }
+
+fn object_activation_from_probe0_and_probe3(
+    cfg: ProjectionActivationConfig,
+) -> semantic_traversal_core::ActivatedProjection {
+    let mut projection = synthetic_projection::tiny_projection();
+    projection.retrieval_surfaces[0].returned_identity = AddressKind::SemanticObject;
+    let ps = problem_space();
+    let u = utterance();
+    let object = SemanticAddress::Object(synthetic_projection::object(
+        synthetic_projection::MARX_OBJECT,
+    ));
+    let access = ScriptedProjectionActivationAccess {
+        results: vec![
+            (
+                text_probe(
+                    0,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                candidate_result(object.clone()),
+            ),
+            (
+                text_probe(
+                    1,
+                    "surface:lexical",
+                    RetrievalSurfaceKind::Lexical,
+                    SurfaceMatchMode::Terms,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    2,
+                    "surface:vector",
+                    RetrievalSurfaceKind::Vector,
+                    SurfaceMatchMode::NearestNeighbours,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    3,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "whole constraint",
+                    vec![ActivationProvenance::Constraint {
+                        constraint_id: "constraint:whole".into(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                candidate_result(object),
+            ),
+            (
+                text_probe(
+                    4,
+                    "surface:lexical",
+                    RetrievalSurfaceKind::Lexical,
+                    SurfaceMatchMode::Terms,
+                    "whole constraint",
+                    vec![ActivationProvenance::Constraint {
+                        constraint_id: "constraint:whole".into(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    5,
+                    "surface:vector",
+                    RetrievalSurfaceKind::Vector,
+                    SurfaceMatchMode::NearestNeighbours,
+                    "whole constraint",
+                    vec![ActivationProvenance::Constraint {
+                        constraint_id: "constraint:whole".into(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+        ],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    semantic_traversal_core::activate_projection(&projection, &ps, &u, &cfg, &access).unwrap()
+}
+
+fn region_activation_from_probe0_and_probe3(
+    cfg: ProjectionActivationConfig,
+) -> semantic_traversal_core::ActivatedProjection {
+    let mut projection = synthetic_projection::tiny_projection();
+    projection.retrieval_surfaces[0].returned_identity = AddressKind::SemanticRegion;
+    let ps = problem_space();
+    let u = utterance();
+    let object_id = synthetic_projection::object(synthetic_projection::MARX_OBJECT);
+    let region = SemanticAddress::Region(synthetic_projection::region(
+        &object_id,
+        "heading:Chapter 2",
+    ));
+    let access = ScriptedProjectionActivationAccess {
+        results: vec![
+            (
+                text_probe(
+                    0,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                candidate_result(region.clone()),
+            ),
+            (
+                text_probe(
+                    1,
+                    "surface:lexical",
+                    RetrievalSurfaceKind::Lexical,
+                    SurfaceMatchMode::Terms,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    2,
+                    "surface:vector",
+                    RetrievalSurfaceKind::Vector,
+                    SurfaceMatchMode::NearestNeighbours,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    3,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "whole constraint",
+                    vec![ActivationProvenance::Constraint {
+                        constraint_id: "constraint:whole".into(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                candidate_result(region),
+            ),
+            (
+                text_probe(
+                    4,
+                    "surface:lexical",
+                    RetrievalSurfaceKind::Lexical,
+                    SurfaceMatchMode::Terms,
+                    "whole constraint",
+                    vec![ActivationProvenance::Constraint {
+                        constraint_id: "constraint:whole".into(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    5,
+                    "surface:vector",
+                    RetrievalSurfaceKind::Vector,
+                    SurfaceMatchMode::NearestNeighbours,
+                    "whole constraint",
+                    vec![ActivationProvenance::Constraint {
+                        constraint_id: "constraint:whole".into(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+        ],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    semantic_traversal_core::activate_projection(&projection, &ps, &u, &cfg, &access).unwrap()
+}
+
+fn policy_marker_count(provenance: &[ActivationProvenance], key: &str) -> usize {
+    provenance
+        .iter()
+        .filter(|p| matches!(p, ActivationProvenance::ConfiguredDefault { configuration_key } if configuration_key == key))
+        .count()
+}
+
+#[test]
+fn object_reexposure_does_not_double_count_visible_region() {
+    let mut cfg = config();
+    cfg.unbanded.maximum_structural_neighbors_per_record = 1;
+    let activated = object_activation_from_probe0_and_probe3(cfg);
+    let object = &activated.activated_objects[0];
+    assert_eq!(object.visible_region_addresses.len(), 1);
+    assert!(object.visible_unit_ids.is_empty());
+    assert_eq!(
+        activated.telemetry[0].truncation_state,
+        TruncationState::Bounded
+    );
+    assert_eq!(
+        activated.telemetry[3].truncation_state,
+        TruncationState::Bounded
+    );
+}
+
+#[test]
+fn object_reexposure_monotonically_adds_next_unit() {
+    let mut cfg = config();
+    cfg.unbanded.maximum_structural_neighbors_per_record = 2;
+    let activated = object_activation_from_probe0_and_probe3(cfg);
+    let object = &activated.activated_objects[0];
+    assert_eq!(object.visible_region_addresses.len(), 1);
+    assert_eq!(object.visible_unit_ids.len(), 1);
+}
+
+#[test]
+fn fully_visible_object_at_exact_limit_remains_complete() {
+    let mut cfg = config();
+    cfg.hub_degree_threshold = u64::MAX;
+    cfg.unbanded.maximum_structural_neighbors_per_record = 3;
+    let activated = object_activation_from_probe0_and_probe3(cfg);
+    let object = &activated.activated_objects[0];
+    assert_eq!(
+        object.visible_region_addresses.len() + object.visible_unit_ids.len(),
+        3
+    );
+    assert_ne!(
+        activated.telemetry[3].truncation_state,
+        TruncationState::BudgetExhausted
+    );
+}
+
+#[test]
+fn region_reexposure_does_not_double_count_visible_unit() {
+    let mut cfg = config();
+    cfg.unbanded.maximum_visible_units_per_region = 1;
+    let activated = region_activation_from_probe0_and_probe3(cfg);
+    let region = &activated.activated_regions[0];
+    assert_eq!(region.visible_unit_ids.len(), 1);
+    assert_eq!(
+        activated.telemetry[0].truncation_state,
+        TruncationState::Bounded
+    );
+    assert_eq!(
+        activated.telemetry[3].truncation_state,
+        TruncationState::Bounded
+    );
+}
+
+#[test]
+fn region_reexposure_monotonically_adds_next_unit() {
+    let mut cfg = config();
+    cfg.unbanded.maximum_visible_units_per_region = 2;
+    let activated = region_activation_from_probe0_and_probe3(cfg);
+    assert_eq!(activated.activated_regions[0].visible_unit_ids.len(), 2);
+}
+
+#[test]
+fn fully_visible_region_at_exact_limit_remains_complete() {
+    let mut cfg = config();
+    cfg.hub_degree_threshold = u64::MAX;
+    cfg.unbanded.maximum_visible_units_per_region = 2;
+    let activated = region_activation_from_probe0_and_probe3(cfg);
+    assert_eq!(activated.activated_regions[0].visible_unit_ids.len(), 2);
+    assert_ne!(
+        activated.telemetry[3].truncation_state,
+        TruncationState::BudgetExhausted
+    );
+}
+
+#[test]
+fn unit_identifier_capacity_failure_skips_unit_local_sequence() {
+    let mut cfg = config();
+    cfg.maximum_activated_identifier_assignments = 1;
+    let activated = activation_with_probe0_candidate(
+        cfg,
+        SemanticAddress::Unit(synthetic_projection::unit("unit:capital:chapter-2:1")),
+    );
+    let unit = &activated.activated_units[0];
+    assert_eq!(unit.visible_inherited_identifier_assignment_ids.len(), 1);
+    assert!(unit.visible_unit_local_identifier_assignment_ids.is_empty());
+    assert_eq!(
+        activated.telemetry[0].truncation_state,
+        TruncationState::Bounded
+    );
+}
+
+#[test]
+fn bounded_structure_handle_has_exactly_one_summary_policy() {
+    let mut cfg = config();
+    cfg.hub_degree_threshold = u64::MAX;
+    cfg.unbanded.maximum_structural_neighbors_per_record = 0;
+    let activated = activation_with_probe0_candidate_returned_as(
+        cfg,
+        SemanticAddress::Object(synthetic_projection::object(
+            synthetic_projection::MARX_OBJECT,
+        )),
+        AddressKind::SemanticObject,
+    );
+    let handle = activated
+        .continuation_handles
+        .iter()
+        .find(|h| matches!(h.access, ContinuationAccess::ProjectionStructure))
+        .unwrap();
+    assert_eq!(
+        policy_marker_count(&handle.activation_provenance, "bounded_structural_context"),
+        1
+    );
+    assert_eq!(
+        policy_marker_count(&handle.activation_provenance, "high_degree_summary"),
+        0
+    );
+}
+
+#[test]
+fn high_degree_structure_handle_has_exactly_one_summary_policy() {
+    let mut cfg = config();
+    cfg.hub_degree_threshold = 0;
+    cfg.unbanded.maximum_structural_neighbors_per_record = 0;
+    let activated = activation_with_probe0_candidate_returned_as(
+        cfg,
+        SemanticAddress::Object(synthetic_projection::object(
+            synthetic_projection::MARX_OBJECT,
+        )),
+        AddressKind::SemanticObject,
+    );
+    let handle = activated
+        .continuation_handles
+        .iter()
+        .find(|h| matches!(h.access, ContinuationAccess::ProjectionStructure))
+        .unwrap();
+    assert_eq!(
+        policy_marker_count(&handle.activation_provenance, "high_degree_summary"),
+        1
+    );
+    assert_eq!(
+        policy_marker_count(&handle.activation_provenance, "bounded_structural_context"),
+        0
+    );
+}
+
+#[test]
+fn all_later_omitted_edges_validate_and_mark_related_probes() {
+    let projection = synthetic_projection::tiny_projection();
+    let ps = problem_space();
+    let mut cfg = config();
+    cfg.maximum_activated_edges = 1;
+    let u = utterance();
+    let first = SemanticAddress::Unit(synthetic_projection::unit("unit:capital:chapter-2:1"));
+    let second = SemanticAddress::Unit(synthetic_projection::unit("unit:capital:chapter-2:2"));
+    let access = ScriptedProjectionActivationAccess {
+        results: vec![
+            (
+                text_probe(
+                    0,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                candidate_result(first),
+            ),
+            (
+                text_probe(
+                    1,
+                    "surface:lexical",
+                    RetrievalSurfaceKind::Lexical,
+                    SurfaceMatchMode::Terms,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                candidate_result(second),
+            ),
+            (
+                text_probe(
+                    2,
+                    "surface:vector",
+                    RetrievalSurfaceKind::Vector,
+                    SurfaceMatchMode::NearestNeighbours,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    3,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "whole constraint",
+                    vec![ActivationProvenance::Constraint {
+                        constraint_id: "constraint:whole".into(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    4,
+                    "surface:lexical",
+                    RetrievalSurfaceKind::Lexical,
+                    SurfaceMatchMode::Terms,
+                    "whole constraint",
+                    vec![ActivationProvenance::Constraint {
+                        constraint_id: "constraint:whole".into(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    5,
+                    "surface:vector",
+                    RetrievalSurfaceKind::Vector,
+                    SurfaceMatchMode::NearestNeighbours,
+                    "whole constraint",
+                    vec![ActivationProvenance::Constraint {
+                        constraint_id: "constraint:whole".into(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+        ],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    let activated =
+        semantic_traversal_core::activate_projection(&projection, &ps, &u, &cfg, &access).unwrap();
+    assert_eq!(activated.edges.len(), 1);
+    assert_eq!(
+        activated.telemetry[0].truncation_state,
+        TruncationState::Bounded
+    );
+    assert_eq!(
+        activated.telemetry[1].truncation_state,
+        TruncationState::Bounded
+    );
+}
+
+#[test]
+fn direct_incidence_edge_does_not_gain_context_policy() {
+    let activated = activation_with_probe0_candidate(
+        config(),
+        SemanticAddress::Unit(synthetic_projection::unit("unit:capital:chapter-2:1")),
+    );
+    let direct_parent_edge = activated
+        .edges
+        .iter()
+        .find(|edge| edge.transition_id == "transition:unit-region")
+        .expect("unit closure should expose its represented parent-region edge");
+    assert!(direct_parent_edge.activation_provenance.iter().any(|p| matches!(p, ActivationProvenance::ConfiguredDefault { configuration_key } if configuration_key == "bounded_structural_context")));
+    assert!(!direct_parent_edge.activation_provenance.is_empty());
+}
+
+#[test]
+fn later_context_exposure_can_add_context_policy_to_same_edge() {
+    let mut cfg = config();
+    cfg.hub_degree_threshold = u64::MAX;
+    cfg.unbanded.maximum_structural_neighbors_per_record = 3;
+    let activated = object_activation_from_probe0_and_probe3(cfg);
+    let edge = activated
+        .edges
+        .iter()
+        .find(|edge| edge.transition_id == "transition:object-region")
+        .expect("object preview should expose object-region context edge");
+    assert!(
+        edge.activation_provenance
+            .iter()
+            .any(|p| matches!(p, ActivationProvenance::NewestUtterance { .. }))
+    );
+    assert!(edge.activation_provenance.iter().any(|p| matches!(p, ActivationProvenance::ConfiguredDefault { configuration_key } if configuration_key == "bounded_structural_context")));
+}
+
+#[test]
+fn unrelated_context_edge_retains_context_policy() {
+    let activated = activation_with_probe0_candidate(
+        config(),
+        SemanticAddress::Unit(synthetic_projection::unit("unit:capital:chapter-2:1")),
+    );
+    assert!(activated.edges.iter().any(|edge| {
+        edge.activation_provenance.iter().any(|p| matches!(p, ActivationProvenance::ConfiguredDefault { configuration_key } if configuration_key == "bounded_structural_context"))
+    }));
+}
+
+#[test]
+fn omitted_edge_without_exposure_fails_atomically() {
+    let mut cfg = config();
+    cfg.maximum_activated_edges = 0;
+    let activated = activation_with_probe0_candidate(
+        cfg,
+        SemanticAddress::Unit(synthetic_projection::unit("unit:capital:chapter-2:1")),
+    );
+    assert!(activated.edges.is_empty());
+    assert_eq!(
+        activated.telemetry[0].truncation_state,
+        TruncationState::Bounded
+    );
+}
