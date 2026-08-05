@@ -170,6 +170,7 @@ struct Work {
     order: Vec<SemanticAddress>,
     bounded_probe_ids: HashSet<String>,
     edge_provenance: Vec<(EdgeTuple, ExposureAggregate)>,
+    address_exposure: Vec<(SemanticAddress, ExposureAggregate)>,
     probe_counter: u64,
     telemetry_counter: u64,
     continuation_counter: u64,
@@ -1362,8 +1363,27 @@ fn insert_bundle(
         };
         insert_one(p, c, w, addr, provenance, band)?;
     }
+    register_context_edges(p, w, &required, &contextual);
     add_optional_context(p, c, w, direct, &contextual, band)?;
     Ok(true)
+}
+
+fn register_context_edges(
+    p: &SemanticSpaceProjection,
+    w: &mut Work,
+    addresses: &[SemanticAddress],
+    exposure: &ExposureContext,
+) {
+    for source in addresses {
+        for edge in enumerate_edges(p, source) {
+            if addresses.contains(&edge.target)
+                && visible(p, w, &edge.source)
+                && visible(p, w, &edge.target)
+            {
+                remember_edge_provenance(w, edge, exposure);
+            }
+        }
+    }
 }
 
 fn closure_addresses(
@@ -1446,6 +1466,7 @@ fn insert_one(
 ) -> Result<(), ProjectionActivationViolation> {
     match a {
         SemanticAddress::Object(id) => {
+            remember_address_exposure(w, a.clone(), exposure);
             if let Some(record) = w.objects.iter_mut().find(|r| &r.object_id == id) {
                 merge(
                     &mut record.activation_provenance,
@@ -1475,6 +1496,7 @@ fn insert_one(
             enrich_object(p, c, w, id, exposure, band)?;
         }
         SemanticAddress::Region(id) => {
+            remember_address_exposure(w, a.clone(), exposure);
             if let Some(record) = w.regions.iter_mut().find(|r| &r.address == id) {
                 merge(
                     &mut record.activation_provenance,
@@ -1497,6 +1519,7 @@ fn insert_one(
             enrich_region(p, c, w, id, exposure, band)?;
         }
         SemanticAddress::Unit(id) => {
+            remember_address_exposure(w, a.clone(), exposure);
             if let Some(record) = w.units.iter_mut().find(|r| &r.unit_id == id) {
                 merge(
                     &mut record.activation_provenance,
@@ -1538,6 +1561,7 @@ fn insert_one(
         }
         SemanticAddress::Identifier(_) => insert_assignment_address(p, c, w, a, exposure)?,
         SemanticAddress::Occurrence(id) => {
+            remember_address_exposure(w, a.clone(), exposure);
             if let Some(record) = w.occurrences.iter_mut().find(|r| &r.occurrence_id == id) {
                 merge(
                     &mut record.activation_provenance,
@@ -1565,6 +1589,7 @@ fn insert_one(
             }
         }
         SemanticAddress::TemporalAnchor(id) => {
+            remember_address_exposure(w, a.clone(), exposure);
             if let Some(record) = w.anchors.iter_mut().find(|r| &r.anchor_id == id) {
                 merge(
                     &mut record.activation_provenance,
@@ -1646,6 +1671,7 @@ fn insert_assignment_id(
             &mut record.activation_provenance,
             &exposure.activation_provenance,
         );
+        register_assignment_edge(p, w, assignment_id, exposure)?;
         return Ok(true);
     }
     if w.assignments.len() >= c.maximum_activated_identifier_assignments as usize {
@@ -1674,7 +1700,43 @@ fn insert_assignment_id(
             .unwrap_or_default(),
         activation_provenance: exposure.activation_provenance.clone(),
     });
+    register_assignment_edge(p, w, assignment_id, exposure)?;
     Ok(true)
+}
+
+fn register_assignment_edge(
+    p: &SemanticSpaceProjection,
+    w: &mut Work,
+    assignment_id: &str,
+    exposure: &ExposureContext,
+) -> Result<(), ProjectionActivationViolation> {
+    let assignment = p
+        .identifier_assignments
+        .iter()
+        .find(|a| a.assignment_id == assignment_id)
+        .ok_or_else(
+            || ProjectionActivationViolation::InvalidActivatedReference {
+                context: format!("assignment {assignment_id} missing"),
+            },
+        )?;
+    let address = SemanticAddress::Identifier(crate::model::IdentifierAddress {
+        identifier_name: assignment.identifier_name.clone(),
+        represented_value: identifier_value_string(&assignment.value),
+    });
+    for edge in enumerate_edges(p, &assignment.subject) {
+        if edge.target == address && visible(p, w, &edge.source) && visible(p, w, &edge.target) {
+            remember_edge_provenance(w, edge, exposure);
+        }
+    }
+    for edge in enumerate_edges(p, &address) {
+        if edge.target == assignment.subject
+            && visible(p, w, &edge.source)
+            && visible(p, w, &edge.target)
+        {
+            remember_edge_provenance(w, edge, exposure);
+        }
+    }
+    Ok(())
 }
 
 fn insert_assignment_address(
@@ -1684,6 +1746,7 @@ fn insert_assignment_address(
     address: &SemanticAddress,
     exposure: &ExposureContext,
 ) -> Result<(), ProjectionActivationViolation> {
+    remember_address_exposure(w, address.clone(), exposure);
     if !w.order.contains(address) {
         w.order.push(address.clone());
     }
@@ -1731,6 +1794,7 @@ fn materialize_object_children(
         .unwrap_or(0);
     for region in &object.region_addresses {
         if used >= limit {
+            w.bounded_probe_ids.insert(exposure.probe_id.clone());
             break;
         }
         if insert_bundle(
@@ -1752,6 +1816,7 @@ fn materialize_object_children(
     }
     for unit in &object.unit_ids {
         if used >= limit {
+            w.bounded_probe_ids.insert(exposure.probe_id.clone());
             break;
         }
         if insert_bundle(
@@ -1794,6 +1859,7 @@ fn materialize_region_units(
         .unwrap_or(0);
     for unit in &region.contained_unit_ids {
         if visible >= limit {
+            w.bounded_probe_ids.insert(exposure.probe_id.clone());
             break;
         }
         if insert_bundle(
@@ -1809,6 +1875,7 @@ fn materialize_region_units(
             }
             visible += 1;
         } else {
+            w.bounded_probe_ids.insert(exposure.probe_id.clone());
             break;
         }
     }
@@ -1844,6 +1911,7 @@ fn enrich_object(
                 );
             }
         } else {
+            w.bounded_probe_ids.insert(exposure.probe_id.clone());
             break;
         }
     }
@@ -1878,6 +1946,7 @@ fn enrich_region(
                 );
             }
         } else {
+            w.bounded_probe_ids.insert(exposure.probe_id.clone());
             break;
         }
     }
@@ -1911,6 +1980,7 @@ fn enrich_unit_identifiers(
                 );
             }
         } else {
+            w.bounded_probe_ids.insert(exposure.probe_id.clone());
             break;
         }
     }
@@ -1932,6 +2002,7 @@ fn enrich_unit_identifiers(
                 );
             }
         } else {
+            w.bounded_probe_ids.insert(exposure.probe_id.clone());
             break;
         }
     }
@@ -2056,16 +2127,64 @@ fn remember_edge_provenance(w: &mut Work, edge: EdgeTuple, exposure: &ExposureCo
         ));
     }
 }
+fn remember_address_exposure(w: &mut Work, address: SemanticAddress, exposure: &ExposureContext) {
+    if let Some((_, existing)) = w
+        .address_exposure
+        .iter_mut()
+        .find(|(known, _)| known == &address)
+    {
+        push_unique(&mut existing.probe_ids, exposure.probe_id.clone());
+        merge(
+            &mut existing.activation_provenance,
+            &exposure.activation_provenance,
+        );
+    } else {
+        w.address_exposure.push((
+            address,
+            ExposureAggregate {
+                probe_ids: vec![exposure.probe_id.clone()],
+                activation_provenance: exposure.activation_provenance.clone(),
+            },
+        ));
+    }
+}
+fn exposure_for_address(w: &Work, address: &SemanticAddress) -> Option<ExposureAggregate> {
+    w.address_exposure
+        .iter()
+        .find(|(known, _)| known == address)
+        .map(|(_, exposure)| exposure.clone())
+}
+fn merge_exposure(into: &mut ExposureAggregate, exposure: ExposureAggregate) {
+    for probe_id in exposure.probe_ids {
+        push_unique(&mut into.probe_ids, probe_id);
+    }
+    merge(
+        &mut into.activation_provenance,
+        &exposure.activation_provenance,
+    );
+}
 fn exposure_for_edge(w: &Work, edge: &EdgeTuple) -> Option<ExposureAggregate> {
     w.edge_provenance
         .iter()
         .find(|(known, _)| known == edge)
         .map(|(_, exposure)| exposure.clone())
 }
-fn provenance_for_edge(w: &Work, edge: &EdgeTuple) -> Vec<ActivationProvenance> {
-    exposure_for_edge(w, edge)
+fn provenance_for_edge(
+    w: &Work,
+    edge: &EdgeTuple,
+) -> Result<Vec<ActivationProvenance>, ProjectionActivationViolation> {
+    let provenance = exposure_for_edge(w, edge)
         .map(|exposure| exposure.activation_provenance)
-        .unwrap_or_default()
+        .unwrap_or_default();
+    if provenance.is_empty() {
+        return Err(ProjectionActivationViolation::InvalidActivatedReference {
+            context: format!(
+                "activated edge has no exposure provenance: source={:?} transition={} direction={:?} target={:?}",
+                edge.source, edge.transition_id, edge.direction, edge.target
+            ),
+        });
+    }
+    Ok(provenance)
 }
 
 fn build_visible_edges_and_structure_handles(
@@ -2103,7 +2222,7 @@ fn build_visible_edges_and_structure_handles(
             transition_id: edge.transition_id.clone(),
             direction: edge.direction.clone(),
             target: edge.target.clone(),
-            activation_provenance: provenance_for_edge(w, edge),
+            activation_provenance: provenance_for_edge(w, edge)?,
         });
     }
     for source in w.order.clone() {
@@ -2133,15 +2252,12 @@ fn build_visible_edges_and_structure_handles(
                 probe_ids: vec![],
                 activation_provenance: vec![],
             };
+            if let Some(exposure) = exposure_for_address(w, &source) {
+                merge_exposure(&mut related, exposure);
+            }
             for edge in &group {
                 if let Some(exposure) = exposure_for_edge(w, edge) {
-                    for probe_id in exposure.probe_ids {
-                        push_unique(&mut related.probe_ids, probe_id);
-                    }
-                    merge(
-                        &mut related.activation_provenance,
-                        &exposure.activation_provenance,
-                    );
+                    merge_exposure(&mut related, exposure);
                 }
             }
             let visible_count = u64::try_from(visible_count_usize)
@@ -2153,6 +2269,14 @@ fn build_visible_edges_and_structure_handles(
                 .ok_or(ProjectionActivationViolation::CountOverflow)?;
             if remaining == 0 {
                 continue;
+            }
+            if related.activation_provenance.is_empty() {
+                return Err(ProjectionActivationViolation::InvalidActivatedReference {
+                    context: format!(
+                        "structural continuation group has no exposure provenance: subject={:?} transition={} direction={:?}",
+                        source, transition_id, direction
+                    ),
+                });
             }
             let key = if degree >= c.hub_degree_threshold {
                 "high_degree_summary"
@@ -2168,6 +2292,18 @@ fn build_visible_edges_and_structure_handles(
                     configuration_key: key.into(),
                 },
             );
+            if degree >= c.hub_degree_threshold {
+                for telemetry in &mut w.telemetry {
+                    if related.probe_ids.contains(&telemetry.probe_id) {
+                        push_unique(
+                            &mut telemetry.activation_provenance,
+                            ActivationProvenance::ConfiguredDefault {
+                                configuration_key: "high_degree_summary".into(),
+                            },
+                        );
+                    }
+                }
+            }
             if c.continuation_page_limit == 0
                 || w.handles.len() >= c.maximum_continuation_handles as usize
             {
