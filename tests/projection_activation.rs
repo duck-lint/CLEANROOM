@@ -2,15 +2,16 @@ mod support;
 
 use semantic_traversal_core::{
     ActivationUtterance, ProjectionActivationAccess, ProjectionActivationAccessFailure,
-    ProjectionActivationCandidate, ProjectionActivationConfig, ProjectionActivationProbe,
-    ProjectionActivationProbeBand, ProjectionActivationProbeResult,
-    ProjectionActivationProbeSource, ProjectionActivationViolation, SemanticSpaceProjection,
+    ProjectionActivationCandidate, ProjectionActivationCandidateTransition,
+    ProjectionActivationConfig, ProjectionActivationProbe, ProjectionActivationProbeBand,
+    ProjectionActivationProbeResult, ProjectionActivationProbeSource,
+    ProjectionActivationViolation, SemanticSpaceProjection,
     activation::ActivationProvenance,
     activation::{
         CandidateCount, ContinuationAccess, ProjectionActivationBandConfig,
         ProjectionActivationSurfaceConfig, TruncationState,
     },
-    model::{AddressKind, IdentifierAddress, RetrievalSurfaceKind, SemanticAddress},
+    model::{AddressKind, Direction, IdentifierAddress, RetrievalSurfaceKind, SemanticAddress},
     problem_space::{
         ActivationBand, AttentionLens, OpenTension, OpenTensionType, ProblemConstraint,
         ProblemConstraintApplicability, ProblemReferent, ProblemRegion, ProblemRelation,
@@ -1867,14 +1868,100 @@ fn open_tension_candidate_exposure_preserves_candidate_index() {
 
 #[test]
 fn relation_guides_incidence_provenance_without_creating_relation() {
+    let mut projection = synthetic_projection::tiny_projection();
+    projection.retrieval_surfaces[0].returned_identity = AddressKind::SemanticObject;
+    let mut ps = problem_space();
+    ps.constraints.clear();
+    ps.open_tensions.clear();
+    ps.regions[0].anchor_referents.truncate(1);
+    ps.regions[1].anchor_referents.clear();
     let mut cfg = config();
-    cfg.maximum_initial_relation_depth = 0;
-    let activated = activation_with_probe0_candidate_returned_as(
-        cfg,
-        SemanticAddress::Object(synthetic_projection::object(
-            synthetic_projection::MARX_OBJECT,
-        )),
-        AddressKind::SemanticObject,
+    only_available_surfaces(
+        &mut projection,
+        &mut cfg,
+        &["surface:exact", "surface:graph"],
+    );
+    cfg.maximum_initial_relation_depth = 1;
+    cfg.unbanded.maximum_textual_seeds = 0;
+    cfg.primary.maximum_textual_seeds = 1;
+    cfg.secondary.maximum_textual_seeds = 0;
+    cfg.tertiary.maximum_textual_seeds = 0;
+    cfg.background.maximum_textual_seeds = 0;
+    let u = utterance();
+    let source = SemanticAddress::Object(synthetic_projection::object(
+        synthetic_projection::MARX_OBJECT,
+    ));
+    let occurrence = synthetic_projection::occurrence("occurrence:journal-one:capital-object");
+    let text_provenance = vec![
+        ActivationProvenance::ProblemRegion {
+            region_id: "region:primary".into(),
+        },
+        ActivationProvenance::ProblemReferent {
+            region_id: "region:primary".into(),
+            referent_id: "referent:capital".into(),
+        },
+        ActivationProvenance::AttentionBand {
+            region_id: "region:primary".into(),
+            band: ActivationBand::Primary,
+        },
+    ];
+    let mut incidence_provenance = text_provenance.clone();
+    incidence_provenance.push(ActivationProvenance::ProblemRelation {
+        relation_id: "relation:comparison".into(),
+    });
+    let access = ScriptedProjectionActivationAccess {
+        results: vec![
+            (
+                exact_seed_probe(
+                    0,
+                    "Capital",
+                    text_provenance,
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Primary),
+                ),
+                candidate_result(source.clone()),
+            ),
+            (
+                graph_incidence_probe(
+                    1,
+                    source.clone(),
+                    incidence_provenance,
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Primary),
+                    1,
+                ),
+                incidence_result(
+                    SemanticAddress::Occurrence(occurrence.clone()),
+                    "transition:object-occurrence-incoming",
+                    Direction::Incoming,
+                ),
+            ),
+        ],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    let activated =
+        semantic_traversal_core::activate_projection(&projection, &ps, &u, &cfg, &access).unwrap();
+    let incidence_telemetry = activated
+        .telemetry
+        .iter()
+        .find(|record| record.surface_id == "surface:graph")
+        .expect("graph incidence telemetry is emitted");
+    assert!(incidence_telemetry.activation_provenance.contains(
+        &ActivationProvenance::ProblemRelation {
+            relation_id: "relation:comparison".into()
+        }
+    ));
+    let edge = activated
+        .edges
+        .iter()
+        .find(|edge| edge.transition_id == "transition:object-occurrence-incoming")
+        .expect("actual projected incidence edge is activated");
+    assert_eq!(edge.source, source);
+    assert_eq!(edge.target, SemanticAddress::Occurrence(occurrence));
+    assert!(
+        edge.activation_provenance
+            .contains(&ActivationProvenance::ProblemRelation {
+                relation_id: "relation:comparison".into()
+            })
     );
     assert!(
         activated
@@ -1884,42 +1971,65 @@ fn relation_guides_incidence_provenance_without_creating_relation() {
     );
     let serialized = serde_json::to_string(&activated).unwrap();
     assert!(!serialized.contains("corpus_relation"));
-    assert!(!serialized.contains("relation:comparison"));
+    assert!(!serialized.contains("referent_binding"));
+    assert!(!serialized.contains("canonical_binding"));
+    assert!(!serialized.contains("problem_region_binding"));
 }
 
 #[test]
 fn attention_band_changes_breadth_not_identity() {
     let unit_id = synthetic_projection::unit("unit:capital:chapter-2:1");
-    let mut narrow = config();
-    narrow.unbanded.text_preview_character_limit = 4;
-    narrow.unbanded.maximum_structural_neighbors_per_record = 0;
-    narrow.unbanded.maximum_visible_units_per_region = 0;
-    let mut wide = config();
-    wide.unbanded.text_preview_character_limit = 12;
-    wide.unbanded.maximum_structural_neighbors_per_record = 4;
-    wide.unbanded.maximum_visible_units_per_region = 4;
-    let narrow_activation =
-        activation_with_probe0_candidate(narrow, SemanticAddress::Unit(unit_id.clone()));
-    let wide_activation =
-        activation_with_probe0_candidate(wide, SemanticAddress::Unit(unit_id.clone()));
+    let narrow_activation = band_referent_activation(BandReferentScenario {
+        band: ActivationBand::Primary,
+        region_id: "region:narrow-band",
+        referent_id: "referent:narrow",
+        expression: "narrow referent",
+        preview_limit: 4,
+        structural_limit: 0,
+        visible_units_limit: 0,
+        unit_id: unit_id.clone(),
+    });
+    let wide_activation = band_referent_activation(BandReferentScenario {
+        band: ActivationBand::Secondary,
+        region_id: "region:wide-band",
+        referent_id: "referent:wide",
+        expression: "wide referent",
+        preview_limit: 12,
+        structural_limit: 4,
+        visible_units_limit: 4,
+        unit_id: unit_id.clone(),
+    });
+    let narrow_unit = &narrow_activation.activated_units[0];
+    let wide_unit = &wide_activation.activated_units[0];
+    assert_eq!(narrow_unit.unit_id, wide_unit.unit_id);
+    assert_eq!(narrow_unit.parent_object_id, wide_unit.parent_object_id);
     assert_eq!(
-        narrow_activation.activated_units[0].unit_id,
-        wide_activation.activated_units[0].unit_id
+        narrow_unit.parent_region_address,
+        wide_unit.parent_region_address
     );
-    assert_eq!(
-        narrow_activation.activated_units[0].parent_object_id,
-        wide_activation.activated_units[0].parent_object_id
+    assert_ne!(narrow_unit.text_preview, wide_unit.text_preview);
+    assert!(
+        narrow_unit
+            .activation_provenance
+            .contains(&ActivationProvenance::AttentionBand {
+                region_id: "region:narrow-band".into(),
+                band: ActivationBand::Primary,
+            })
     );
-    assert_eq!(
-        narrow_activation.activated_units[0].parent_region_address,
-        wide_activation.activated_units[0].parent_region_address
-    );
-    assert_ne!(
-        narrow_activation.activated_units[0].text_preview,
-        wide_activation.activated_units[0].text_preview
+    assert!(
+        wide_unit
+            .activation_provenance
+            .contains(&ActivationProvenance::AttentionBand {
+                region_id: "region:wide-band".into(),
+                band: ActivationBand::Secondary,
+            })
     );
     assert_eq!(narrow_activation.activated_units.len(), 1);
     assert_eq!(wide_activation.activated_units.len(), 1);
+    let serialized = serde_json::to_string(&wide_activation).unwrap();
+    assert!(!serialized.contains("referent_binding"));
+    assert!(!serialized.contains("canonical_binding"));
+    assert!(!serialized.contains("problem_region_binding"));
 }
 
 #[test]
@@ -2381,39 +2491,93 @@ fn preview_vectors_never_reference_missing_records() {
 
 #[test]
 fn closure_only_records_do_not_trigger_surface_probes() {
+    let mut projection = synthetic_projection::tiny_projection();
+    let mut ps = problem_space();
+    ps.constraints.clear();
+    ps.regions.clear();
+    ps.relations.clear();
+    ps.open_tensions.clear();
+    ps.attention_lens.primary_region_ids.clear();
+    ps.attention_lens.secondary_region_ids.clear();
+    ps.attention_lens.tertiary_region_ids.clear();
+    ps.attention_lens.background_region_ids.clear();
     let mut cfg = config();
-    cfg.maximum_initial_relation_depth = 0;
+    only_available_surfaces(
+        &mut projection,
+        &mut cfg,
+        &["surface:exact", "surface:graph"],
+    );
+    cfg.maximum_initial_relation_depth = 1;
+    cfg.unbanded.maximum_textual_seeds = 1;
+    cfg.primary.maximum_textual_seeds = 0;
+    cfg.secondary.maximum_textual_seeds = 0;
+    cfg.tertiary.maximum_textual_seeds = 0;
+    cfg.background.maximum_textual_seeds = 0;
+    let u = utterance();
     let unit_id = synthetic_projection::unit("unit:capital:chapter-2:1");
-    let activated = activation_with_probe0_candidate(cfg, SemanticAddress::Unit(unit_id.clone()));
+    let unit_address = SemanticAddress::Unit(unit_id.clone());
+    let parent_object = synthetic_projection::object(synthetic_projection::MARX_OBJECT);
+    let parent_region = synthetic_projection::region(&parent_object, "heading:Chapter 2");
+    let access = ScriptedProjectionActivationAccess {
+        results: vec![
+            (
+                text_probe(
+                    0,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                candidate_result(unit_address.clone()),
+            ),
+            (
+                graph_incidence_probe(
+                    1,
+                    unit_address.clone(),
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                    1,
+                ),
+                empty_result(),
+            ),
+        ],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    let activated =
+        semantic_traversal_core::activate_projection(&projection, &ps, &u, &cfg, &access).unwrap();
+    assert!(
+        activated
+            .activated_units
+            .iter()
+            .any(|record| record.unit_id == unit_id)
+    );
     assert!(
         activated
             .activated_objects
             .iter()
-            .any(|record| record.object_id
-                == synthetic_projection::object(synthetic_projection::MARX_OBJECT))
+            .any(|record| record.object_id == parent_object)
     );
     assert!(
         activated
             .activated_regions
             .iter()
-            .any(|record| record.address
-                == synthetic_projection::region(
-                    &synthetic_projection::object(synthetic_projection::MARX_OBJECT),
-                    "heading:Chapter 2"
-                ))
+            .any(|record| record.address == parent_region)
     );
-    assert!(
-        activated
-            .telemetry
-            .iter()
-            .all(|record| record.current_depth == 0)
-    );
-    assert!(
-        activated
-            .telemetry
-            .iter()
-            .all(|record| record.probe_id != "activation-probe:6")
-    );
+    let graph_telemetry = activated
+        .telemetry
+        .iter()
+        .filter(|record| record.surface_id == "surface:graph")
+        .collect::<Vec<_>>();
+    assert_eq!(graph_telemetry.len(), 1);
+    assert_eq!(graph_telemetry[0].current_depth, 1);
+    assert_eq!(graph_telemetry[0].probe_id, "activation-probe:1");
 }
 
 #[test]
@@ -2571,24 +2735,102 @@ fn hydration_address_is_not_dereferenced_or_copied() {
 
 #[test]
 fn later_larger_bound_monotonically_enriches_preview() {
+    let mut projection = synthetic_projection::tiny_projection();
+    let mut ps = seed_order_problem_space();
+    ps.regions[0].anchor_referents = vec![ProblemReferent {
+        referent_id: "referent:narrow".into(),
+        expression: "narrow exposure".into(),
+        source_contribution_id: "contribution:seed-order".into(),
+    }];
+    ps.regions[1].anchor_referents = vec![ProblemReferent {
+        referent_id: "referent:wide".into(),
+        expression: "wide exposure".into(),
+        source_contribution_id: "contribution:seed-order".into(),
+    }];
+    ps.regions.truncate(2);
+    ps.attention_lens.tertiary_region_ids.clear();
+    ps.attention_lens.background_region_ids.clear();
+    ps.constraints.clear();
+    ps.open_tensions.clear();
+    let mut cfg = seed_order_config();
+    only_available_surfaces(&mut projection, &mut cfg, &["surface:exact"]);
+    cfg.unbanded.maximum_textual_seeds = 0;
+    cfg.primary.maximum_textual_seeds = 1;
+    cfg.secondary.maximum_textual_seeds = 1;
+    cfg.tertiary.maximum_textual_seeds = 0;
+    cfg.background.maximum_textual_seeds = 0;
+    cfg.primary.text_preview_character_limit = 4;
+    cfg.secondary.text_preview_character_limit = 12;
+    let u = ActivationUtterance {
+        utterance_id: "utterance:monotonic-preview".into(),
+        text: "ignored newest".into(),
+    };
     let unit_id = synthetic_projection::unit("unit:capital:chapter-2:1");
-    let mut narrow = config();
-    narrow.unbanded.text_preview_character_limit = 4;
-    let mut wide = config();
-    wide.unbanded.text_preview_character_limit = 12;
-    let narrow_activation =
-        activation_with_probe0_candidate(narrow, SemanticAddress::Unit(unit_id.clone()));
-    let wide_activation =
-        activation_with_probe0_candidate(wide, SemanticAddress::Unit(unit_id.clone()));
-    assert_eq!(narrow_activation.activated_units[0].unit_id, unit_id);
-    assert_eq!(wide_activation.activated_units[0].unit_id, unit_id);
-    assert_ne!(
-        narrow_activation.activated_units[0].text_preview,
-        wide_activation.activated_units[0].text_preview
+    let unit_address = SemanticAddress::Unit(unit_id.clone());
+    let access = ScriptedProjectionActivationAccess {
+        results: vec![
+            (
+                exact_seed_probe(
+                    0,
+                    "narrow exposure",
+                    referent_provenance(
+                        "region:primary-order",
+                        "referent:narrow",
+                        ActivationBand::Primary,
+                    ),
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Primary),
+                ),
+                candidate_result(unit_address.clone()),
+            ),
+            (
+                exact_seed_probe(
+                    1,
+                    "wide exposure",
+                    referent_provenance(
+                        "region:secondary-order",
+                        "referent:wide",
+                        ActivationBand::Secondary,
+                    ),
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Secondary),
+                ),
+                candidate_result(unit_address.clone()),
+            ),
+        ],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    let activated =
+        semantic_traversal_core::activate_projection(&projection, &ps, &u, &cfg, &access).unwrap();
+    assert_eq!(activated.activated_units.len(), 1);
+    let unit = &activated.activated_units[0];
+    assert_eq!(unit.unit_id, unit_id);
+    assert_eq!(
+        unit.text_preview,
+        semantic_traversal_core::ActivatedTextPreview::Inline {
+            text: "Capital is a".into(),
+            truncated: true,
+        }
     );
-    assert_eq!(wide_activation.activated_units.len(), 1);
-    assert_eq!(wide_activation.activated_objects.len(), 1);
-    assert_eq!(wide_activation.activated_regions.len(), 1);
+    assert_ne!(
+        unit.text_preview,
+        semantic_traversal_core::ActivatedTextPreview::Inline {
+            text: "Capi".into(),
+            truncated: true,
+        }
+    );
+    let primary_index = unit
+        .activation_provenance
+        .iter()
+        .position(|p| matches!(p, ActivationProvenance::ProblemReferent { referent_id, .. } if referent_id == "referent:narrow"))
+        .expect("narrow exposure provenance is retained");
+    let secondary_index = unit
+        .activation_provenance
+        .iter()
+        .position(|p| matches!(p, ActivationProvenance::ProblemReferent { referent_id, .. } if referent_id == "referent:wide"))
+        .expect("wide exposure provenance is retained");
+    assert!(primary_index < secondary_index);
+    assert_eq!(activated.activated_objects.len(), 1);
+    assert_eq!(activated.activated_regions.len(), 1);
 }
 
 #[test]
@@ -4819,6 +5061,147 @@ fn candidate_result(address: SemanticAddress) -> ProjectionActivationProbeResult
         temporal_anchor_count: 0,
         unresolved_target_count: 0,
     }
+}
+
+fn incidence_result(
+    address: SemanticAddress,
+    transition_id: &str,
+    direction: Direction,
+) -> ProjectionActivationProbeResult {
+    ProjectionActivationProbeResult {
+        candidates: vec![ProjectionActivationCandidate {
+            address,
+            transition: Some(ProjectionActivationCandidateTransition {
+                transition_id: transition_id.into(),
+                direction,
+            }),
+        }],
+        candidate_count: CandidateCount::Exact(1),
+        continuation: None,
+        identifier_type_distribution: vec![],
+        temporal_anchor_count: 0,
+        unresolved_target_count: 0,
+    }
+}
+
+fn graph_incidence_probe(
+    id: u64,
+    address: SemanticAddress,
+    provenance: Vec<ActivationProvenance>,
+    band: ProjectionActivationProbeBand,
+    current_depth: u32,
+) -> ProjectionActivationProbe {
+    let mut activation_provenance = provenance;
+    activation_provenance.push(ActivationProvenance::ConfiguredDefault {
+        configuration_key: "automatic_surface_fan_out".into(),
+    });
+    ProjectionActivationProbe {
+        probe_id: format!("activation-probe:{id}"),
+        band,
+        surface_id: "surface:graph".into(),
+        surface_kind: RetrievalSurfaceKind::Graph,
+        match_mode: SurfaceMatchMode::Incidence,
+        source: ProjectionActivationProbeSource::Address { address },
+        candidate_limit: 2,
+        current_depth,
+        activation_provenance,
+    }
+}
+
+struct BandReferentScenario {
+    band: ActivationBand,
+    region_id: &'static str,
+    referent_id: &'static str,
+    expression: &'static str,
+    preview_limit: u32,
+    structural_limit: u32,
+    visible_units_limit: u32,
+    unit_id: semantic_traversal_core::model::SemanticUnitId,
+}
+
+fn band_referent_activation(
+    scenario: BandReferentScenario,
+) -> semantic_traversal_core::ActivatedProjection {
+    let mut projection = synthetic_projection::tiny_projection();
+    let mut cfg = config();
+    only_available_surfaces(&mut projection, &mut cfg, &["surface:exact"]);
+    cfg.unbanded.maximum_textual_seeds = 0;
+    cfg.primary.maximum_textual_seeds = 0;
+    cfg.secondary.maximum_textual_seeds = 0;
+    cfg.tertiary.maximum_textual_seeds = 0;
+    cfg.background.maximum_textual_seeds = 0;
+    let band_cfg = match scenario.band {
+        ActivationBand::Primary => &mut cfg.primary,
+        ActivationBand::Secondary => &mut cfg.secondary,
+        ActivationBand::Tertiary => &mut cfg.tertiary,
+        ActivationBand::Background => &mut cfg.background,
+    };
+    band_cfg.maximum_textual_seeds = 1;
+    band_cfg.text_preview_character_limit = scenario.preview_limit;
+    band_cfg.maximum_structural_neighbors_per_record = scenario.structural_limit;
+    band_cfg.maximum_visible_units_per_region = scenario.visible_units_limit;
+    let region = seed_region(
+        scenario.region_id,
+        scenario.band.clone(),
+        &[(scenario.referent_id, scenario.expression)],
+    );
+    let ps = ProblemSpaceState {
+        thread_id: "thread:band-comparison".into(),
+        version: 1,
+        regions: vec![region],
+        relations: vec![],
+        constraints: vec![],
+        open_tensions: vec![],
+        contribution_history: vec![],
+        attention_lens: AttentionLens {
+            primary_region_ids: if scenario.band == ActivationBand::Primary {
+                vec![scenario.region_id.into()]
+            } else {
+                vec![]
+            },
+            secondary_region_ids: if scenario.band == ActivationBand::Secondary {
+                vec![scenario.region_id.into()]
+            } else {
+                vec![]
+            },
+            tertiary_region_ids: if scenario.band == ActivationBand::Tertiary {
+                vec![scenario.region_id.into()]
+            } else {
+                vec![]
+            },
+            background_region_ids: if scenario.band == ActivationBand::Background {
+                vec![scenario.region_id.into()]
+            } else {
+                vec![]
+            },
+        },
+        source_turn_range: SourceTurnRange {
+            first_turn_id: "turn:band-comparison".into(),
+            last_turn_id: "turn:band-comparison".into(),
+        },
+    };
+    let u = ActivationUtterance {
+        utterance_id: "utterance:band-comparison".into(),
+        text: "ignored newest".into(),
+    };
+    let access = ScriptedProjectionActivationAccess {
+        results: vec![(
+            exact_seed_probe(
+                0,
+                scenario.expression,
+                referent_provenance(
+                    scenario.region_id,
+                    scenario.referent_id,
+                    scenario.band.clone(),
+                ),
+                ProjectionActivationProbeBand::Attention(scenario.band),
+            ),
+            candidate_result(SemanticAddress::Unit(scenario.unit_id)),
+        )],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    semantic_traversal_core::activate_projection(&projection, &ps, &u, &cfg, &access).unwrap()
 }
 
 fn activation_with_custom_projection_candidate(
