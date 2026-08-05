@@ -1,9 +1,10 @@
 mod support;
 
 use semantic_traversal_core::{
-    ActivationUtterance, ProjectionActivationCandidate, ProjectionActivationConfig,
-    ProjectionActivationProbe, ProjectionActivationProbeBand, ProjectionActivationProbeResult,
-    ProjectionActivationProbeSource, ProjectionActivationViolation,
+    ActivationUtterance, ProjectionActivationAccess, ProjectionActivationAccessFailure,
+    ProjectionActivationCandidate, ProjectionActivationConfig, ProjectionActivationProbe,
+    ProjectionActivationProbeBand, ProjectionActivationProbeResult,
+    ProjectionActivationProbeSource, ProjectionActivationViolation, SemanticSpaceProjection,
     activation::ActivationProvenance,
     activation::{
         CandidateCount, ContinuationAccess, ProjectionActivationBandConfig,
@@ -199,6 +200,246 @@ fn text_probe(
     }
 }
 
+struct PanicProjectionActivationAccess;
+
+impl ProjectionActivationAccess for PanicProjectionActivationAccess {
+    fn execute_probe(
+        &self,
+        _projection: &SemanticSpaceProjection,
+        probe: &ProjectionActivationProbe,
+    ) -> Result<ProjectionActivationProbeResult, ProjectionActivationAccessFailure> {
+        panic!("preflight should reject before executing probe {probe:?}");
+    }
+}
+
+fn only_available_surfaces(
+    projection: &mut SemanticSpaceProjection,
+    cfg: &mut ProjectionActivationConfig,
+    surface_ids: &[&str],
+) {
+    for surface in &mut projection.retrieval_surfaces {
+        surface.available = surface_ids.contains(&surface.surface_id.as_str());
+    }
+    cfg.surface_limits
+        .retain(|limit| surface_ids.contains(&limit.surface_id.as_str()));
+}
+
+fn seed_region(region_id: &str, band: ActivationBand, referents: &[(&str, &str)]) -> ProblemRegion {
+    ProblemRegion {
+        region_id: region_id.into(),
+        anchor_referents: referents
+            .iter()
+            .map(|(referent_id, expression)| ProblemReferent {
+                referent_id: (*referent_id).into(),
+                expression: (*expression).into(),
+                source_contribution_id: "contribution:seed-order".into(),
+            })
+            .collect(),
+        relation_ids: vec![],
+        local_constraint_ids: if region_id == "region:primary-order" {
+            vec!["constraint:regional-order".into()]
+        } else {
+            vec![]
+        },
+        open_tension_ids: if region_id == "region:primary-order" {
+            vec!["tension:seed-order".into()]
+        } else {
+            vec![]
+        },
+        source_contribution_ids: vec!["contribution:seed-order".into()],
+        persistence_state: RegionPersistenceState::Active,
+        activation_band: band,
+        supersedes_region_id: None,
+    }
+}
+
+fn seed_order_problem_space() -> ProblemSpaceState {
+    ProblemSpaceState {
+        thread_id: "thread:seed-order".into(),
+        version: 11,
+        regions: vec![
+            seed_region(
+                "region:primary-order",
+                ActivationBand::Primary,
+                &[("referent:a", "referent A"), ("referent:b", "referent B")],
+            ),
+            seed_region(
+                "region:secondary-order",
+                ActivationBand::Secondary,
+                &[("referent:secondary", "secondary referent")],
+            ),
+            seed_region(
+                "region:tertiary-order",
+                ActivationBand::Tertiary,
+                &[("referent:tertiary", "tertiary referent")],
+            ),
+            seed_region(
+                "region:background-order",
+                ActivationBand::Background,
+                &[("referent:background", "background referent")],
+            ),
+        ],
+        relations: vec![],
+        constraints: vec![
+            ProblemConstraint {
+                constraint_id: "constraint:whole-order".into(),
+                expression: "whole order constraint".into(),
+                applicability: ProblemConstraintApplicability::WholeProblemSpace,
+                source_contribution_id: "contribution:seed-order".into(),
+                lifecycle: RecordLifecycle::Active,
+            },
+            ProblemConstraint {
+                constraint_id: "constraint:regional-order".into(),
+                expression: "regional order constraint".into(),
+                applicability: ProblemConstraintApplicability::Regions {
+                    region_ids: vec!["region:primary-order".into()],
+                },
+                source_contribution_id: "contribution:seed-order".into(),
+                lifecycle: RecordLifecycle::Active,
+            },
+        ],
+        open_tensions: vec![OpenTension {
+            tension_id: "tension:seed-order".into(),
+            region_id: "region:primary-order".into(),
+            tension_type: OpenTensionType::UnresolvedReference,
+            unresolved_expression: Some("unresolved seed expression".into()),
+            candidate_bindings: vec!["candidate zero".into(), "candidate one".into()],
+            source_turn_id: "turn:seed-order".into(),
+            lifecycle: TensionLifecycle::Open,
+        }],
+        contribution_history: vec![],
+        attention_lens: AttentionLens {
+            primary_region_ids: vec!["region:primary-order".into()],
+            secondary_region_ids: vec!["region:secondary-order".into()],
+            tertiary_region_ids: vec!["region:tertiary-order".into()],
+            background_region_ids: vec!["region:background-order".into()],
+        },
+        source_turn_range: SourceTurnRange {
+            first_turn_id: "turn:seed-order".into(),
+            last_turn_id: "turn:seed-order".into(),
+        },
+    }
+}
+
+fn seed_order_config() -> ProjectionActivationConfig {
+    let mut cfg = config();
+    cfg.unbanded.maximum_textual_seeds = 2;
+    cfg.primary.maximum_textual_seeds = 6;
+    cfg.secondary.maximum_textual_seeds = 1;
+    cfg.tertiary.maximum_textual_seeds = 1;
+    cfg.background.maximum_textual_seeds = 1;
+    cfg.maximum_telemetry_records = 80;
+    cfg
+}
+
+fn seed_order_inputs() -> (
+    SemanticSpaceProjection,
+    ProblemSpaceState,
+    ProjectionActivationConfig,
+    ActivationUtterance,
+) {
+    let mut projection = synthetic_projection::tiny_projection();
+    let mut cfg = seed_order_config();
+    only_available_surfaces(&mut projection, &mut cfg, &["surface:exact"]);
+    let utterance = ActivationUtterance {
+        utterance_id: "utterance:seed-order".into(),
+        text: "newest seed text".into(),
+    };
+    (projection, seed_order_problem_space(), cfg, utterance)
+}
+
+fn whole_constraint_provenance() -> Vec<ActivationProvenance> {
+    vec![ActivationProvenance::Constraint {
+        constraint_id: "constraint:whole-order".into(),
+    }]
+}
+
+fn referent_provenance(
+    region_id: &str,
+    referent_id: &str,
+    band: ActivationBand,
+) -> Vec<ActivationProvenance> {
+    vec![
+        ActivationProvenance::ProblemRegion {
+            region_id: region_id.into(),
+        },
+        ActivationProvenance::ProblemReferent {
+            region_id: region_id.into(),
+            referent_id: referent_id.into(),
+        },
+        ActivationProvenance::AttentionBand {
+            region_id: region_id.into(),
+            band,
+        },
+    ]
+}
+
+fn regional_constraint_provenance() -> Vec<ActivationProvenance> {
+    vec![
+        ActivationProvenance::ProblemRegion {
+            region_id: "region:primary-order".into(),
+        },
+        ActivationProvenance::Constraint {
+            constraint_id: "constraint:regional-order".into(),
+        },
+        ActivationProvenance::AttentionBand {
+            region_id: "region:primary-order".into(),
+            band: ActivationBand::Primary,
+        },
+    ]
+}
+
+fn tension_expression_provenance() -> Vec<ActivationProvenance> {
+    vec![
+        ActivationProvenance::ProblemRegion {
+            region_id: "region:primary-order".into(),
+        },
+        ActivationProvenance::OpenTension {
+            tension_id: "tension:seed-order".into(),
+        },
+        ActivationProvenance::AttentionBand {
+            region_id: "region:primary-order".into(),
+            band: ActivationBand::Primary,
+        },
+    ]
+}
+
+fn tension_candidate_provenance(candidate_index: u32) -> Vec<ActivationProvenance> {
+    vec![
+        ActivationProvenance::ProblemRegion {
+            region_id: "region:primary-order".into(),
+        },
+        ActivationProvenance::OpenTension {
+            tension_id: "tension:seed-order".into(),
+        },
+        ActivationProvenance::OpenTensionCandidate {
+            tension_id: "tension:seed-order".into(),
+            candidate_index,
+        },
+        ActivationProvenance::AttentionBand {
+            region_id: "region:primary-order".into(),
+            band: ActivationBand::Primary,
+        },
+    ]
+}
+
+fn exact_seed_probe(
+    id: u64,
+    text: &str,
+    provenance: Vec<ActivationProvenance>,
+    band: ProjectionActivationProbeBand,
+) -> ProjectionActivationProbe {
+    text_probe(
+        id,
+        "surface:exact",
+        RetrievalSurfaceKind::Exact,
+        SurfaceMatchMode::Literal,
+        text,
+        provenance,
+        band,
+    )
+}
+
 #[test]
 fn activation_rejects_unvalidated_projection() {
     let mut projection = synthetic_projection::tiny_projection();
@@ -208,70 +449,85 @@ fn activation_rejects_unvalidated_projection() {
         &problem_space(),
         &utterance(),
         &config(),
-        &ScriptedProjectionActivationAccess::default(),
+        &PanicProjectionActivationAccess,
     )
     .unwrap_err();
-    assert!(matches!(
+    assert_eq!(
         err,
-        ProjectionActivationViolation::ProjectionNotValidated { .. }
-    ));
+        ProjectionActivationViolation::ProjectionNotValidated {
+            status: ProjectionValidationStatus::Unvalidated,
+        }
+    );
 }
 
 #[test]
 fn activation_rejects_configuration_snapshot_mismatch() {
-    let projection = synthetic_projection::tiny_projection();
+    let mut projection = synthetic_projection::tiny_projection();
+    projection.configuration_snapshot_id = "projection-config:test-mismatch".into();
     let mut cfg = config();
-    cfg.configuration_snapshot_id = "other".into();
+    cfg.configuration_snapshot_id = "activation-config:test-mismatch".into();
     let err = semantic_traversal_core::activate_projection(
         &projection,
         &problem_space(),
         &utterance(),
         &cfg,
-        &ScriptedProjectionActivationAccess::default(),
+        &PanicProjectionActivationAccess,
     )
     .unwrap_err();
-    assert!(matches!(
+    assert_eq!(
         err,
-        ProjectionActivationViolation::ConfigurationSnapshotMismatch { .. }
-    ));
+        ProjectionActivationViolation::ConfigurationSnapshotMismatch {
+            projection_configuration_snapshot_id: "projection-config:test-mismatch".into(),
+            activation_configuration_snapshot_id: "activation-config:test-mismatch".into(),
+        }
+    );
 }
 
 #[test]
 fn activation_rejects_missing_available_surface_configuration() {
     let projection = synthetic_projection::tiny_projection();
     let mut cfg = config();
-    cfg.surface_limits.pop();
+    let removed_id = "surface:temporal";
+    cfg.surface_limits
+        .retain(|surface| surface.surface_id != removed_id);
     let err = semantic_traversal_core::activate_projection(
         &projection,
         &problem_space(),
         &utterance(),
         &cfg,
-        &ScriptedProjectionActivationAccess::default(),
+        &PanicProjectionActivationAccess,
     )
     .unwrap_err();
-    assert!(matches!(
+    assert_eq!(
         err,
-        ProjectionActivationViolation::MissingAvailableSurfaceConfiguration { .. }
-    ));
+        ProjectionActivationViolation::MissingAvailableSurfaceConfiguration {
+            surface_id: removed_id.into(),
+        }
+    );
 }
 
 #[test]
 fn activation_rejects_invalid_attention_lens_closure() {
     let projection = synthetic_projection::tiny_projection();
     let mut ps = problem_space();
-    ps.attention_lens.primary_region_ids.push("missing".into());
+    ps.attention_lens
+        .secondary_region_ids
+        .push("region:primary".into());
     let err = semantic_traversal_core::activate_projection(
         &projection,
         &ps,
         &utterance(),
         &config(),
-        &ScriptedProjectionActivationAccess::default(),
+        &PanicProjectionActivationAccess,
     )
     .unwrap_err();
-    assert!(matches!(
-        err,
-        ProjectionActivationViolation::InvalidActivatedReference { .. }
-    ));
+    match err {
+        ProjectionActivationViolation::InvalidActivatedReference { context } => {
+            assert!(context.contains("region:primary"));
+            assert!(context.contains("duplicates"));
+        }
+        other => panic!("expected invalid attention-lens reference, got {other:?}"),
+    }
 }
 
 #[test]
@@ -282,19 +538,14 @@ fn activation_violation_implements_error() {
 
 #[test]
 fn activation_dispatches_seed_groups_in_contract_order() {
-    let projection = synthetic_projection::tiny_projection();
-    let ps = problem_space();
-    let cfg = config();
-    let u = utterance();
+    let (projection, mut ps, mut cfg, u) = seed_order_inputs();
+    cfg.primary.maximum_textual_seeds = 1;
     let scripts = ScriptedProjectionActivationAccess {
         results: vec![
             (
-                text_probe(
+                exact_seed_probe(
                     0,
-                    "surface:exact",
-                    RetrievalSurfaceKind::Exact,
-                    SurfaceMatchMode::Literal,
-                    "newest",
+                    "newest seed text",
                     vec![ActivationProvenance::NewestUtterance {
                         utterance_id: u.utterance_id.clone(),
                     }],
@@ -303,72 +554,63 @@ fn activation_dispatches_seed_groups_in_contract_order() {
                 empty_result(),
             ),
             (
-                text_probe(
+                exact_seed_probe(
                     1,
-                    "surface:lexical",
-                    RetrievalSurfaceKind::Lexical,
-                    SurfaceMatchMode::Terms,
-                    "newest",
-                    vec![ActivationProvenance::NewestUtterance {
-                        utterance_id: u.utterance_id.clone(),
-                    }],
+                    "whole order constraint",
+                    whole_constraint_provenance(),
                     ProjectionActivationProbeBand::Unbanded,
                 ),
                 empty_result(),
             ),
             (
-                text_probe(
+                exact_seed_probe(
                     2,
-                    "surface:vector",
-                    RetrievalSurfaceKind::Vector,
-                    SurfaceMatchMode::NearestNeighbours,
-                    "newest",
-                    vec![ActivationProvenance::NewestUtterance {
-                        utterance_id: u.utterance_id.clone(),
-                    }],
-                    ProjectionActivationProbeBand::Unbanded,
+                    "referent A",
+                    referent_provenance(
+                        "region:primary-order",
+                        "referent:a",
+                        ActivationBand::Primary,
+                    ),
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Primary),
                 ),
                 empty_result(),
             ),
             (
-                text_probe(
+                exact_seed_probe(
                     3,
-                    "surface:exact",
-                    RetrievalSurfaceKind::Exact,
-                    SurfaceMatchMode::Literal,
-                    "whole constraint",
-                    vec![ActivationProvenance::Constraint {
-                        constraint_id: "constraint:whole".into(),
-                    }],
-                    ProjectionActivationProbeBand::Unbanded,
+                    "secondary referent",
+                    referent_provenance(
+                        "region:secondary-order",
+                        "referent:secondary",
+                        ActivationBand::Secondary,
+                    ),
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Secondary),
                 ),
                 empty_result(),
             ),
             (
-                text_probe(
+                exact_seed_probe(
                     4,
-                    "surface:lexical",
-                    RetrievalSurfaceKind::Lexical,
-                    SurfaceMatchMode::Terms,
-                    "whole constraint",
-                    vec![ActivationProvenance::Constraint {
-                        constraint_id: "constraint:whole".into(),
-                    }],
-                    ProjectionActivationProbeBand::Unbanded,
+                    "tertiary referent",
+                    referent_provenance(
+                        "region:tertiary-order",
+                        "referent:tertiary",
+                        ActivationBand::Tertiary,
+                    ),
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Tertiary),
                 ),
                 empty_result(),
             ),
             (
-                text_probe(
+                exact_seed_probe(
                     5,
-                    "surface:vector",
-                    RetrievalSurfaceKind::Vector,
-                    SurfaceMatchMode::NearestNeighbours,
-                    "whole constraint",
-                    vec![ActivationProvenance::Constraint {
-                        constraint_id: "constraint:whole".into(),
-                    }],
-                    ProjectionActivationProbeBand::Unbanded,
+                    "background referent",
+                    referent_provenance(
+                        "region:background-order",
+                        "referent:background",
+                        ActivationBand::Background,
+                    ),
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Background),
                 ),
                 empty_result(),
             ),
@@ -376,14 +618,60 @@ fn activation_dispatches_seed_groups_in_contract_order() {
         failures: vec![],
         declared_modes: vec![],
     };
+    ps.open_tensions.clear();
     let activated =
         semantic_traversal_core::activate_projection(&projection, &ps, &u, &cfg, &scripts).unwrap();
-    assert_eq!(activated.telemetry.len(), 6);
-    assert_eq!(activated.telemetry[0].probe_id, "activation-probe:0");
-    assert_eq!(activated.telemetry[3].probe_id, "activation-probe:3");
-    assert_eq!(activated.telemetry[0].surface_id, "surface:exact");
-    assert_eq!(activated.telemetry[1].surface_id, "surface:lexical");
-    assert_eq!(activated.telemetry[2].surface_id, "surface:vector");
+    let provenance_without_fanout = activated
+        .telemetry
+        .iter()
+        .map(|telemetry| {
+            telemetry
+                .activation_provenance
+                .iter()
+                .filter(|provenance| !matches!(provenance, ActivationProvenance::ConfiguredDefault { configuration_key } if configuration_key == "automatic_surface_fan_out"))
+                .cloned()
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        provenance_without_fanout[0],
+        vec![ActivationProvenance::NewestUtterance {
+            utterance_id: u.utterance_id
+        }]
+    );
+    assert_eq!(provenance_without_fanout[1], whole_constraint_provenance());
+    assert_eq!(
+        provenance_without_fanout[2],
+        referent_provenance(
+            "region:primary-order",
+            "referent:a",
+            ActivationBand::Primary
+        )
+    );
+    assert_eq!(
+        provenance_without_fanout[3],
+        referent_provenance(
+            "region:secondary-order",
+            "referent:secondary",
+            ActivationBand::Secondary
+        )
+    );
+    assert_eq!(
+        provenance_without_fanout[4],
+        referent_provenance(
+            "region:tertiary-order",
+            "referent:tertiary",
+            ActivationBand::Tertiary
+        )
+    );
+    assert_eq!(
+        provenance_without_fanout[5],
+        referent_provenance(
+            "region:background-order",
+            "referent:background",
+            ActivationBand::Background
+        )
+    );
 }
 
 #[test]
@@ -716,389 +1004,718 @@ fn empty_probe_activation_for(
 
 #[test]
 fn activation_rejects_invalid_projection() {
-    let scenario_name = "activation_rejects_invalid_projection";
-    let activated =
-        empty_probe_activation_for(scenario_name, "activation rejects invalid projection", 38);
+    let mut projection = synthetic_projection::tiny_projection();
+    projection.validation_status = ProjectionValidationStatus::Invalid;
+    let err = semantic_traversal_core::activate_projection(
+        &projection,
+        &problem_space(),
+        &utterance(),
+        &config(),
+        &PanicProjectionActivationAccess,
+    )
+    .unwrap_err();
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        err,
+        ProjectionActivationViolation::ProjectionNotValidated {
+            status: ProjectionValidationStatus::Invalid,
+        }
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 38,
-        "activation_rejects_invalid_projection uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activation_rejects_unknown_surface_configuration() {
-    let scenario_name = "activation_rejects_unknown_surface_configuration";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "activation rejects unknown surface configuration",
-        49,
-    );
+    let projection = synthetic_projection::tiny_projection();
+    let mut cfg = config();
+    let mut unknown = cfg.surface_limits[0].clone();
+    unknown.surface_id = "surface:unknown".into();
+    cfg.surface_limits.push(unknown);
+    let err = semantic_traversal_core::activate_projection(
+        &projection,
+        &problem_space(),
+        &utterance(),
+        &cfg,
+        &PanicProjectionActivationAccess,
+    )
+    .unwrap_err();
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        err,
+        ProjectionActivationViolation::UnknownOrUnavailableSurfaceConfiguration {
+            surface_id: "surface:unknown".into(),
+        }
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 49,
-        "activation_rejects_unknown_surface_configuration uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activation_rejects_unavailable_surface_configuration() {
-    let scenario_name = "activation_rejects_unavailable_surface_configuration";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "activation rejects unavailable surface configuration",
-        53,
-    );
+    let mut projection = synthetic_projection::tiny_projection();
+    let unavailable_id = "surface:exact";
+    projection
+        .retrieval_surfaces
+        .iter_mut()
+        .find(|surface| surface.surface_id == unavailable_id)
+        .expect("synthetic exact surface exists")
+        .available = false;
+    let err = semantic_traversal_core::activate_projection(
+        &projection,
+        &problem_space(),
+        &utterance(),
+        &config(),
+        &PanicProjectionActivationAccess,
+    )
+    .unwrap_err();
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        err,
+        ProjectionActivationViolation::UnknownOrUnavailableSurfaceConfiguration {
+            surface_id: unavailable_id.into(),
+        }
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 53,
-        "activation_rejects_unavailable_surface_configuration uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activation_rejects_duplicate_surface_configuration() {
-    let scenario_name = "activation_rejects_duplicate_surface_configuration";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "activation rejects duplicate surface configuration",
-        51,
-    );
+    let projection = synthetic_projection::tiny_projection();
+    let mut cfg = config();
+    let duplicated_id = cfg.surface_limits[0].surface_id.clone();
+    cfg.surface_limits.push(cfg.surface_limits[0].clone());
+    let err = semantic_traversal_core::activate_projection(
+        &projection,
+        &problem_space(),
+        &utterance(),
+        &cfg,
+        &PanicProjectionActivationAccess,
+    )
+    .unwrap_err();
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        err,
+        ProjectionActivationViolation::DuplicateSurfaceConfiguration {
+            surface_id: duplicated_id,
+        }
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 51,
-        "activation_rejects_duplicate_surface_configuration uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activation_rejects_surface_limit_above_hard_limit() {
-    let scenario_name = "activation_rejects_surface_limit_above_hard_limit";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "activation rejects surface limit above hard limit",
-        50,
-    );
+    let projection = synthetic_projection::tiny_projection();
+    let mut cfg = config();
+    let descriptor = projection
+        .retrieval_surfaces
+        .iter()
+        .find(|surface| surface.surface_id == "surface:exact")
+        .expect("synthetic exact surface exists");
+    let requested = descriptor
+        .hard_candidate_limit
+        .checked_add(1)
+        .expect("fixture hard limit can be incremented");
+    cfg.surface_limits
+        .iter_mut()
+        .find(|limit| limit.surface_id == descriptor.surface_id)
+        .expect("exact surface config exists")
+        .primary_candidate_limit = requested;
+    let err = semantic_traversal_core::activate_projection(
+        &projection,
+        &problem_space(),
+        &utterance(),
+        &cfg,
+        &PanicProjectionActivationAccess,
+    )
+    .unwrap_err();
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        err,
+        ProjectionActivationViolation::SurfaceCandidateLimitExceedsHardLimit {
+            surface_id: descriptor.surface_id.clone(),
+            requested,
+            hard_maximum: descriptor.hard_candidate_limit,
+        }
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 50,
-        "activation_rejects_surface_limit_above_hard_limit uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activation_preserves_region_referent_constraint_and_tension_order() {
-    let scenario_name = "activation_preserves_region_referent_constraint_and_tension_order";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "activation preserves region referent constraint and tension order",
-        66,
-    );
+    let (projection, ps, mut cfg, u) = seed_order_inputs();
+    cfg.unbanded.maximum_textual_seeds = 0;
+    cfg.primary.maximum_textual_seeds = 6;
+    cfg.secondary.maximum_textual_seeds = 0;
+    cfg.tertiary.maximum_textual_seeds = 0;
+    cfg.background.maximum_textual_seeds = 0;
+    let scripts = ScriptedProjectionActivationAccess {
+        results: vec![
+            (
+                exact_seed_probe(
+                    0,
+                    "referent A",
+                    referent_provenance(
+                        "region:primary-order",
+                        "referent:a",
+                        ActivationBand::Primary,
+                    ),
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Primary),
+                ),
+                empty_result(),
+            ),
+            (
+                exact_seed_probe(
+                    1,
+                    "referent B",
+                    referent_provenance(
+                        "region:primary-order",
+                        "referent:b",
+                        ActivationBand::Primary,
+                    ),
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Primary),
+                ),
+                empty_result(),
+            ),
+            (
+                exact_seed_probe(
+                    2,
+                    "regional order constraint",
+                    regional_constraint_provenance(),
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Primary),
+                ),
+                empty_result(),
+            ),
+            (
+                exact_seed_probe(
+                    3,
+                    "unresolved seed expression",
+                    tension_expression_provenance(),
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Primary),
+                ),
+                empty_result(),
+            ),
+            (
+                exact_seed_probe(
+                    4,
+                    "candidate zero",
+                    tension_candidate_provenance(0),
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Primary),
+                ),
+                empty_result(),
+            ),
+            (
+                exact_seed_probe(
+                    5,
+                    "candidate one",
+                    tension_candidate_provenance(1),
+                    ProjectionActivationProbeBand::Attention(ActivationBand::Primary),
+                ),
+                empty_result(),
+            ),
+        ],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    let activated =
+        semantic_traversal_core::activate_projection(&projection, &ps, &u, &cfg, &scripts).unwrap();
+    let telemetry_text_order = activated
+        .telemetry
+        .iter()
+        .map(|t| t.probe_id.as_str())
+        .collect::<Vec<_>>();
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
-    );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
+        telemetry_text_order,
         vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
+            "activation-probe:0",
+            "activation-probe:1",
+            "activation-probe:2",
+            "activation-probe:3",
+            "activation-probe:4",
+            "activation-probe:5"
         ]
     );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 66,
-        "activation_preserves_region_referent_constraint_and_tension_order uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
+    assert!(activated.telemetry[4].activation_provenance.contains(
+        &ActivationProvenance::OpenTensionCandidate {
+            tension_id: "tension:seed-order".into(),
+            candidate_index: 0
+        }
+    ));
+    assert!(activated.telemetry[5].activation_provenance.contains(
+        &ActivationProvenance::OpenTensionCandidate {
+            tension_id: "tension:seed-order".into(),
+            candidate_index: 1
+        }
+    ));
 }
 
 #[test]
 fn activation_preserves_projection_surface_order() {
-    let scenario_name = "activation_preserves_projection_surface_order";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "activation preserves projection surface order",
-        46,
+    let mut projection = synthetic_projection::tiny_projection();
+    let mut cfg = config();
+    only_available_surfaces(
+        &mut projection,
+        &mut cfg,
+        &["surface:vector", "surface:exact", "surface:lexical"],
     );
+    projection
+        .retrieval_surfaces
+        .sort_by_key(|surface| match surface.surface_id.as_str() {
+            "surface:vector" => 0,
+            "surface:exact" => 1,
+            "surface:lexical" => 2,
+            _ => 3,
+        });
+    cfg.unbanded.maximum_textual_seeds = 1;
+    cfg.primary.maximum_textual_seeds = 0;
+    let u = utterance();
+    let scripts = ScriptedProjectionActivationAccess {
+        results: vec![
+            (
+                text_probe(
+                    0,
+                    "surface:vector",
+                    RetrievalSurfaceKind::Vector,
+                    SurfaceMatchMode::NearestNeighbours,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    1,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    2,
+                    "surface:lexical",
+                    RetrievalSurfaceKind::Lexical,
+                    SurfaceMatchMode::Terms,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+        ],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    let activated = semantic_traversal_core::activate_projection(
+        &projection,
+        &problem_space(),
+        &u,
+        &cfg,
+        &scripts,
+    )
+    .unwrap();
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        activated
+            .telemetry
+            .iter()
+            .map(|t| t.surface_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["surface:vector", "surface:exact", "surface:lexical"]
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 46,
-        "activation_preserves_projection_surface_order uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn activation_preserves_descriptor_mode_order() {
-    let scenario_name = "activation_preserves_descriptor_mode_order";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "activation preserves descriptor mode order",
-        43,
-    );
+    let mut projection = synthetic_projection::tiny_projection();
+    let mut cfg = config();
+    only_available_surfaces(&mut projection, &mut cfg, &["surface:exact"]);
+    projection
+        .retrieval_surfaces
+        .iter_mut()
+        .find(|surface| surface.surface_id == "surface:exact")
+        .unwrap()
+        .match_modes = vec![
+        SurfaceMatchMode::Terms,
+        SurfaceMatchMode::Literal,
+        SurfaceMatchMode::NearestNeighbours,
+    ];
+    cfg.unbanded.maximum_textual_seeds = 1;
+    cfg.primary.maximum_textual_seeds = 0;
+    let u = utterance();
+    let provenance = vec![ActivationProvenance::NewestUtterance {
+        utterance_id: u.utterance_id.clone(),
+    }];
+    let scripts = ScriptedProjectionActivationAccess {
+        results: vec![
+            (
+                text_probe(
+                    0,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Terms,
+                    "newest",
+                    provenance.clone(),
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    1,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "newest",
+                    provenance.clone(),
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    2,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::NearestNeighbours,
+                    "newest",
+                    provenance,
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+        ],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    let activated = semantic_traversal_core::activate_projection(
+        &projection,
+        &problem_space(),
+        &u,
+        &cfg,
+        &scripts,
+    )
+    .unwrap();
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
-    );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
+        activated
+            .telemetry
+            .iter()
+            .map(|t| t.match_mode.clone())
+            .collect::<Vec<_>>(),
         vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
+            SurfaceMatchMode::Terms,
+            SurfaceMatchMode::Literal,
+            SurfaceMatchMode::NearestNeighbours
         ]
     );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 43,
-        "activation_preserves_descriptor_mode_order uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn textual_seed_limit_applies_before_surface_fanout() {
-    let scenario_name = "textual_seed_limit_applies_before_surface_fanout";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "textual seed limit applies before surface fanout",
-        49,
+    let mut projection = synthetic_projection::tiny_projection();
+    let mut cfg = config();
+    only_available_surfaces(
+        &mut projection,
+        &mut cfg,
+        &["surface:exact", "surface:lexical"],
     );
-    assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
-    );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 49,
-        "textual_seed_limit_applies_before_surface_fanout uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
+    cfg.unbanded.maximum_textual_seeds = 1;
+    cfg.primary.maximum_textual_seeds = 0;
+    let u = utterance();
+    let scripts = ScriptedProjectionActivationAccess {
+        results: vec![
+            (
+                text_probe(
+                    0,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    1,
+                    "surface:lexical",
+                    RetrievalSurfaceKind::Lexical,
+                    SurfaceMatchMode::Terms,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+        ],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    let activated = semantic_traversal_core::activate_projection(
+        &projection,
+        &problem_space(),
+        &u,
+        &cfg,
+        &scripts,
+    )
+    .unwrap();
+    assert_eq!(activated.telemetry.len(), 2);
+    assert!(activated.telemetry.iter().all(|t| {
+        t.activation_provenance
+            .iter()
+            .any(|p| matches!(p, ActivationProvenance::NewestUtterance { .. }))
+    }));
+    assert!(activated.telemetry.iter().all(|t| !t.activation_provenance.iter().any(|p| matches!(p, ActivationProvenance::Constraint { constraint_id } if constraint_id == "constraint:whole"))));
 }
 
 #[test]
 fn candidate_limit_applies_per_probe_surface_and_mode() {
-    let scenario_name = "candidate_limit_applies_per_probe_surface_and_mode";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "candidate limit applies per probe surface and mode",
-        51,
+    let mut projection = synthetic_projection::tiny_projection();
+    let mut cfg = config();
+    only_available_surfaces(
+        &mut projection,
+        &mut cfg,
+        &["surface:exact", "surface:lexical"],
     );
+    cfg.unbanded.maximum_textual_seeds = 1;
+    cfg.primary.maximum_textual_seeds = 0;
+    cfg.surface_limits
+        .iter_mut()
+        .find(|limit| limit.surface_id == "surface:exact")
+        .unwrap()
+        .unbanded_candidate_limit = 1;
+    cfg.surface_limits
+        .iter_mut()
+        .find(|limit| limit.surface_id == "surface:lexical")
+        .unwrap()
+        .unbanded_candidate_limit = 3;
+    let u = utterance();
+    let provenance = vec![ActivationProvenance::NewestUtterance {
+        utterance_id: u.utterance_id.clone(),
+    }];
+    let scripts = ScriptedProjectionActivationAccess {
+        results: vec![
+            (
+                {
+                    let mut probe = text_probe(
+                        0,
+                        "surface:exact",
+                        RetrievalSurfaceKind::Exact,
+                        SurfaceMatchMode::Literal,
+                        "newest",
+                        provenance.clone(),
+                        ProjectionActivationProbeBand::Unbanded,
+                    );
+                    probe.candidate_limit = 1;
+                    probe
+                },
+                empty_result(),
+            ),
+            (
+                {
+                    let mut probe = text_probe(
+                        1,
+                        "surface:lexical",
+                        RetrievalSurfaceKind::Lexical,
+                        SurfaceMatchMode::Terms,
+                        "newest",
+                        provenance,
+                        ProjectionActivationProbeBand::Unbanded,
+                    );
+                    probe.candidate_limit = 3;
+                    probe
+                },
+                empty_result(),
+            ),
+        ],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    let activated = semantic_traversal_core::activate_projection(
+        &projection,
+        &problem_space(),
+        &u,
+        &cfg,
+        &scripts,
+    )
+    .unwrap();
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        activated
+            .telemetry
+            .iter()
+            .map(|t| t.surface_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["surface:exact", "surface:lexical"]
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 51,
-        "candidate_limit_applies_per_probe_surface_and_mode uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn zero_candidate_limit_still_emits_telemetry() {
-    let scenario_name = "zero_candidate_limit_still_emits_telemetry";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "zero candidate limit still emits telemetry",
-        43,
-    );
-    assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
-    );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
+    let mut projection = synthetic_projection::tiny_projection();
+    let mut cfg = config();
+    only_available_surfaces(&mut projection, &mut cfg, &["surface:exact"]);
+    cfg.unbanded.maximum_textual_seeds = 1;
+    cfg.primary.maximum_textual_seeds = 0;
+    cfg.surface_limits[0].unbanded_candidate_limit = 0;
+    let u = utterance();
+    let scripts = ScriptedProjectionActivationAccess {
+        results: vec![(
+            {
+                let mut probe = text_probe(
+                    0,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "newest",
+                    vec![ActivationProvenance::NewestUtterance {
+                        utterance_id: u.utterance_id.clone(),
+                    }],
+                    ProjectionActivationProbeBand::Unbanded,
+                );
+                probe.candidate_limit = 0;
+                probe
             },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
+            empty_result(),
+        )],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    let activated = semantic_traversal_core::activate_projection(
+        &projection,
+        &problem_space(),
+        &u,
+        &cfg,
+        &scripts,
+    )
+    .unwrap();
+    assert_eq!(activated.telemetry.len(), 1);
     assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 43,
-        "zero_candidate_limit_still_emits_telemetry uses a scenario-specific expansion budget"
+        activated.telemetry[0].candidate_count,
+        CandidateCount::Exact(0)
     );
     assert_eq!(activated.telemetry[0].returned_count, 0);
+    assert!(matches!(
+        activated.telemetry[0].truncation_state,
+        TruncationState::Complete
+    ));
 }
 
 #[test]
 fn all_configured_available_text_surfaces_fire() {
-    let scenario_name = "all_configured_available_text_surfaces_fire";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "all configured available text surfaces fire",
-        44,
-    );
+    let projection = synthetic_projection::tiny_projection();
+    let mut cfg = config();
+    cfg.unbanded.maximum_textual_seeds = 1;
+    cfg.primary.maximum_textual_seeds = 0;
+    let u = utterance();
+    let provenance = vec![ActivationProvenance::NewestUtterance {
+        utterance_id: u.utterance_id.clone(),
+    }];
+    let scripts = ScriptedProjectionActivationAccess {
+        results: vec![
+            (
+                text_probe(
+                    0,
+                    "surface:exact",
+                    RetrievalSurfaceKind::Exact,
+                    SurfaceMatchMode::Literal,
+                    "newest",
+                    provenance.clone(),
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    1,
+                    "surface:lexical",
+                    RetrievalSurfaceKind::Lexical,
+                    SurfaceMatchMode::Terms,
+                    "newest",
+                    provenance.clone(),
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+            (
+                text_probe(
+                    2,
+                    "surface:vector",
+                    RetrievalSurfaceKind::Vector,
+                    SurfaceMatchMode::NearestNeighbours,
+                    "newest",
+                    provenance,
+                    ProjectionActivationProbeBand::Unbanded,
+                ),
+                empty_result(),
+            ),
+        ],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    let activated = semantic_traversal_core::activate_projection(
+        &projection,
+        &problem_space(),
+        &u,
+        &cfg,
+        &scripts,
+    )
+    .unwrap();
     assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
+        activated
+            .telemetry
+            .iter()
+            .map(|t| t.surface_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["surface:exact", "surface:lexical", "surface:vector"]
     );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
+    assert!(
+        activated
+            .telemetry
+            .iter()
+            .all(|t| t.surface_id != "surface:graph" && t.surface_id != "surface:temporal")
     );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 44,
-        "all_configured_available_text_surfaces_fire uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
 }
 
 #[test]
 fn empty_text_seed_is_dispatched_without_semantic_filtering() {
-    let scenario_name = "empty_text_seed_is_dispatched_without_semantic_filtering";
-    let activated = empty_probe_activation_for(
-        scenario_name,
-        "empty text seed is dispatched without semantic filtering",
-        57,
-    );
-    assert_eq!(
-        activated.newest_utterance_id,
-        format!("utterance:{scenario_name}")
-    );
-    assert_eq!(
-        activated.telemetry[0].activation_provenance,
-        vec![
-            ActivationProvenance::NewestUtterance {
-                utterance_id: format!("utterance:{scenario_name}"),
-            },
-            ActivationProvenance::ConfiguredDefault {
-                configuration_key: "automatic_surface_fan_out".into(),
-            },
-        ]
-    );
-    assert_eq!(
-        activated.telemetry[0].remaining_expansion_budget, 57,
-        "empty_text_seed_is_dispatched_without_semantic_filtering uses a scenario-specific expansion budget"
-    );
-    assert_eq!(activated.telemetry[0].returned_count, 0);
+    let mut projection = synthetic_projection::tiny_projection();
+    let mut cfg = config();
+    only_available_surfaces(&mut projection, &mut cfg, &["surface:exact"]);
+    cfg.unbanded.maximum_textual_seeds = 1;
+    cfg.primary.maximum_textual_seeds = 0;
+    let mut u = utterance();
+    u.text.clear();
+    let scripts = ScriptedProjectionActivationAccess {
+        results: vec![(
+            text_probe(
+                0,
+                "surface:exact",
+                RetrievalSurfaceKind::Exact,
+                SurfaceMatchMode::Literal,
+                "",
+                vec![ActivationProvenance::NewestUtterance {
+                    utterance_id: u.utterance_id.clone(),
+                }],
+                ProjectionActivationProbeBand::Unbanded,
+            ),
+            empty_result(),
+        )],
+        failures: vec![],
+        declared_modes: vec![],
+    };
+    let activated = semantic_traversal_core::activate_projection(
+        &projection,
+        &problem_space(),
+        &u,
+        &cfg,
+        &scripts,
+    )
+    .unwrap();
+    assert_eq!(activated.telemetry.len(), 1);
+    assert_eq!(activated.telemetry[0].probe_id, "activation-probe:0");
 }
 
 #[test]
@@ -3680,21 +4297,38 @@ fn continuation_arithmetic_overflow_is_count_overflow() {
 #[test]
 fn declared_mode_requires_explicit_access_support() {
     let mut projection = synthetic_projection::tiny_projection();
-    projection.retrieval_surfaces[0].match_modes = vec![SurfaceMatchMode::Declared {
-        name: "custom".into(),
+    let mut cfg = config();
+    only_available_surfaces(&mut projection, &mut cfg, &["surface:exact"]);
+    projection
+        .retrieval_surfaces
+        .iter_mut()
+        .find(|surface| surface.surface_id == "surface:exact")
+        .unwrap()
+        .match_modes = vec![SurfaceMatchMode::Declared {
+        name: "custom-text".into(),
     }];
+    cfg.unbanded.maximum_textual_seeds = 1;
+    cfg.primary.maximum_textual_seeds = 0;
     let err = semantic_traversal_core::activate_projection(
         &projection,
         &problem_space(),
         &utterance(),
-        &config(),
+        &cfg,
         &ScriptedProjectionActivationAccess::default(),
     )
     .unwrap_err();
-    assert!(matches!(
-        err,
-        ProjectionActivationViolation::SurfaceAccessFailed { .. }
-    ));
+    match err {
+        ProjectionActivationViolation::SurfaceAccessFailed {
+            surface_id,
+            probe_id,
+            context,
+        } => {
+            assert_eq!(surface_id, "surface:exact");
+            assert_eq!(probe_id, "activation-probe:0");
+            assert!(context.contains("custom-text"));
+        }
+        other => panic!("expected declared-mode access failure, got {other:?}"),
+    }
 }
 
 #[test]
