@@ -2957,8 +2957,10 @@ fn identifier_assignment_order_follows_projection_order() {
     let mut projection = synthetic_projection::tiny_projection();
     let marx = synthetic_projection::object(synthetic_projection::MARX_OBJECT);
     let desired = vec![
-        "assignment:marx:creator".to_owned(),
+        "assignment:marx:format".to_owned(),
         "assignment:marx:title".to_owned(),
+        "assignment:marx:note_type".to_owned(),
+        "assignment:marx:creator".to_owned(),
     ];
     projection.identifier_assignments.sort_by_key(|assignment| {
         desired
@@ -2988,15 +2990,27 @@ fn identifier_assignment_order_follows_projection_order() {
     let activated_ids = activated
         .activated_identifier_assignments
         .iter()
+        .filter(|assignment| desired.contains(&assignment.assignment_id))
         .map(|assignment| assignment.assignment_id.clone())
         .collect::<Vec<_>>();
-    assert_eq!(&activated_ids[..2], &desired[..]);
+    assert_eq!(activated_ids, desired);
+    let mut sorted = desired.clone();
+    sorted.sort();
+    assert_ne!(desired, sorted);
     let object = activated
         .activated_objects
         .iter()
         .find(|object| object.object_id == marx)
         .unwrap();
     assert_eq!(object.visible_identifier_assignment_ids, desired);
+    for assignment_id in &object.visible_identifier_assignment_ids {
+        assert!(
+            activated
+                .activated_identifier_assignments
+                .iter()
+                .any(|assignment| &assignment.assignment_id == assignment_id)
+        );
+    }
 }
 
 #[test]
@@ -3057,6 +3071,34 @@ fn first_seen_record_order_is_stable() {
             synthetic_projection::MCCARTHY_OBJECT.to_owned()
         ]
     );
+    let expected_regions = vec![
+        synthetic_projection::region(
+            &synthetic_projection::object(synthetic_projection::MARX_OBJECT),
+            "heading:Chapter 2",
+        ),
+        synthetic_projection::region(
+            &synthetic_projection::object(synthetic_projection::MCCARTHY_OBJECT),
+            "heading:Chapter 1",
+        ),
+    ];
+    assert_eq!(
+        activated
+            .activated_regions
+            .iter()
+            .map(|region| region.address.clone())
+            .collect::<Vec<_>>(),
+        expected_regions
+    );
+    for region in &expected_regions {
+        assert_eq!(
+            activated
+                .activated_regions
+                .iter()
+                .filter(|record| &record.address == region)
+                .count(),
+            1
+        );
+    }
 }
 
 #[test]
@@ -3105,11 +3147,16 @@ fn incidence_traversal_respects_relation_depth() {
 #[test]
 fn incidence_cycles_are_suppressed_per_root() {
     let source = SemanticAddress::Object(synthetic_projection::object(
-        synthetic_projection::MARX_OBJECT,
+        synthetic_projection::JOURNAL_ONE_OBJECT,
     ));
     let occurrence = SemanticAddress::Occurrence(synthetic_projection::occurrence(
         "occurrence:journal-one:capital-object",
     ));
+    let occurrence_source_transition = "transition:occurrence-object-source";
+    assert_eq!(
+        occurrence_source_transition,
+        "transition:occurrence-object-source"
+    );
     let activated = graph_root_activation(
         3,
         vec![
@@ -3117,25 +3164,42 @@ fn incidence_cycles_are_suppressed_per_root() {
                 source.clone(),
                 incidence_result(
                     occurrence.clone(),
-                    "transition:object-occurrence-incoming",
-                    Direction::Incoming,
+                    "transition:object-occurrence-outgoing",
+                    Direction::Outgoing,
                 ),
             ),
-            (occurrence.clone(), empty_result()),
+            (occurrence.clone(), incidence_result_many(vec![])),
         ],
     );
-    let graph_ids = activated
+    let graph = activated
         .telemetry
         .iter()
         .filter(|record| record.surface_id == "surface:graph")
-        .map(|record| record.probe_id.clone())
         .collect::<Vec<_>>();
-    assert_eq!(graph_ids, vec!["activation-probe:1", "activation-probe:2"]);
+    assert_eq!(graph.len(), 2);
+    assert_eq!(graph[0].current_depth, 1);
+    assert_eq!(graph[1].current_depth, 2);
+    assert!(activated.edges.iter().any(|edge| {
+        edge.source == source
+            && edge.target == occurrence
+            && edge.transition_id == "transition:object-occurrence-outgoing"
+            && edge.direction == Direction::Outgoing
+    }));
     assert_eq!(
         activated
-            .edges
+            .activated_objects
             .iter()
-            .filter(|edge| edge.source == source)
+            .filter(|object| object.object_id
+                == synthetic_projection::object(synthetic_projection::JOURNAL_ONE_OBJECT))
+            .count(),
+        1
+    );
+    assert_eq!(
+        activated
+            .activated_occurrences
+            .iter()
+            .filter(|record| record.occurrence_id
+                == synthetic_projection::occurrence("occurrence:journal-one:capital-object"))
             .count(),
         1
     );
@@ -3248,21 +3312,45 @@ fn activated_edges_deduplicate_by_exact_tuple() {
             edge.source == source
                 && edge.target == target
                 && edge.transition_id == "transition:object-occurrence-incoming"
+                && edge.direction == Direction::Incoming
         })
         .collect::<Vec<_>>();
     assert_eq!(edges.len(), 1);
-    assert_eq!(edges[0].edge_id, "activated-edge:0");
-    assert!(
-        edges[0]
-            .activation_provenance
-            .iter()
-            .any(|p| matches!(p, ActivationProvenance::NewestUtterance { .. }))
+    let edge = edges[0];
+    assert_eq!(edge.edge_id, "activated-edge:0");
+    assert_eq!(edge.source, source);
+    assert_eq!(edge.transition_id, "transition:object-occurrence-incoming");
+    assert_eq!(edge.direction, Direction::Incoming);
+    assert_eq!(edge.target, target);
+    let root_paths = edge
+        .activation_provenance
+        .iter()
+        .filter_map(|p| match p {
+            ActivationProvenance::NewestUtterance { utterance_id } => Some(utterance_id.clone()),
+            ActivationProvenance::Constraint { constraint_id } => Some(constraint_id.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        root_paths,
+        vec![
+            "utterance:graph-two-root".to_owned(),
+            "constraint:graph-second-root".to_owned()
+        ]
     );
-    assert!(
-        edges[0]
-            .activation_provenance
+    assert_eq!(
+        activated
+            .edges
             .iter()
-            .any(|p| matches!(p, ActivationProvenance::Constraint { .. }))
+            .filter(|edge| {
+                edge.edge_id == "activated-edge:1"
+                    && edge.source == source
+                    && edge.target == target
+                    && edge.transition_id == "transition:object-occurrence-incoming"
+                    && edge.direction == Direction::Incoming
+            })
+            .count(),
+        0
     );
 }
 
@@ -3300,10 +3388,22 @@ fn activated_edge_ids_follow_first_insertion_order() {
         .iter()
         .filter(|edge| edge.transition_id == "transition:object-occurrence-outgoing")
         .collect::<Vec<_>>();
+    assert_eq!(occurrence_edges.len(), 2);
     assert_eq!(occurrence_edges[0].edge_id, "activated-edge:0");
     assert_eq!(occurrence_edges[0].source, source);
+    assert_eq!(
+        occurrence_edges[0].transition_id,
+        "transition:object-occurrence-outgoing"
+    );
+    assert_eq!(occurrence_edges[0].direction, Direction::Outgoing);
     assert_eq!(occurrence_edges[0].target, first);
     assert_eq!(occurrence_edges[1].edge_id, "activated-edge:1");
+    assert_eq!(occurrence_edges[1].source, source);
+    assert_eq!(
+        occurrence_edges[1].transition_id,
+        "transition:object-occurrence-outgoing"
+    );
+    assert_eq!(occurrence_edges[1].direction, Direction::Outgoing);
     assert_eq!(occurrence_edges[1].target, second);
 }
 
@@ -3318,10 +3418,7 @@ fn edge_bound_truncates_without_reordering_records() {
     let second = SemanticAddress::Occurrence(synthetic_projection::occurrence(
         "occurrence:journal-one:cleo",
     ));
-    let mut cfg = graph_config(1);
-    cfg.maximum_activated_edges = 1;
-    let activated = graph_activation_with_config(
-        cfg,
+    let graph_results = || {
         vec![(
             source.clone(),
             incidence_result_many(vec![
@@ -3336,12 +3433,76 @@ fn edge_bound_truncates_without_reordering_records() {
                     Direction::Outgoing,
                 ),
             ]),
-        )],
+        )]
+    };
+    let mut unbounded_cfg = graph_config(1);
+    unbounded_cfg.maximum_activated_edges = 2;
+    let unbounded = graph_activation_with_config(unbounded_cfg, graph_results());
+    let mut bounded_cfg = graph_config(1);
+    bounded_cfg.maximum_activated_edges = 1;
+    let bounded = graph_activation_with_config(bounded_cfg, graph_results());
+    assert_eq!(unbounded.edges.len(), 2);
+    assert_eq!(unbounded.edges[0].target, first);
+    assert_eq!(unbounded.edges[1].target, second);
+    assert_eq!(bounded.edges.len(), 1);
+    assert_eq!(bounded.edges[0].edge_id, unbounded.edges[0].edge_id);
+    assert_eq!(bounded.edges[0].source, unbounded.edges[0].source);
+    assert_eq!(
+        bounded.edges[0].transition_id,
+        unbounded.edges[0].transition_id
     );
-    assert_eq!(activated.edges.len(), 1);
-    assert_eq!(activated.edges[0].target, first);
+    assert_eq!(bounded.edges[0].direction, unbounded.edges[0].direction);
+    assert_eq!(bounded.edges[0].target, first);
+    assert_eq!(
+        bounded
+            .activated_objects
+            .iter()
+            .map(|record| record.object_id.clone())
+            .collect::<Vec<_>>(),
+        unbounded
+            .activated_objects
+            .iter()
+            .map(|record| record.object_id.clone())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        bounded
+            .activated_regions
+            .iter()
+            .map(|record| record.address.clone())
+            .collect::<Vec<_>>(),
+        unbounded
+            .activated_regions
+            .iter()
+            .map(|record| record.address.clone())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        bounded
+            .activated_units
+            .iter()
+            .map(|record| record.unit_id.clone())
+            .collect::<Vec<_>>(),
+        unbounded
+            .activated_units
+            .iter()
+            .map(|record| record.unit_id.clone())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        bounded
+            .activated_occurrences
+            .iter()
+            .map(|record| record.occurrence_id.clone())
+            .collect::<Vec<_>>(),
+        unbounded
+            .activated_occurrences
+            .iter()
+            .map(|record| record.occurrence_id.clone())
+            .collect::<Vec<_>>()
+    );
     assert!(
-        activated
+        bounded
             .activated_occurrences
             .iter()
             .any(|record| &record.occurrence_id
@@ -3350,8 +3511,19 @@ fn edge_bound_truncates_without_reordering_records() {
                     _ => unreachable!(),
                 })
     );
+    let root_telemetry = bounded
+        .telemetry
+        .iter()
+        .find(|record| record.surface_id == "surface:exact")
+        .unwrap();
+    assert_eq!(root_telemetry.candidate_count, CandidateCount::Exact(1));
+    let graph_telemetry = bounded
+        .telemetry
+        .iter()
+        .find(|record| record.surface_id == "surface:graph")
+        .unwrap();
     assert!(matches!(
-        activated.telemetry[1].truncation_state,
+        graph_telemetry.truncation_state,
         TruncationState::Bounded
     ));
 }
