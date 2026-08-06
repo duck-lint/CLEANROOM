@@ -2,468 +2,235 @@
 
 ## Principle
 
-Recover substrate authority without restarting the project.
+Recover substrate authority without restarting the project. The Python system supplies an operator-attested recovery baseline; the clean-room task is to preserve and improve the demonstrated capability while grounding representations in the complete authored substrate.
 
-The Python runtime has already demonstrated whole-corpus feasibility. The clean-room task is to preserve and improve that demonstrated capability without importing accidental Python architecture into the new kernel.
-
-The sequence is therefore:
+The required order is:
 
 ```text
-preserve completed clean-room work
-→ expose complete authored and materialized corpus facts
-→ reconcile candidate contracts against those facts
-→ construct and validate the real projection
-→ revalidate existing corpus-sensitive implementation
-→ continue the clean runtime
+whole-corpus observation
+→ contract-contact reconciliation
+→ bounded contract amendment
+→ real projection construction
+→ complete-vault projection validation
+→ real projection-access implementation
+→ candidate activation revalidation
+→ semantic-access inference
+→ conformance
+→ execution
+→ packet and synthesis
+→ private UAT
 ```
 
-Existing clean-room work remains valuable. Its corpus-sensitive portions are provisional until they survive complete-vault contact.
+This does not restart CLEANROOM. Existing contracts, fold, fixture, and PR #9 work are preserved, while corpus-sensitive portions remain provisional.
 
-## Authority rule
-
-Use this order throughout implementation:
-
-1. authored vault and Organon;
-2. observed whole-corpus behavior and private UAT;
-3. semantic distinctions that survive corpus contact;
-4. candidate clean-room contracts;
-5. Python implementation boundaries;
-6. generic engineering conventions.
-
-The Python runtime is admissible evidence, not architectural authority.
-
-No implementation is justified solely by prose coherence. No synthetic fixture substitutes for whole-corpus grounding. No compatibility mechanism is added without a concrete consumer.
-
-## Phase 0 — Preserve the current repositories and recovery baseline
-
-1. Preserve `duck-lint/semantic-traversal` in its existing repository and history as the demonstrated Python system.
-2. Preserve `duck-lint/CLEANROOM` as an independent repository.
-3. Record the exact `CLEANROOM` base, open branches, and candidate implementations at the start of recovery.
-4. Do not delete, rewrite, or restart the accepted contract, fold, fixture, or activation work.
-5. Freeze new corpus-sensitive implementation until the real projection boundary is established.
-
-Deliverable:
-
-- a recorded recovery baseline with no loss of completed work.
-
-## Phase 1 — Correct authority and lifecycle declarations
-
-Update the clean-room documents so that:
-
-- whole-corpus feasibility is recorded as demonstrated;
-- the immediate question is faithful reconstruction and improvement;
-- the authored vault and Organon outrank candidate contracts;
-- Python capabilities, failures, corpus observations, and private UAT are admissible evidence;
-- synthetic fixtures are regression surfaces rather than architectural substitutes;
-- corpus-sensitive contracts are provisional until validated against the complete vault.
-
-Classify existing artifacts as:
+## Authority domains
 
 ```text
-accepted and corpus-independent
-provisional pending corpus contact
-validated against the complete vault
-superseded by higher-authority evidence
+Constitutive system meaning
+    Organon
+    explicit operator decisions
+
+Runtime semantic authority
+    accepted kernel equations
+    accepted runtime invariants
+
+Corpus actuality
+    raw authored-vault structure and content
+    including irregularities, absences, ambiguity,
+    malformed structures, and unresolved authoring states
+
+Representational authority
+    corpus-validated semantic contracts
+
+Implementation authority
+    accepted implementation contracts
+    within their explicitly declared responsibility
 ```
 
-The deterministic problem-space fold is primarily thread-state machinery and may remain accepted unless corpus contact exposes a relevant contradiction.
+The domains are scoped. The Organon constrains system meaning; explicit operator decisions resolve open authoring or constitutive questions; the vault supplies actual authored instances; equations and invariants constrain deterministic runtime authority; contracts become representational authority only after corpus validation; implementations are authoritative only within accepted boundaries. A cross-domain conflict requires classification, retained evidence, an explicit operator or contract decision, and a bounded amendment.
 
-Projection, unit-materialization, occurrence, retrieval-surface, and activation assumptions remain provisional.
-
-Deliverable:
-
-- an explicit substrate-first recovery posture without code changes.
-
-## Phase 2 — Define a versioned whole-corpus observation exchange
-
-Create a read-only exchange generated locally from the authored vault and the demonstrated Python substrate.
-
-The exchange must keep three evidence layers distinguishable:
+## Evidence taxonomy
 
 ```text
-authored source observations
+raw authored-vault observations
 Python materialization observations
-runtime behavior and private-UAT observations
+runtime traces and measured behavior
+private-UAT reports
+synthetic fixtures
+implementation source and diagnostics
+operator attestations
 ```
 
-The authored layer should expose, as available:
+Evidence can establish a required capability, concrete consumer, corpus phenomenon, failure mode, contradiction, unsupported assumption, performance or scale condition, or need for amendment. It does not silently become semantic authority. Python success does not prove Python architecture; private UAT validates behavior rather than internal implementation; synthetic fixtures establish local mechanics rather than corpus actuality; source and diagnostics establish what code does rather than what the system ought to mean.
 
-- source identity and UUID;
-- path and filename;
-- admitted frontmatter and field provenance;
-- heading hierarchy;
-- authored Markdown blocks;
-- wikilinks, aliases, embeds, heading targets, and block targets;
-- source hashes and snapshot identity.
+## Phase 0 — Preserve the recovery boundary
 
-The Python-materialization layer should expose, as available:
+1. Preserve `duck-lint/semantic-traversal` and its history as evidence of the Python system.
+2. Preserve `duck-lint/CLEANROOM` and its existing contracts, fold, fixture, and PR #9 work.
+3. Record exact repository, branch, corpus, suite, report, and implementation identities where available.
+4. Do not restart, delete, rewrite, or import legacy runtime orchestration.
+5. Freeze further semantic-access, conformance, execution, packet, and synthesis implementation until real projection access exists.
 
-- notes and canonicalized chunks;
-- section and ordinal structure;
-- admitted frontmatter serialization;
-- graph nodes, authored occurrences, and incidence;
-- temporal anchors and provenance;
-- retrieval-surface availability and bounds;
-- inventory identity, validation status, and counts.
+## Phase 1 — Record the operator-attested recovery baseline
 
-The behavior layer should expose repository-safe or private-local records of:
+The operator attests that complete-vault ingest occurred; real corpus questions were answered; exact, lexical, vector, graph, and temporal mechanisms operated; multi-turn private UAT exercised the system; and useful whole-corpus behavior resulted.
 
-- capabilities demonstrated;
-- observed failures;
-- execution limits;
-- private-UAT obligations and outcomes.
+Classify this as an `operator-attested recovery baseline`. It does not establish Python ontology correctness, projected-affordance exhaustiveness, preservation of CLEANROOM equations or invariants, evidence-admission correctness, absence of accidental semantic/coherence gates, correctness of candidate Rust contracts or Python boundaries, or corpus-scale suitability of candidate Rust activation.
 
-Private corpus content remains local and ignored. Public code may define the exporter, schemas, validation, and redacted aggregate reporting.
-
-The exchange must not silently convert Python records into clean-room authority.
-
-Deliverable:
-
-- a versioned, deterministic, read-only observation bundle and local generation procedure.
-
-## Phase 3 — Reconcile candidate contracts against corpus evidence
-
-For each material clean-room contract field or distinction, record one status:
+The recovery-baseline manifest records, where available:
 
 ```text
-supported
-supported_with_revision
-contradicted
-not_observed
+python_repository_commit
+corpus_snapshot_identity
+inventory_identity
+materialization_or_index_identity
+private_uat_suite_identities
+report_identities
+demonstrated_capabilities
+known_failures
+known_architectural_violations
+unmeasured_areas
+private_artifact_hashes_or_locations
+attestation_timestamp
+```
+
+Unknown or unavailable identities are `unknown`; no historical identity is inferred or fabricated.
+
+## Phase 2 — Observe the complete authored substrate
+
+Observation precedes semantic classification or admission. The observation bundle exposes, as available:
+
+```text
+source path
+source identity and UUID observation
+raw frontmatter keys
+raw frontmatter value shapes
+frontmatter source provenance
+heading hierarchy
+authored Markdown block candidates
+raw Markdown
+wikilinks
+aliases
+embeds
+heading targets
+block targets
+source spans
+parse failures
+unsupported syntax
+ambiguous targets
+unresolved targets
+source hashes
+corpus snapshot identity
+```
+
+Do not call these facts semantic objects, semantic units, identifiers, or occurrences yet. A relevant observation is then classified as:
+
+```text
+admitted
+quarantined
+rejected
+unresolved
 open_authoring_decision
 ```
 
-Each judgment must retain:
+Admission retains the raw observation, classification rule, rule authority, information preserved, and information lost or excluded.
 
-- the clean-room claim being evaluated;
-- authored-vault evidence;
-- Python materialization or behavior evidence;
-- the bridge rule from evidence to judgment;
-- preserved distinctions;
-- known breaks or losses;
-- required contract revision, if any.
+Python chunks, graph nodes, anchors, and indexes are materialization observations. A chunk may correspond to an authored unit, be a transport split, reveal a defect, or remain unresolved. Naming a record does not settle its semantic status.
 
-Interpret the statuses strictly:
+## Phase 3 — Reconcile contract contact
 
-- `supported` means supported within the admitted corpus and evidence scope;
-- `supported_with_revision` requires an explicit contract correction;
-- `contradicted` blocks dependent implementation;
-- `not_observed` neither validates nor invalidates the claim;
-- `open_authoring_decision` requires operator authority rather than runtime invention.
+For every material corpus-sensitive claim, produce a human-readable mapping containing:
 
-Priority review areas include:
+```text
+contract claim
+authority domain
+raw authored example
+Python materialization observation
+runtime or UAT evidence, when relevant
+proposed CLEANROOM representation
+bridge rule
+positive example
+ugly or irregular example
+counterexample
+information preserved
+information lost or excluded
+unresolved decision
+status
+required amendment
+```
 
-- object identity versus discovery surfaces;
-- heading-region identity;
-- authored semantic-unit boundaries;
-- empty-body objects;
-- intrinsic identifiers versus contextual participation;
-- frontmatter and body occurrence provenance;
-- heading and block target resolution;
-- reverse incidence;
-- temporal-anchor sourcing;
-- identifier applicability and semantic roles;
-- identifier-to-surface affordances;
-- Python chunk splits versus clean-room transport segments;
-- hydration and continuation assumptions.
+The report must make inspectable mappings possible, including:
 
-Deliverable:
+```text
+this note
+this heading
+this frontmatter value
+this authored block
+this link occurrence
+this unresolved target
 
-- a complete contract-contact matrix and bounded amendment list.
+→
 
-## Phase 4 — Amend only the contradicted or unsupported contracts
+this candidate object
+this candidate region
+this candidate unit
+this candidate identifier assignment
+this candidate occurrence
+this explicit unresolved representation
+```
 
-Revise candidate contracts only where Phase 3 supplies evidence.
+Private content may remain local. Repository-safe output may contain counts, hashes, redacted paths or stable local references, classification totals, unresolved-decision totals, and structural failure summaries. A polished abstract matrix without inspectable local mappings is insufficient.
 
-Each amendment must identify:
+For each claim, use the lifecycle states `candidate`, `provisionally accepted`, `corpus-validated`, or `superseded`. Corpus-independent mechanics may become accepted without whole-corpus validation when their boundary genuinely does not depend on corpus structure. Corpus-sensitive contracts remain provisional until raw observation, admission, projection construction, real projection access, and applicable UAT validate them. Validation is scoped to a versioned corpus snapshot and admitted evidence boundary; later corpus changes may require revalidation without retroactively invalidating the prior snapshot result.
 
-- the higher-authority evidence;
-- the exact prior assumption;
-- the smallest required correction;
-- affected schemas and tests;
-- migration implications for existing candidate code;
-- unresolved questions left open.
+## Phase 4 — Amend only what evidence requires
 
-Do not add abstractions merely because they appear prudent.
+Each bounded amendment identifies the prior claim, evidence, bridge rule, smallest correction, information preserved or lost, affected contracts and tests, migration implications, and unresolved decisions. Do not add abstractions, fallbacks, compatibility paths, or extension points without a concrete consumer.
 
-Do not add fallbacks, compatibility paths, or generalized extension points without a concrete consumer.
+## Phase 5 — Construct the real projection
 
-Deliverable:
-
-- corpus-grounded contracts and schemas.
-
-## Phase 5 — Build the read-only real projection adapter
-
-Define a versioned adapter:
+Build a versioned read-only boundary:
 
 ```text
 WholeCorpusObservationBundle
     → SemanticSpaceProjection
 ```
 
-The adapter may:
-
-- map authored UUIDs to canonical object identities;
-- materialize accepted heading regions and semantic units;
-- attach admitted identifiers with source provenance;
-- map authored links and field relations to occurrence records;
-- derive reverse incidence from authoritative occurrences;
-- map materially sourced temporal facts to temporal anchors;
-- expose validated retrieval-surface capabilities;
-- calculate deterministic snapshot identity and logical hash.
-
-The adapter may not:
-
-- infer semantic equivalence;
-- guess unresolved targets;
-- assign corpus-specific semantic roles without accepted authority;
-- treat folder placement as the sole object type;
-- flatten contextual participation into intrinsic typing;
-- silently promote Python chunks to authored semantic units;
-- fabricate missing block mappings;
-- fill required fields with invented defaults;
-- import legacy runtime orchestration.
-
-Unmappable required structure produces a typed projection-construction violation.
-
-Deliverable:
-
-- a read-only adapter and typed construction-failure surface.
+Construction may map admitted authored facts to canonical objects, regions, units, identifiers, occurrences, anchors, and surfaces. It must retain provenance and represent ambiguity, malformed structures, unsupported syntax, and unresolved targets explicitly. It must not invent mappings, guess equivalence, or silently promote Python chunks to authored semantic units.
 
 ## Phase 6 — Validate the complete-vault projection
 
-Validate at least:
+Validate object, region, unit, identifier, occurrence, target, reverse-incidence, temporal, surface, provenance, transport-segmentation, bound, and deterministic-identity closure. Every admitted fact is represented or explicitly rejected, and every unresolved or ambiguous fact remains explicit. Produce a whole-corpus projection validation report with counts, hashes, statuses, and structural failures.
 
-1. every admitted canonical object is represented or explicitly rejected;
-2. UUID identity remains distinct from path, filename, title, and aliases;
-3. empty-body objects remain addressable;
-4. every region belongs to one object;
-5. every unit belongs to one object and one region;
-6. every object and region resolves to its contained units;
-7. every identifier assignment has an applicable descriptor and provenance;
-8. inherited and local assignments remain distinguishable;
-9. contextual relations remain occurrences rather than intrinsic target properties;
-10. every resolved occurrence has canonical source and target;
-11. every target exposes reverse incidence;
-12. heading targets resolve to regions;
-13. block targets resolve to units;
-14. ambiguity and unresolved targets remain explicit;
-15. every temporal anchor identifies its authored source;
-16. every retrieval surface declares inspected components, returned identity, bounds, and coverage semantics;
-17. every valid identifier-to-surface affordance is represented;
-18. transport segmentation preserves one parent semantic-unit identity;
-19. prompt-size bounds discard no mandatory projected structure;
-20. the projection is deterministic for equivalent input.
+## Phase 7 — Build the real read-only projection-access boundary
 
-The report records counts, hashes, statuses, and structural failures without requiring private prose in the repository.
-
-Deliverable:
-
-- a whole-corpus projection validation report.
-
-## Phase 7 — Revalidate completed clean-room implementation
-
-Retain the tiny synthetic fixture for fast deterministic regression tests.
-
-Then run existing corpus-sensitive implementation against the validated real projection.
-
-### Problem-space fold
-
-Confirm that no substrate evidence contradicts its authority boundary. Do not reopen it merely because the recovery sequence changed.
-
-### Projection activation
-
-Test the candidate activation implementation against whole-corpus conditions including:
-
-- large object and unit counts;
-- empty-body objects;
-- high-degree nodes;
-- heterogeneous identifier shapes;
-- deep heading trees;
-- duplicate titles with distinct UUIDs;
-- unresolved links;
-- object-field and body occurrences sharing targets;
-- large reverse-incidence sets;
-- hydration-address units;
-- zero-result surfaces;
-- bound-limited candidate bundles;
-- every actual surface and match-mode combination.
-
-Every correction must cite the observed corpus or execution failure requiring it.
-
-Deliverable:
-
-- corpus-grounded acceptance, amendment, or rejection of the existing candidate activation implementation.
-
-## Phase 8 — Implement semantic-access inference
-
-Implement:
-
-\[
-T_t = I_2(P_t,u_t,W_t)
-\]
-
-Use a separate provider from boundary inference.
-
-Allow typed expansion within configured limits:
-
-\[
-W_t^{(k+1)}
-=
-\operatorname{expand}(M_\sigma,W_t^{(k)},q_k,\beta)
-\]
-
-Prove against the validated projection that:
-
-- problem regions bind to canonical semantic addresses;
-- open tensions remain explicit access objectives;
-- plans may branch and rejoin;
-- incoming and outgoing directions remain available;
-- routine bounds come from configuration;
-- required and optional obligations remain distinct;
-- the plan neither resolves the problem nor judges evidence.
-
-Deliverable:
-
-- provider-neutral semantic-access inference over the complete projected substrate.
-
-## Phase 9 — Implement structural conformance
-
-Implement:
-
-\[
-C(T_t,M_\sigma)
-\]
-
-as a pure deterministic function.
-
-It returns a conforming plan or exact structural violations.
-
-It must not rank evidence, infer aliases, judge paraphrases, generate semantic roles, calculate problem-space coherence, or repair meaning.
-
-Validate failures against actual projected possibilities as well as synthetic invalid cases.
-
-Deliverable:
-
-- conformance and bounded repair interfaces grounded in the real projection.
-
-## Phase 10 — Implement execution adapters
-
-Implement:
-
-\[
-R_t = E(T_t,M_\sigma)
-\]
-
-Add one real surface at a time:
-
-1. exact;
-2. lexical;
-3. vector;
-4. graph;
-5. temporal.
-
-Reuse a Python artifact only when a bounded compatibility review shows that it supplies a clean external substrate or operator responsibility without excess authority.
-
-Every result hydrates to canonical semantic units and retains full provenance.
-
-No result is filtered by a generated proposition, paraphrase comparison, or problem-space coherence test.
-
-Deliverable:
-
-- real execution adapters and per-surface whole-corpus tests.
-
-## Phase 11 — Implement packet assembly, coverage, and synthesis
-
-Packet assembly may deduplicate canonical identity, apply declared mechanical ordering and bounds, preserve breadth, attach provenance, and record execution limits.
-
-Coverage derives only from measured execution.
-
-Synthesis receives:
-
-\[
-A_t
-=
-S(P_t,u_t,v_{t-1},T_t,R_t,L_t)
-\]
-
-Prove:
-
-- exact exhaustive negative authority;
-- total-count readiness;
-- graph-depth and candidate-cap reporting;
-- unavailable-surface reporting;
-- no semantic veto after execution;
-- newest-utterance focus;
-- previous-turn continuity labeled separately from corpus evidence;
-- visible provenance and execution limits;
-- no answer-bearing unit removed for a semantic reason.
-
-Deliverable:
-
-- deterministic packet construction and provider-neutral synthesis.
-
-## Phase 12 — Private UAT and behavioral fidelity
-
-Use a new suite identity for every fresh baseline.
-
-Compare CLEANROOM with demonstrated Python behavior at the level of:
+This is a distinct implementation phase after complete-vault projection validation:
 
 ```text
-requested distinction
-canonical bindings
-access paths
-returned unit identities
-coverage authority
-answer-supporting evidence
-failure classification
+validated SemanticSpaceProjection
++ actual corpus-derived surface indexes or providers
++ typed activation probe
+→ mechanically computed ProjectionActivationProbeResult
 ```
 
-Do not require identical plans, internal names, or answer wording.
+The boundary is the real `ProjectionActivationAccess` implementation required before candidate activation revalidation.
 
-Test at least:
+The boundary supports every actual available combination of exact, lexical, vector, graph, temporal, and declared match modes, where present. Results are computed from actual corpus-derived surfaces and indexes; they are not hand-authored expected candidates.
 
-- semantic continuation without duplicate accumulation;
-- explicit correction and supersession;
-- recurrent unresolved tension;
-- multi-turn referent resolution;
-- projection expansion;
-- positive-only activation;
-- exact count and exact absence;
-- multi-object chronology;
-- thread isolation;
-- restart recovery.
+The concrete implementation is intentionally undecided in this documentation correction. Permitted future implementations include Rust read-only indexes, a bounded Python process or protocol, deterministic exported query indexes, or another explicit versioned read-only boundary.
 
-Timing is operational telemetry, not acceptance.
+This boundary performs probes needed by initial activation. Later semantic-access execution adapters execute conforming traversal plans and hydrate outputs. They are not the same responsibility.
 
-Deliverable:
+## Phase 8 — Revalidate candidate activation
 
-- private whole-corpus evidence that the reconstruction preserves and improves demonstrated capability.
+Only after Phase 7, test the candidate activation implementation against the real projection-access result, including actual counts, empty objects, heterogeneous identifiers, deep headings, duplicate titles, unresolved links, reverse incidence, hydration addresses, zero-result surfaces, bounds, and every actual surface/match-mode combination. PR #9 remains untouched and provisional.
 
-## Phase 13 — Compatibility and integration decision
+## Phase 9 — Resume frozen semantic-access work
 
-For each Python artifact, classify it as:
+After activation revalidation, proceed in order through semantic-access inference, structural conformance, execution adapters, packet assembly, synthesis, and private UAT. Execution must preserve canonical identity and provenance; packet removal must be mechanical and measured; synthesis receives results without a post-retrieval semantic veto.
 
-- valid external substrate producer;
-- reusable unchanged behind a versioned boundary;
-- reusable only after removal of excess authority;
-- migration logic only;
-- observational evidence only;
-- no place in the clean kernel.
+## Phase 10 — Private UAT and integration
 
-Accept the clean runtime only when:
+Use fresh suite identities and compare requested distinctions, bindings, paths, unit identities, coverage, evidence, and failure classification. Timing is telemetry, not acceptance. Only after corpus validation and UAT may specific Python producers, adapters, or operators be reused across explicit boundaries.
 
-- its contracts survive complete-vault contact;
-- the real projection is sufficiently exhaustive;
-- synthetic and whole-corpus suites pass;
-- private UAT confirms behavioral fidelity;
-- no legacy semantic veto or coherence gate has reappeared.
-
-Then choose an explicit integration strategy:
-
-- replace the old runtime package with a released CLEANROOM runtime;
-- consume CLEANROOM as a versioned dependency;
-- expose CLEANROOM through a stable service boundary;
-- archive the legacy runtime after migration.
-
-Repository ancestry need not be merged for the architecture to replace the old runtime.
+The end state remains one production kernel authority. Python may remain evidence, a local observer, a bounded exporter, or evaluation/migration tooling. No Python runtime port is authorized merely to preserve implementation ancestry.

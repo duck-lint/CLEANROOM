@@ -2,329 +2,144 @@
 
 ## Recommendation
 
-Rust remains a strong candidate for the clean deterministic runtime and the best default choice for the reconstruction.
+Rust remains a strong candidate for the clean deterministic runtime and the best default choice for reconstruction. The recommendation is conditional: corpus-sensitive contracts must be grounded in the complete authored substrate before Rust makes them expensive to revise.
 
-The recommendation is conditional:
+Rust can make distinctions such as `ProblemSpaceState`, `SemanticSpaceProjection`, `SemanticObject`, `SemanticRegion`, `SemanticUnit`, `TransportSegment`, `SemanticAccessPlan`, `ConformanceResult`, `RetrievalResult`, and `SynthesisInput` difficult to blur. It cannot determine the correct ontology. A successful compile, schema round trip, or synthetic test proves mechanical consistency, not fit with the complete vault.
 
-> Corpus-sensitive contracts should be grounded in the complete authored substrate before Rust makes them expensive to revise.
-
-The reason to use Rust is not raw speed.
-
-The reason is that Rust can make the distinctions in the kernel difficult to blur accidentally:
+## Domain-scoped authority
 
 ```text
-ProblemSpaceState
-ProblemRegion
-ProblemRelation
-OpenTension
-AttentionLens
-BoundaryContribution
-SemanticSpaceProjection
-ActivatedProjection
-SemanticObject
-SemanticRegion
-SemanticUnit
-TransportSegment
-SemanticAccessPlan
-ConformanceResult
-RetrievalResult
-ExecutionLimits
-SynthesisInput
+Constitutive system meaning
+    Organon
+    explicit operator decisions
+
+Runtime semantic authority
+    accepted kernel equations
+    accepted runtime invariants
+
+Corpus actuality
+    raw authored-vault structure and content
+    including irregularities, absences, ambiguity,
+    malformed structures, and unresolved authoring states
+
+Representational authority
+    corpus-validated semantic contracts
+
+Implementation authority
+    accepted implementation contracts
+    within their explicitly declared responsibility
 ```
 
-These can be distinct types rather than loosely related dictionaries passed through one large orchestration path.
+The Organon constrains system meaning; explicit operator decisions resolve constitutive questions; the vault supplies actual instances and irregularities; equations and invariants constrain deterministic authority; corpus-validated contracts define representation; and implementations are authoritative only inside accepted boundaries. No domain silently overrides another. Conflicts require classification, retained evidence, an explicit decision, and a bounded amendment.
 
-## Current project posture
+## Operator-attested recovery baseline
 
-The project is not choosing between an unproven Python idea and a Rust prototype.
+The operator attests that complete-vault ingest occurred, real corpus questions were answered, exact/lexical/vector/graph/temporal mechanisms operated, multi-turn private UAT exercised the system, and useful whole-corpus behavior resulted. This is an `operator-attested recovery baseline`, not an unqualified architectural fact.
 
-The Python runtime has already demonstrated whole-corpus feasibility.
+It does not establish Python ontology correctness, exhaustive projected affordances, preservation of CLEANROOM equations or invariants, evidence-admission correctness, absence of accidental semantic/coherence gates, correctness of candidate Rust contracts, correctness of Python boundaries, or corpus-scale suitability of candidate Rust activation.
 
-CLEANROOM already contains substantial Rust work:
+The recovery-baseline manifest records, where available:
 
-- exchange contracts and schemas;
-- strong semantic identities;
-- deterministic problem-space folding and replay;
-- a synthetic semantic projection;
-- projection-activation contracts;
-- a candidate deterministic activation implementation.
+```text
+python_repository_commit
+corpus_snapshot_identity
+inventory_identity
+materialization_or_index_identity
+private_uat_suite_identities
+report_identities
+demonstrated_capabilities
+known_failures
+known_architectural_violations
+unmeasured_areas
+private_artifact_hashes_or_locations
+attestation_timestamp
+```
 
-That work should be preserved.
-
-Its corpus-sensitive abstractions remain provisional until they survive complete-vault projection and private-UAT contact.
+Unknown or unavailable identities are `unknown`, never inferred or fabricated.
 
 ## What Rust helps with
 
-### Explicit state shapes
+Rust is suitable for typed state shapes, explicit failure boundaries, serialization contracts, canonical identity and hashing, replayable folds, projection validation, graph and temporal traversal, deterministic deduplication, bounded packet assembly, SQLite access, and provider calls.
 
-Structs and enums can represent:
-
-- problem-space perturbation operations;
-- attention-band transitions;
-- canonical object, region, and unit addresses;
-- occurrence direction;
-- retrieval requests;
-- required and optional execution obligations;
-- structural violations;
-- execution outcomes;
-- synthesis-packet contents.
-
-Pattern matching encourages every variant to be handled explicitly.
-
-### Failure boundaries
-
-Recoverable failures can be represented as typed results:
-
-```text
-Result<ProblemSpaceState, BoundaryFoldViolation>
-Result<SemanticSpaceProjection, ProjectionConstructionViolations>
-Result<ConformingAccessPlan, ConformanceViolations>
-Result<RetrievalResult, ExecutionFailure>
-```
-
-This supports the distinction between:
-
-- invalid boundary operation;
-- unmappable or invalid substrate structure;
-- invalid semantic-access plan;
-- unavailable retrieval surface;
-- successful zero matches;
-- partial execution;
-- provider failure.
-
-### Serialization contracts
-
-Serde can serialize and deserialize strongly typed runtime objects.
-
-A JSON Schema generator can expose contracts for:
-
-- boundary-inference output;
-- persisted problem-space state;
-- substrate observation and projection exchange;
-- semantic-access output;
-- structural violations;
-- diagnostics;
-- synthesis packets.
-
-### Deterministic core
-
-Rust is well suited to:
-
-- canonical identity and hashing;
-- replayable problem-space folds;
-- projection construction and validation;
-- graph and occurrence traversal;
-- temporal ordering;
-- deterministic deduplication;
-- bounded packet assembly;
-- SQLite access;
-- provider HTTP calls.
-
-## What Rust does not solve
-
-Rust cannot determine the correct ontology.
-
-It can make a wrong ontology beautifully explicit and difficult to remove.
-
-A type such as:
-
-```text
-EligibleRelationProposition
-```
-
-would still be wrong if the kernel and corpus supply no authority for it.
-
-Rust therefore increases the cost of conceptual mistakes as much as it increases structural safety.
-
-A successful compile, schema round trip, or synthetic test proves mechanical consistency. It does not prove that the represented distinctions fit the complete vault.
+It is not evidence that the represented distinctions are correct. A type such as `EligibleRelationProposition` remains unjustified if the kernel and corpus supply no authority for it.
 
 ## Dynamic projection versus static types
 
-The corpus's actual semantic possibilities remain data.
-
-Rust types should define the shape and authority of:
-
-- problem-space records;
-- semantic objects, regions, and units;
-- identifiers;
-- relations and occurrences;
-- retrieval surfaces;
-- semantic-access plans;
-- retrieval and synthesis packets.
-
-They should not hard-code actual corpus objects, headings, links, dates, Organon identifier values, or Python-specific intermediate categories.
+Rust types should define record shape and authority boundaries for problem-space records, objects, regions, units, identifiers, relations, occurrences, retrieval surfaces, access plans, and packets. They should not hard-code actual corpus objects, headings, links, dates, Organon identifier values, or Python-specific intermediate categories.
 
 ```text
 Rust type system
-    defines record shape, lifecycle, and authority boundaries
+    record shape, lifecycle, authority boundaries
 
 SemanticSpaceProjection
-    contains corpus-specific schema and canonical instances
+    corpus-specific schema and canonical instances
 
 whole-corpus observation exchange
-    supplies versioned evidence from authored and materialized substrate facts
+    versioned evidence from authored and materialized facts
 ```
 
-## Semantic units versus transport segments
+A `SemanticUnitId` must remain distinct from `TransportSegmentId`. A provider limit may divide one authored unit into ordered transport segments without creating additional canonical semantic units. The authored boundary must be checked against the complete vault, not inferred from a Python `chunk_id`.
 
-Rust should encode the distinction directly:
+## Pre-admission observation boundary
+
+The first corpus-facing implementation is an observation exchange, not semantic admission. As available it exposes source path, source identity and UUID observation, raw frontmatter keys and value shapes, provenance, heading hierarchy, Markdown block candidates and raw Markdown, wikilinks, aliases, embeds, heading/block targets, source spans, parse failures, unsupported syntax, ambiguous/unresolved targets, source hashes, and corpus snapshot identity.
+
+These observations are not yet semantic objects, units, identifiers, or occurrences. Classification as `admitted`, `quarantined`, `rejected`, `unresolved`, or `open_authoring_decision` retains the raw observation, rule, authority, information preserved, and information lost or excluded.
+
+Python chunks, graph nodes, anchors, and indexes are materialization observations. A Python chunk may correspond to an authored unit, transport split, defect, or unresolved record. Rust must not promote it by naming it differently.
+
+## Projection and access boundaries
+
+Projection construction is a versioned read-only mapping from the observation bundle to a validated `SemanticSpaceProjection`. It must retain actual corpus irregularities and explicit unresolved states rather than invent mappings.
+
+After complete-vault projection validation, build the real read-only projection-access boundary:
 
 ```text
-SemanticUnitId
-TransportSegmentId
+validated SemanticSpaceProjection
++ actual corpus-derived surface indexes or providers
++ typed activation probe
+→ mechanically computed ProjectionActivationProbeResult
 ```
 
-A provider or embedding limit may divide one unit into transport segments without creating additional canonical semantic units.
+It supports every actual available combination of exact, lexical, vector, graph, temporal, and declared match modes, where present. Results are computed from actual corpus-derived surfaces and indexes. They are not hand-authored expected candidates.
 
-The type system should make accidental promotion of a transport segment into an independently authored semantic unit difficult.
+The concrete implementation is not selected by this documentation correction. Future choices may include Rust read-only indexes, a bounded Python process or protocol, deterministic exported query indexes, or another explicit versioned read-only boundary.
 
-The actual authored unit boundary must be checked against the complete vault rather than inferred from the current Python `chunk_id` shape.
+Projection access performs probes needed by initial activation. Later semantic-access execution adapters execute conforming traversal plans and hydrate outputs. They are separate responsibilities.
 
-## Pydantic analogy
+The real `ProjectionActivationAccess` implementation is required before candidate activation revalidation.
 
-The rough correspondence is:
+## Current project posture
+
+The independent Python system provides an operator-attested recovery baseline, not an unqualified architectural fact. CLEANROOM already contains contracts, schemas, deterministic problem-space folding and replay, a synthetic projection, activation contracts, and candidate activation work. Preserve these artifacts. PR #9 remains provisional; synthetic success does not validate it against the real projection.
+
+Python remains admissible evidence and a possible bounded substrate/access provider. It does not automatically become architectural authority. No Python runtime port is authorized. No compatibility mechanism is introduced without a concrete consumer. The end state remains one production kernel authority.
+
+## Provider and repository boundaries
+
+Keep model providers behind narrow interfaces such as `BoundaryInferenceProvider`, `SemanticAccessInferenceProvider`, and `SynthesisProvider`. Provider-specific formats must not leak into kernel types.
+
+`CLEANROOM` remains independent. A Python exporter may produce the observation bundle because Python owns demonstrated ingest and local corpus access. The exported artifact, provenance, and adapter contract—not Python orchestration—form the boundary. The Obsidian plugin remains an external versioned protocol boundary.
+
+## Decision and continuation rule
+
+Continue with Rust when authority boundaries remain accepted, corpus-sensitive contracts have survived whole-corpus contact, the real projection can be built without invention, and explicit type distinctions justify slower iteration. Use Python for demonstrated behavioral evidence, local substrate observation, bounded export, evaluation, and migration analysis.
+
+The corrected sequence is:
 
 ```text
-Pydantic model
-    ↔ Rust structs/enums + Serde + JSON Schema
-
-model instance validation
-    ↔ deserialization plus explicit validation
-
-dynamic corpus schema and instances
-    ↔ SemanticSpaceProjection data
+whole-corpus observation
+→ contract-contact reconciliation
+→ bounded contract amendment
+→ real projection construction
+→ complete-vault projection validation
+→ real projection-access implementation
+→ candidate activation revalidation
+→ semantic-access inference
+→ conformance
+→ execution
+→ packet and synthesis
+→ private UAT
 ```
 
-Structural conformance is more than JSON shape validation. A plan may be valid JSON while referencing an absent identifier, object, region, unit, relation, target, direction, or surface.
-
-Projection construction is also more than deserialization. It must prove that the exchanged authored and materialized facts can be mapped into the accepted clean-room distinctions without invention.
-
-## Suggested package shape
-
-Begin with one Rust package and strict modules:
-
-```text
-model
-problem_space
-projection
-projection_adapter
-projection_validation
-activation
-boundary_inference
-semantic_access
-conformance
-execution
-packet
-synthesis
-runtime
-cli
-```
-
-Names remain implementation decisions.
-
-Split modules into crates only after their boundaries survive complete-vault and private-UAT contact.
-
-## Provider boundaries
-
-The three primary model calls should sit behind narrow interfaces:
-
-```text
-BoundaryInferenceProvider
-SemanticAccessInferenceProvider
-SynthesisProvider
-```
-
-The bounded repair call may reuse the semantic-access provider interface with a distinct request type.
-
-Provider-specific request formats must not leak into kernel types.
-
-## Corpus boundary
-
-CLEANROOM remains an independent repository.
-
-The real corpus enters through a versioned, read-only substrate observation or projection exchange contract.
-
-The exchange should preserve the distinction among:
-
-```text
-authored vault fact
-Python materialization observation
-runtime behavior observation
-clean-room interpretation
-```
-
-Legacy runtime orchestration must not become the route by which the Rust kernel accesses corpus facts.
-
-A Python exporter may produce the observation bundle because Python currently owns the demonstrated ingest and local corpus access. The exported artifact, its provenance, and the adapter contract—not Python orchestration—form the boundary.
-
-## Obsidian boundary
-
-The Obsidian plugin remains TypeScript and communicates through a versioned protocol.
-
-Authored wikilinks remain Obsidian-facing syntax. Canonical UUID and region/unit resolution remain substrate and projection responsibilities.
-
-The complete vault, not the plugin's convenience representation, remains higher authority.
-
-## Python's continuing role
-
-Python is not merely a disposable prototype.
-
-It currently provides:
-
-- demonstrated whole-corpus runtime behavior;
-- local authored-vault access and materialization;
-- corpus inventory and inspection;
-- private-UAT infrastructure;
-- observational evidence about capabilities and failures;
-- a possible read-only substrate-observation exporter.
-
-Python may continue to support:
-
-- offline evaluation;
-- corpus inspection;
-- migration scripts;
-- notebooks;
-- report generation;
-- compatibility analysis.
-
-Python must not remain a second production authority for problem-space state, semantic-access schemas, projection meaning, or evidence admission after migration.
-
-The end state should contain one production kernel authority.
-
-## Decision rule
-
-Continue with Rust when:
-
-- the clean authority boundaries remain accepted;
-- the relevant corpus-sensitive contracts have survived whole-corpus contact;
-- the real projection can be constructed and validated without invention;
-- explicit type distinctions are more valuable than fastest possible iteration;
-- slower initial iteration is acceptable in exchange for stronger structural discipline.
-
-Use Python where it already has concrete authority or access as:
-
-- demonstrated behavioral evidence;
-- a local substrate observer;
-- a bounded exporter;
-- evaluation and migration tooling.
-
-Do not port the Python runtime merely to preserve implementation ancestry.
-
-## Current recommendation
-
-Use this sequence:
-
-1. preserve the existing Rust contracts, fold, fixture, and candidate activation work;
-2. define a versioned whole-corpus observation exchange;
-3. compare candidate contracts against the authored vault, Python materialization, and private UAT;
-4. revise only distinctions contradicted or unsupported by that evidence;
-5. construct and validate the complete-vault `SemanticSpaceProjection`;
-6. re-evaluate the existing activation implementation against the real projection;
-7. continue semantic access, conformance, execution, packet assembly, and synthesis in Rust;
-8. migrate or retire Python responsibilities only through explicit validated boundaries.
-
-Do not restart CLEANROOM.
-
-Do not treat the synthetic projection as sufficient architectural acceptance.
-
-Do not port the old Python runtime.
+Do not restart CLEANROOM, port the old Python runtime, or treat the synthetic projection as sufficient architectural acceptance.

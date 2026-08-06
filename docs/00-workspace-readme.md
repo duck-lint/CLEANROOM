@@ -21,83 +21,177 @@ pillar:
 
 This workspace begins from that kernel.
 
-## Demonstrated starting point
+## Domain-scoped authority
 
-The independent Python system in `duck-lint/semantic-traversal` has already demonstrated whole-corpus feasibility against the authored vault.
+Authority is scoped to responsibility, not arranged as one universal ranking:
 
-The immediate clean-room question is therefore not whether Semantic Traversal is possible.
+```text
+Constitutive system meaning
+    Organon
+    explicit operator decisions
 
-It is whether `duck-lint/CLEANROOM` faithfully preserves and improves the demonstrated system while grounding its abstractions in the complete authored substrate.
+Runtime semantic authority
+    accepted kernel equations
+    accepted runtime invariants
 
-The Python runtime is not architectural authority. Its demonstrated capabilities, failures, corpus observations, execution traces, and private-UAT results remain admissible evidence.
+Corpus actuality
+    raw authored-vault structure and content
+    including irregularities, absences, ambiguity,
+    malformed structures, and unresolved authoring states
 
-## Source hierarchy
+Representational authority
+    corpus-validated semantic contracts
 
-The clean-room project uses this order of authority:
+Implementation authority
+    accepted implementation contracts
+    within their explicitly declared responsibility
+```
 
-1. The authored vault and the Organon that constrains its typing, relations, scope, and movement.
-2. Observed whole-corpus behavior and private UAT.
-3. Accepted semantic distinctions that survive corpus contact.
-4. Candidate `CLEANROOM` contracts.
-5. Python implementation boundaries.
-6. Generic engineering conventions.
+The Organon constrains system meaning. Explicit operator decisions resolve open authoring or constitutive questions. The vault supplies actual authored instances and irregularities. Runtime equations and invariants constrain deterministic authority. A contract becomes representational authority only after corpus validation. An implementation is authoritative only inside its accepted boundary.
 
-When two sources conflict, the higher source wins until the conflict is deliberately resolved.
+No domain silently overrides another. A conflict between domains triggers:
 
-A Python component does not earn architectural authority merely because it exists. A candidate clean-room contract does not earn acceptance merely because it is coherent, typed, or well tested against a synthetic fixture.
+```text
+classification
+→ retained evidence
+→ explicit operator or contract decision
+→ bounded amendment
+```
 
-## Evidence and implementation posture
+## Evidence taxonomy
 
-No new implementation is justified solely by prose coherence.
+The following are evidence classes, not automatic semantic authorities:
 
-No synthetic fixture may substitute for whole-corpus grounding.
+```text
+raw authored-vault observations
+Python materialization observations
+runtime traces and measured behavior
+private-UAT reports
+synthetic fixtures
+implementation source and diagnostics
+operator attestations
+```
 
-No compatibility mechanism is added without a concrete consumer.
+Evidence may establish a required capability, a concrete consumer, a corpus phenomenon, a failure mode, a contradiction, an unsupported assumption, a performance or scale condition, or the need for an explicit amendment. Evidence does not silently acquire semantic authority.
 
-The clean-room repository remains independent. Corpus contact occurs through an explicit, versioned, read-only substrate observation or projection exchange boundary rather than by importing legacy orchestration into the Rust kernel.
+Observed Python success does not prove that the Python mechanism is architecturally correct. Private UAT may establish required behavior without validating an internal implementation. Synthetic fixtures establish local deterministic mechanics, not corpus actuality. Implementation source establishes what code does, not what the system ought to mean.
+
+## Operator-attested recovery baseline
+
+The operator attests that the independent Python system demonstrated whole-corpus feasibility against the authored vault. This is an `operator-attested recovery baseline`, not an unqualified architectural fact.
+
+The attested scope is:
+
+- complete-vault ingest occurred;
+- real corpus questions were answered;
+- exact, lexical, vector, graph, and temporal mechanisms operated;
+- multi-turn private UAT exercised the system;
+- the system produced useful whole-corpus behavior.
+
+This does not establish:
+
+- correctness of the Python ontology;
+- exhaustiveness of projected affordances;
+- preservation of CLEANROOM equations or invariants;
+- correctness of evidence admission;
+- absence of accidental semantic or coherence gates;
+- correctness of candidate Rust contracts;
+- correctness of Python implementation boundaries;
+- corpus-scale suitability of the candidate Rust activation runtime.
+
+The next substrate-observation implementation must produce or reference a recovery-baseline manifest. Where available it records:
+
+```text
+python_repository_commit
+corpus_snapshot_identity
+inventory_identity
+materialization_or_index_identity
+private_uat_suite_identities
+report_identities
+demonstrated_capabilities
+known_failures
+known_architectural_violations
+unmeasured_areas
+private_artifact_hashes_or_locations
+attestation_timestamp
+```
+
+Unknown or unavailable identities are represented as `unknown`. They are not inferred, reconstructed, or fabricated.
+
+## Pre-admission substrate observation
+
+Corpus contact begins with raw authored observations, before semantic classification or admission. As available, the observation bundle exposes:
+
+```text
+source path
+source identity and UUID observation
+raw frontmatter keys
+raw frontmatter value shapes
+frontmatter source provenance
+heading hierarchy
+authored Markdown block candidates
+raw Markdown
+wikilinks
+aliases
+embeds
+heading targets
+block targets
+source spans
+parse failures
+unsupported syntax
+ambiguous targets
+unresolved targets
+source hashes
+corpus snapshot identity
+```
+
+These are not yet semantic objects, semantic units, identifiers, or occurrences. Each relevant fact may subsequently be classified as `admitted`, `quarantined`, `rejected`, `unresolved`, or `open_authoring_decision`. Admission retains the raw observation, classification rule, authority for that rule, information preserved, and information lost or excluded.
+
+Python chunks, graph nodes, anchors, and indexes are materialization observations. A Python chunk is not automatically a semantic unit: it may correspond to an authored unit, be a transport split, reveal a materialization defect, or remain unresolved pending operator decision. The exporter must not settle that question merely by naming its records.
 
 ## Documents
 
-- `000-organon-of-finite-inquiry.md` — authoritative Organon source, preserving authored wikilinks and terminology.
+- `000-organon-of-finite-inquiry.md` — Organon source.
 - `00-workspace-readme.md` — this document.
-- `01-kernel-equations.md` — formal representation of boundary inference, problem-space evolution, projection activation, semantic access, execution, and synthesis.
-- `02-runtime-invariants.md` — non-negotiable runtime authority boundaries.
-- `03-semantic-object-unit-model.md` — the bidirectional and lateral ontology of semantic objects, semantic units, identifiers, occurrences, links, regions, and contextual relations.
-- `04-semantic-space-projection-requirements.md` — what the frozen semantic projection and its activated working views must expose.
-- `05-clean-implementation-sequence.md` — substrate-first recovery and continuation order for the independent `CLEANROOM` repository.
-- `06-clean-room-protocol.md` — authority hygiene, evidence requirements, review gates, repository discipline, and compatibility rules.
-- `07-rust-assessment.md` — language decision note aligned with whole-corpus grounding and the accepted clean contracts.
-- `08-behavioral-examples.md` — minimal scenarios that test the architecture.
-- `09-vault-topology-and-authored-conventions.md` — evidence-grounded description of the vault's physical topology and authored conventions.
-- `10-organon-vault-substrate-chunking-map.md` — mapping from the Organon through vault structure, semantic objects/units, and unit materialization.
-- `11-problem-space-state.md` — two-call boundary inference, relational problem regions, open tensions, attention bands, persistence, and continuity.
-- `12-semantic-access-and-traversal-language.md` — canonical addressing, directed access paths, execution obligations, outputs, conformance, and repair.
-- `13-projection-activation-and-access.md` — positive-only activated regions, deterministic surface access, expansion, telemetry, and frozen turn snapshots.
+- `01-kernel-equations.md` — kernel equations.
+- `02-runtime-invariants.md` — runtime invariants.
+- `03-semantic-object-unit-model.md` — object, region, unit, identifier, occurrence, and relation distinctions.
+- `04-semantic-space-projection-requirements.md` — projection requirements.
+- `05-clean-implementation-sequence.md` — substrate-first recovery sequence.
+- `06-clean-room-protocol.md` — authority, evidence, lifecycle, and review protocol.
+- `07-rust-assessment.md` — language decision and boundary assessment.
+- `08-behavioral-examples.md` — behavioral scenarios.
+- `09-vault-topology-and-authored-conventions.md` — vault observations.
+- `10-organon-vault-substrate-chunking-map.md` — substrate mapping.
+- `11-problem-space-state.md` — problem-space state.
+- `12-semantic-access-and-traversal-language.md` — semantic access and traversal.
+- `13-projection-activation-and-access.md` — projection activation and access.
 
 ## Current workspace state
 
-The repository already contains:
+The repository already contains the Organon and document set, language-neutral contracts instantiated as Rust exchange types and schemas, a deterministic problem-space fold and replay implementation, a tiny synthetic semantic-space fixture, projection-activation contracts, and a candidate deterministic activation implementation under review.
 
-- the Organon and clean-room document set;
-- language-neutral contracts instantiated as Rust exchange types and schemas;
-- a deterministic problem-space fold and replay implementation;
-- a tiny synthetic semantic-space fixture;
-- projection-activation contracts;
-- a candidate deterministic activation implementation under review.
+These are preserved. PR #9 remains provisional; synthetic tests do not make it accepted against the real corpus. Further semantic-access, conformance, execution, packet, and synthesis implementation remains frozen until the recovery sequence reaches those gates.
 
-These artifacts are preserved.
+Python remains admissible evidence and a possible bounded substrate/access provider. It does not automatically become architectural authority. No Python runtime port is authorized, no compatibility mechanism is introduced without a concrete consumer, and one eventual production kernel authority remains the target.
 
-Corpus-sensitive contracts and implementations remain provisional until they survive complete-vault contact. The synthetic fixture remains a fast deterministic regression surface, not architectural acceptance authority.
+## Corrected continuation order
 
-## Immediate next decision
+```text
+whole-corpus observation
+→ contract-contact reconciliation
+→ bounded contract amendment
+→ real projection construction
+→ complete-vault projection validation
+→ real projection-access implementation
+→ candidate activation revalidation
+→ semantic-access inference
+→ conformance
+→ execution
+→ packet and synthesis
+→ private UAT
+```
 
-Before further semantic-access, conformance, execution, packet, or synthesis implementation:
+The projection-access boundary performs the probes needed by initial activation. Later semantic-access execution adapters execute conforming traversal plans and hydrate outputs. The candidate activation implementation is not revalidated against a hand-authored projection-access substitute.
 
-1. freeze forward architectural elaboration;
-2. define a versioned whole-corpus observation exchange;
-3. compare authored vault structure, Python materialization, and candidate clean-room contracts;
-4. build and validate a read-only complete-vault `SemanticSpaceProjection`;
-5. re-evaluate the existing activation implementation against that projection;
-6. resume the Rust reconstruction only from the validated boundary.
-
-This is a substrate-first recovery of the existing project, not a restart.
+This is substrate-first recovery of the existing project, not a restart.
