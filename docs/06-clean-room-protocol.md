@@ -2,33 +2,58 @@
 
 ## Purpose
 
-This protocol prevents the new runtime from being shaped by attempts to preserve the current implementation.
+This protocol prevents the new runtime from being shaped by accidental attempts to preserve the Python implementation while also preventing clean-room prose from outranking the authored substrate.
 
-The risk is not merely code reuse.
+The risks are symmetrical:
 
-Existing nouns can quietly force the new architecture to contain objects and authorities it does not need.
+- existing nouns can force the new architecture to contain objects and authorities it does not need;
+- internally coherent clean-room abstractions can become insulated from the complete vault they claim to represent.
 
-## 1. Clean context
+Clean-room discipline therefore means authority hygiene, not corpus avoidance.
 
-The initial project workspace should contain only:
+## 1. Authority order
+
+Use this order:
+
+1. authored vault and Organon;
+2. observed whole-corpus behavior and private UAT;
+3. semantic distinctions that survive corpus contact;
+4. candidate clean-room contracts;
+5. Python implementation boundaries;
+6. generic engineering conventions.
+
+The Python runtime is not architectural authority.
+
+Its demonstrated capabilities, failures, corpus observations, execution traces, and private-UAT results are admissible evidence.
+
+A candidate contract remains revisable when higher-authority evidence contradicts it.
+
+## 2. Clean context
+
+The kernel repository remains independent and must not receive ambient legacy orchestration, implementation plans, diagnostics, component diagrams, or old tests as untyped design context.
+
+The project may receive bounded evidence through explicit artifacts:
 
 - the Organon;
-- the clean-room document set;
-- a tiny synthetic semantic-space fixture;
-- accepted language-neutral schemas.
+- authored vault observations;
+- versioned substrate-observation bundles;
+- whole-corpus projection validation reports;
+- redacted behavior and private-UAT summaries;
+- accepted language-neutral schemas;
+- synthetic fixtures used as regression surfaces.
 
-Do not initially include:
+Legacy source may be inspected only for a declared evidence or compatibility question.
 
-- old source files;
-- implementation plans;
-- PR summaries;
-- diagnostics;
-- legacy unit-test names;
-- legacy component diagrams.
+The distinction is:
 
-## 2. Vocabulary discipline
+```text
+bounded observed artifact
+≠ ambient architectural authority
+```
 
-During clean design, prefer:
+## 3. Vocabulary discipline
+
+During clean implementation, prefer:
 
 - problem gestalt;
 - problem region;
@@ -48,9 +73,9 @@ During clean design, prefer:
 - execution limits;
 - synthesis packet.
 
-A legacy term may be mentioned only during the later compatibility audit.
+A Python term may describe an observed artifact or behavior. It does not automatically name a clean-kernel responsibility.
 
-## 3. No salvage presumption
+## 4. No salvage presumption
 
 The default question is not:
 
@@ -58,40 +83,89 @@ The default question is not:
 
 It is:
 
-> Does the clean kernel require this responsibility?
+> Which demonstrated responsibility or corpus fact requires representation, and what is the narrowest clean authority that can represent it?
 
 Only after the responsibility is established should existing code be considered.
 
-## 4. Evidence requirement
+A reusable artifact must cross an explicit package, process, or protocol boundary and must not carry excess semantic authority.
 
-Every proposed component or rule must include:
+## 5. Evidence requirement
+
+Every proposed component, field, rule, or compatibility path must include:
 
 - the kernel equation or invariant it implements;
+- the authored-vault, whole-corpus, private-UAT, or accepted behavioral evidence requiring it;
 - an example requiring it;
 - a counterexample showing what fails without it;
 - its exact authority boundary;
-- proof that it does not duplicate boundary inference, semantic-access inference, or synthesis.
+- proof that it does not duplicate boundary inference, semantic-access inference, or synthesis;
+- the concrete consumer for any compatibility mechanism.
 
-A proposal based on inference must identify the evidence supporting that inference.
+A proposal based on inference must identify the source evidence and bridge rule licensing that inference.
 
-## 5. No implementation before contract acceptance
+Prose coherence is not evidence.
 
-The sequence is:
+## 6. Contract lifecycle
+
+Use explicit lifecycle states:
 
 ```text
-define
-→ provide examples
-→ provide invalid examples
-→ review authority
-→ freeze schema
-→ implement
+candidate
+provisionally accepted
+corpus-validated
+superseded
 ```
 
-## 6. One responsibility per stage
+- `candidate` means represented for review.
+- `provisionally accepted` means internally coherent and mechanically tested but not yet validated against the complete vault where corpus-sensitive.
+- `corpus-validated` means it survived a versioned whole-corpus projection and relevant private-UAT contact.
+- `superseded` means higher-authority evidence required revision.
+
+Do not describe a corpus-sensitive contract as accepted merely because its schema round-trips or its synthetic fixture passes.
+
+## 7. Synthetic-fixture boundary
+
+A synthetic fixture may:
+
+- isolate deterministic behavior;
+- prove invalid structural cases;
+- preserve regression coverage;
+- make edge conditions reproducible;
+- test authority boundaries without private data.
+
+A synthetic fixture may not:
+
+- establish whole-corpus exhaustiveness;
+- substitute for actual identifier diversity;
+- prove actual vault topology;
+- prove real occurrence or temporal coverage;
+- authorize a projection contract contradicted by the complete vault;
+- establish feasibility already demonstrated by the Python system.
+
+Synthetic success is necessary for local mechanics and insufficient for architectural acceptance.
+
+## 8. Implementation sequence
+
+For corpus-sensitive work, use:
+
+```text
+observe authored and materialized corpus facts
+→ classify evidence and authority
+→ define or amend the contract
+→ provide examples and invalid examples
+→ validate against the complete projection
+→ implement
+→ retain synthetic regression tests
+```
+
+For corpus-independent deterministic mechanics, implementation may proceed once the relevant authority boundary is accepted.
+
+## 9. One responsibility per stage
 
 - boundary inference describes how the problem gestalt changes;
 - deterministic folding applies the declared perturbation;
-- projection exposes semantic possibility;
+- substrate observation reports authored and materialized facts;
+- projection construction maps accepted facts into a frozen structural representation;
 - activation presents a bounded positive view through the current attention lens;
 - semantic-access inference connects problem regions and open tensions to projected addresses;
 - conformance validates structural membership;
@@ -101,7 +175,7 @@ define
 
 A stage that performs more than one semantic role is suspect.
 
-## 7. Mandatory end-to-end traceability
+## 10. Mandatory end-to-end traceability
 
 For every test turn, retain:
 
@@ -114,7 +188,9 @@ For every test turn, retain:
 - open tensions before and after the update;
 - updated relational problem space;
 - current attention lens;
-- projection identity;
+- authored corpus snapshot identity;
+- substrate-observation identity;
+- projection identity and validation status;
 - activated projection and activation provenance;
 - expansion requests and telemetry;
 - semantic-access plan;
@@ -125,7 +201,7 @@ For every test turn, retain:
 - synthesis input;
 - answer.
 
-## 8. No invisible semantic consolidation
+## 11. No invisible semantic consolidation
 
 When boundary inference merges, splits, supersedes, or retires a problem region, the operation must retain:
 
@@ -140,7 +216,7 @@ The deterministic runtime may apply the operation.
 
 It may not generate the semantic reason.
 
-## 9. No invisible evidence removals
+## 12. No invisible evidence removals
 
 Any semantic unit removed after retrieval must record:
 
@@ -157,20 +233,24 @@ The following are not acceptable mechanical reasons:
 - proposition mismatch;
 - paraphrase mismatch.
 
-## 10. Projection-first debugging
+## 13. Projection-first debugging
 
-When semantic-access inference cannot construct a desired plan, ask first:
+When semantic access cannot construct or execute a desired path, ask in order:
 
-- Is the needed semantic possibility present in the corpus?
-- Is it materialized?
-- Is it projected?
+- Is the needed structure authored in the vault?
+- Was it admitted?
+- Was it materialized by the substrate producer?
+- Was it transferred through the observation exchange?
+- Was it projected?
 - Is it addressable in every represented direction?
 - Is the relevant identifier coupled to every valid retrieval surface?
 - Can the attention lens activate or expand toward it?
 
 Do not compensate for a missing projection with post-retrieval heuristics.
 
-## 11. Problem-space-first debugging
+Do not assume a Python omission proves the authored structure does not exist.
+
+## 14. Problem-space-first debugging
 
 When conversational continuity fails, ask:
 
@@ -183,69 +263,93 @@ When conversational continuity fails, ask:
 
 Do not compensate with transcript dumping or automatic numerical decay.
 
-## 12. Fresh-run hygiene
+## 15. Fresh-run hygiene
 
 A fresh experimental baseline requires:
 
 - a new suite identity;
 - new thread identities;
 - empty thread state;
+- a recorded authored corpus snapshot;
+- a recorded substrate-observation identity;
 - a recorded projection identity;
 - no replacement of reports without replacement of experimental identity.
 
 A report directory is not conversation state.
 
-## 13. Repository and import discipline
+## 16. Repository and import discipline
 
-`duck-lint/CLEANROOM` remains independent from the legacy runtime repository during clean implementation.
+`duck-lint/CLEANROOM` remains independent from `duck-lint/semantic-traversal`.
 
-Do not import legacy runtime source, orchestration, diagnostics, or tests into `CLEANROOM` merely to accelerate development.
+Do not import Python runtime source, orchestration, diagnostics, or tests into CLEANROOM merely to accelerate development.
 
-When old artifacts are examined, do so through a bounded compatibility review. Reuse is accepted only when a specific artifact implements a clean responsibility without excess authority and crosses an explicit package, process, or protocol boundary.
+Permitted cross-repository contact must use an explicit versioned boundary, such as:
 
-## 14. Review gates
+- a read-only substrate-observation bundle;
+- a projection exchange;
+- an execution-provider protocol;
+- a bounded compatibility report.
 
-### Gate A — Kernel accepted
+Generated private corpus artifacts remain local and ignored.
 
-Equations and invariants are stable.
+Exporter code, schemas, validation, and repository-safe aggregate reports may be committed in the repository that owns them.
 
-### Gate B — Problem-space contract accepted
+## 17. Review gates
 
-Boundary contributions, relational regions, open tensions, persistence, and the attention lens are explicit.
+### Gate A — Kernel authority accepted
 
-### Gate C — Projection accepted
+Equations and invariants are stable enough to guide recovery.
 
-The semantic object/unit/occurrence model is exhaustively represented.
+### Gate B — Problem-space mechanics accepted
 
-### Gate D — Activation accepted
+Boundary contributions, relational regions, open tensions, persistence, attention, fold authority, replay, and thread isolation are explicit.
 
-The problem-space lens produces a bounded positive view without negative inference.
+### Gate C — Whole-corpus substrate contact accepted
 
-### Gate E — Semantic-access plan accepted
+The authored vault and Python materialization are exposed through a versioned observation boundary, with discrepancies and unknowns preserved.
+
+### Gate D — Projection accepted
+
+The complete admitted corpus is represented with validated object, region, unit, identifier, occurrence, anchor, surface, transition, and provenance closure.
+
+### Gate E — Activation accepted
+
+The problem-space lens produces a bounded positive view over the real projection without negative inference.
+
+### Gate F — Semantic-access plan accepted
 
 Inference output refers to projected addresses and connections.
 
-### Gate F — Conformance accepted
+### Gate G — Conformance accepted
 
 Invalid structure is rejected without semantic interpretation.
 
-### Gate G — Execution accepted
+### Gate H — Execution and packet accepted
 
-Returned units preserve identity and reach packet assembly.
+Returned units preserve identity, provenance, measured coverage, and mechanical removal reasons.
 
-### Gate H — Synthesis accepted
+### Gate I — Synthesis accepted
 
-The model receives continuity, focus, problem-space context, retrieval, and limits.
+The model receives continuity, focus, problem-space context, retrieval, and limits without a post-retrieval semantic gate.
 
-### Gate I — Legacy compatibility accepted
+### Gate J — Behavioral fidelity accepted
 
-Only then may specific existing artifacts, substrate producers, adapters, or operators be reused across an explicit boundary.
+Private UAT confirms preservation and improvement of demonstrated whole-corpus capability.
 
-## 15. Stop conditions
+### Gate K — Compatibility accepted
 
-Stop implementation and return to design if:
+Only then may specific Python substrate producers, adapters, or operators be reused across an explicit boundary.
 
-- focus bands are implemented as unrelated topic containers;
+## 18. Stop conditions
+
+Stop implementation and return to evidence or design if:
+
+- a corpus-sensitive abstraction is added without authored or observed corpus evidence;
+- a synthetic fixture is treated as whole-corpus acceptance;
+- a candidate contract outranks contradictory vault evidence;
+- a Python boundary is copied merely because it already exists;
+- a compatibility mechanism has no concrete consumer;
+- attention bands are implemented as unrelated topic containers;
 - the deterministic runtime infers semantic merge, split, or supersession;
 - a numeric coherence score is introduced without demonstrated necessity;
 - coherence is used to rank or admit retrieved evidence;
@@ -253,18 +357,19 @@ Stop implementation and return to design if:
 - a new semantic role is added between execution and synthesis;
 - a runtime heuristic decides paraphrase equivalence;
 - a validly retrieved unit is removed for a non-mechanical reason;
-- a needed path is absent from the projection and code is proposed instead of projection work;
+- a needed path is absent from the projection and post-retrieval code is proposed instead of substrate or projection work;
 - intrinsic typing and contextual participation are blurred;
-- the newest utterance and background problem-space context are conflated.
+- the newest utterance and background problem-space context are conflated;
+- an unknown or unresolved corpus fact is filled with an invented default.
 
-## 16. Legacy terminology and migration posture
+## 19. Legacy terminology and migration posture
 
-Current classes, diagnostics, files, tests, and component names are not design authorities.
+Current Python classes, diagnostics, files, tests, and component names are not design authorities.
 
-A legacy term may describe observed behavior during compatibility review, but it does not earn a place in the clean kernel merely because it already exists.
+They may establish that a capability, failure, data shape, or consumer exists.
 
-The goal is not to recreate every old feature.
+The goal is not to recreate every old feature or every old intermediate object.
 
-The goal is to implement the clean kernel.
+The goal is to reconstruct the demonstrated system under the clean authority boundaries.
 
-Legacy behavior or code is preserved only when it satisfies the new contracts without additional semantic authority.
+Python behavior or code is preserved only when it satisfies the clean contracts without additional semantic authority. Clean-room contracts are preserved only when they survive higher-authority corpus contact.
