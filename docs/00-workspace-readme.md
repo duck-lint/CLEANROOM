@@ -21,59 +21,177 @@ pillar:
 
 This workspace begins from that kernel.
 
-## Source hierarchy
+## Domain-scoped authority
 
-The clean-room project should use this order of authority:
+Authority is scoped to responsibility, not arranged as one universal ranking:
 
-1. The Organon and the corpus-structuring rules it establishes.
-2. The kernel equations and invariants in this package.
-3. The semantic object/unit model.
-4. The semantic-space projection requirements.
-5. Explicit behavioral examples and acceptance tests.
-6. Existing implementation artifacts, consulted only after the clean contracts are frozen and only through a bounded compatibility review.
+```text
+Constitutive system meaning
+    Organon
+    explicit operator decisions
 
-When two sources conflict, the higher source wins until the conflict is deliberately resolved.
+Runtime semantic authority
+    accepted kernel equations
+    accepted runtime invariants
+
+Corpus actuality
+    raw authored-vault structure and content
+    including irregularities, absences, ambiguity,
+    malformed structures, and unresolved authoring states
+
+Representational authority
+    corpus-validated semantic contracts
+
+Implementation authority
+    accepted implementation contracts
+    within their explicitly declared responsibility
+```
+
+The Organon constrains system meaning. Explicit operator decisions resolve open authoring or constitutive questions. The vault supplies actual authored instances and irregularities. Runtime equations and invariants constrain deterministic authority. A contract becomes representational authority only after corpus validation. An implementation is authoritative only inside its accepted boundary.
+
+No domain silently overrides another. A conflict between domains triggers:
+
+```text
+classification
+→ retained evidence
+→ explicit operator or contract decision
+→ bounded amendment
+```
+
+## Evidence taxonomy
+
+The following are evidence classes, not automatic semantic authorities:
+
+```text
+raw authored-vault observations
+Python materialization observations
+runtime traces and measured behavior
+private-UAT reports
+synthetic fixtures
+implementation source and diagnostics
+operator attestations
+```
+
+Evidence may establish a required capability, a concrete consumer, a corpus phenomenon, a failure mode, a contradiction, an unsupported assumption, a performance or scale condition, or the need for an explicit amendment. Evidence does not silently acquire semantic authority.
+
+Observed Python success does not prove that the Python mechanism is architecturally correct. Private UAT may establish required behavior without validating an internal implementation. Synthetic fixtures establish local deterministic mechanics, not corpus actuality. Implementation source establishes what code does, not what the system ought to mean.
+
+## Operator-attested recovery baseline
+
+The operator attests that the independent Python system demonstrated whole-corpus feasibility against the authored vault. This is an `operator-attested recovery baseline`, not an unqualified architectural fact.
+
+The attested scope is:
+
+- complete-vault ingest occurred;
+- real corpus questions were answered;
+- exact, lexical, vector, graph, and temporal mechanisms operated;
+- multi-turn private UAT exercised the system;
+- the system produced useful whole-corpus behavior.
+
+This does not establish:
+
+- correctness of the Python ontology;
+- exhaustiveness of projected affordances;
+- preservation of CLEANROOM equations or invariants;
+- correctness of evidence admission;
+- absence of accidental semantic or coherence gates;
+- correctness of candidate Rust contracts;
+- correctness of Python implementation boundaries;
+- corpus-scale suitability of the candidate Rust activation runtime.
+
+The next substrate-observation implementation must produce or reference a recovery-baseline manifest. Where available it records:
+
+```text
+python_repository_commit
+corpus_snapshot_identity
+inventory_identity
+materialization_or_index_identity
+private_uat_suite_identities
+report_identities
+demonstrated_capabilities
+known_failures
+known_architectural_violations
+unmeasured_areas
+private_artifact_hashes_or_locations
+attestation_timestamp
+```
+
+Unknown or unavailable identities are represented as `unknown`. They are not inferred, reconstructed, or fabricated.
+
+## Pre-admission substrate observation
+
+Corpus contact begins with raw authored observations, before semantic classification or admission. As available, the observation bundle exposes:
+
+```text
+source path
+source identity and UUID observation
+raw frontmatter keys
+raw frontmatter value shapes
+frontmatter source provenance
+heading hierarchy
+authored Markdown block candidates
+raw Markdown
+wikilinks
+aliases
+embeds
+heading targets
+block targets
+source spans
+parse failures
+unsupported syntax
+ambiguous targets
+unresolved targets
+source hashes
+corpus snapshot identity
+```
+
+These are not yet semantic objects, semantic units, identifiers, or occurrences. Each relevant fact may subsequently be classified as `admitted`, `quarantined`, `rejected`, `unresolved`, or `open_authoring_decision`. Admission retains the raw observation, classification rule, authority for that rule, information preserved, and information lost or excluded.
+
+Python chunks, graph nodes, anchors, and indexes are materialization observations. A Python chunk is not automatically a semantic unit: it may correspond to an authored unit, be a transport split, reveal a materialization defect, or remain unresolved pending operator decision. The exporter must not settle that question merely by naming its records.
 
 ## Documents
 
-- `000-organon-of-finite-inquiry.md` — authoritative Organon source, preserving authored wikilinks and terminology.
+- `000-organon-of-finite-inquiry.md` — Organon source.
 - `00-workspace-readme.md` — this document.
-- `01-kernel-equations.md` — formal representation of boundary inference, problem-space evolution, projection activation, semantic access, execution, and synthesis.
-- `02-runtime-invariants.md` — non-negotiable runtime authority boundaries.
-- `03-semantic-object-unit-model.md` — the bidirectional and lateral ontology of semantic objects, semantic units, identifiers, occurrences, links, regions, and contextual relations.
-- `04-semantic-space-projection-requirements.md` — what the frozen semantic projection and its activated working views must expose.
-- `05-clean-implementation-sequence.md` — greenfield implementation order for the independent `CLEANROOM` repository.
-- `06-clean-room-protocol.md` — context hygiene, review gates, repository discipline, and later compatibility rules.
-- `07-rust-assessment.md` — language decision note aligned with the accepted clean contracts.
-- `08-behavioral-examples.md` — minimal scenarios that test the architecture.
-- `09-vault-topology-and-authored-conventions.md` — evidence-grounded description of the vault's physical topology and authored conventions.
-- `10-organon-vault-substrate-chunking-map.md` — mapping from the Organon through vault structure, semantic objects/units, and unit materialization.
-- `11-problem-space-state.md` — two-call boundary inference, relational problem regions, open tensions, attention bands, persistence, and continuity.
-- `12-semantic-access-and-traversal-language.md` — canonical addressing, directed access paths, execution obligations, outputs, conformance, and repair.
-- `13-projection-activation-and-access.md` — positive-only activated regions, deterministic surface access, expansion, telemetry, and frozen turn snapshots.
+- `01-kernel-equations.md` — kernel equations.
+- `02-runtime-invariants.md` — runtime invariants.
+- `03-semantic-object-unit-model.md` — object, region, unit, identifier, occurrence, and relation distinctions.
+- `04-semantic-space-projection-requirements.md` — projection requirements.
+- `05-clean-implementation-sequence.md` — substrate-first recovery sequence.
+- `06-clean-room-protocol.md` — authority, evidence, lifecycle, and review protocol.
+- `07-rust-assessment.md` — language decision and boundary assessment.
+- `08-behavioral-examples.md` — behavioral scenarios.
+- `09-vault-topology-and-authored-conventions.md` — vault observations.
+- `10-organon-vault-substrate-chunking-map.md` — substrate mapping.
+- `11-problem-space-state.md` — problem-space state.
+- `12-semantic-access-and-traversal-language.md` — semantic access and traversal.
+- `13-projection-activation-and-access.md` — projection activation and access.
 
-## Initial workspace contents
+## Current workspace state
 
-The new project workspace should initially contain only:
+The repository already contains the Organon and document set, language-neutral contracts instantiated as Rust exchange types and schemas, a deterministic problem-space fold and replay implementation, a tiny synthetic semantic-space fixture, projection-activation contracts, and a candidate deterministic activation implementation under review.
 
-- these documents;
-- the Organon;
-- a corpus-schema example or tiny synthetic fixture;
-- later, accepted language-neutral data contracts and their clean implementation.
+These are preserved. PR #9 remains provisional; synthetic tests do not make it accepted against the real corpus. Further semantic-access, conformance, execution, packet, and synthesis implementation remains frozen until the recovery sequence reaches those gates.
 
-The legacy runtime remains outside this repository and is not ambient design context.
+Python remains admissible evidence and a possible bounded substrate/access provider. It does not automatically become architectural authority. No Python runtime port is authorized, no compatibility mechanism is introduced without a concrete consumer, and one eventual production kernel authority remains the target.
 
-## Immediate next decision
+## Corrected continuation order
 
-Before code begins, freeze:
+```text
+whole-corpus observation
+→ contract-contact reconciliation
+→ bounded contract amendment
+→ real projection construction
+→ complete-vault projection validation
+→ real projection-access implementation
+→ candidate activation revalidation
+→ semantic-access inference
+→ conformance
+→ execution
+→ packet and synthesis
+→ private UAT
+```
 
-- the equations;
-- the invariants;
-- the problem-space contract;
-- the object/unit ontology;
-- the projection and activation contracts;
-- the semantic-access plan contract;
-- the retrieval-result and synthesis-input contracts;
-- the semantic-unit versus transport-segment rule.
+The projection-access boundary performs the probes needed by initial activation. Later semantic-access execution adapters execute conforming traversal plans and hydrate outputs. The candidate activation implementation is not revalidated against a hand-authored projection-access substitute.
 
-Only then choose concrete module boundaries and implementation language.
+This is substrate-first recovery of the existing project, not a restart.
