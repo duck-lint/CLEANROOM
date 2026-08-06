@@ -21,18 +21,40 @@ pillar:
 
 This workspace begins from that kernel.
 
+## Demonstrated starting point
+
+The independent Python system in `duck-lint/semantic-traversal` has already demonstrated whole-corpus feasibility against the authored vault.
+
+The immediate clean-room question is therefore not whether Semantic Traversal is possible.
+
+It is whether `duck-lint/CLEANROOM` faithfully preserves and improves the demonstrated system while grounding its abstractions in the complete authored substrate.
+
+The Python runtime is not architectural authority. Its demonstrated capabilities, failures, corpus observations, execution traces, and private-UAT results remain admissible evidence.
+
 ## Source hierarchy
 
-The clean-room project should use this order of authority:
+The clean-room project uses this order of authority:
 
-1. The Organon and the corpus-structuring rules it establishes.
-2. The kernel equations and invariants in this package.
-3. The semantic object/unit model.
-4. The semantic-space projection requirements.
-5. Explicit behavioral examples and acceptance tests.
-6. Existing implementation artifacts, consulted only after the clean contracts are frozen and only through a bounded compatibility review.
+1. The authored vault and the Organon that constrains its typing, relations, scope, and movement.
+2. Observed whole-corpus behavior and private UAT.
+3. Accepted semantic distinctions that survive corpus contact.
+4. Candidate `CLEANROOM` contracts.
+5. Python implementation boundaries.
+6. Generic engineering conventions.
 
 When two sources conflict, the higher source wins until the conflict is deliberately resolved.
+
+A Python component does not earn architectural authority merely because it exists. A candidate clean-room contract does not earn acceptance merely because it is coherent, typed, or well tested against a synthetic fixture.
+
+## Evidence and implementation posture
+
+No new implementation is justified solely by prose coherence.
+
+No synthetic fixture may substitute for whole-corpus grounding.
+
+No compatibility mechanism is added without a concrete consumer.
+
+The clean-room repository remains independent. Corpus contact occurs through an explicit, versioned, read-only substrate observation or projection exchange boundary rather than by importing legacy orchestration into the Rust kernel.
 
 ## Documents
 
@@ -42,9 +64,9 @@ When two sources conflict, the higher source wins until the conflict is delibera
 - `02-runtime-invariants.md` — non-negotiable runtime authority boundaries.
 - `03-semantic-object-unit-model.md` — the bidirectional and lateral ontology of semantic objects, semantic units, identifiers, occurrences, links, regions, and contextual relations.
 - `04-semantic-space-projection-requirements.md` — what the frozen semantic projection and its activated working views must expose.
-- `05-clean-implementation-sequence.md` — greenfield implementation order for the independent `CLEANROOM` repository.
-- `06-clean-room-protocol.md` — context hygiene, review gates, repository discipline, and later compatibility rules.
-- `07-rust-assessment.md` — language decision note aligned with the accepted clean contracts.
+- `05-clean-implementation-sequence.md` — substrate-first recovery and continuation order for the independent `CLEANROOM` repository.
+- `06-clean-room-protocol.md` — authority hygiene, evidence requirements, review gates, repository discipline, and compatibility rules.
+- `07-rust-assessment.md` — language decision note aligned with whole-corpus grounding and the accepted clean contracts.
 - `08-behavioral-examples.md` — minimal scenarios that test the architecture.
 - `09-vault-topology-and-authored-conventions.md` — evidence-grounded description of the vault's physical topology and authored conventions.
 - `10-organon-vault-substrate-chunking-map.md` — mapping from the Organon through vault structure, semantic objects/units, and unit materialization.
@@ -52,28 +74,30 @@ When two sources conflict, the higher source wins until the conflict is delibera
 - `12-semantic-access-and-traversal-language.md` — canonical addressing, directed access paths, execution obligations, outputs, conformance, and repair.
 - `13-projection-activation-and-access.md` — positive-only activated regions, deterministic surface access, expansion, telemetry, and frozen turn snapshots.
 
-## Initial workspace contents
+## Current workspace state
 
-The new project workspace should initially contain only:
+The repository already contains:
 
-- these documents;
-- the Organon;
-- a corpus-schema example or tiny synthetic fixture;
-- later, accepted language-neutral data contracts and their clean implementation.
+- the Organon and clean-room document set;
+- language-neutral contracts instantiated as Rust exchange types and schemas;
+- a deterministic problem-space fold and replay implementation;
+- a tiny synthetic semantic-space fixture;
+- projection-activation contracts;
+- a candidate deterministic activation implementation under review.
 
-The legacy runtime remains outside this repository and is not ambient design context.
+These artifacts are preserved.
+
+Corpus-sensitive contracts and implementations remain provisional until they survive complete-vault contact. The synthetic fixture remains a fast deterministic regression surface, not architectural acceptance authority.
 
 ## Immediate next decision
 
-Before code begins, freeze:
+Before further semantic-access, conformance, execution, packet, or synthesis implementation:
 
-- the equations;
-- the invariants;
-- the problem-space contract;
-- the object/unit ontology;
-- the projection and activation contracts;
-- the semantic-access plan contract;
-- the retrieval-result and synthesis-input contracts;
-- the semantic-unit versus transport-segment rule.
+1. freeze forward architectural elaboration;
+2. define a versioned whole-corpus observation exchange;
+3. compare authored vault structure, Python materialization, and candidate clean-room contracts;
+4. build and validate a read-only complete-vault `SemanticSpaceProjection`;
+5. re-evaluate the existing activation implementation against that projection;
+6. resume the Rust reconstruction only from the validated boundary.
 
-Only then choose concrete module boundaries and implementation language.
+This is a substrate-first recovery of the existing project, not a restart.
