@@ -114,7 +114,7 @@ The semantic projection is not identical to any one graph, embedding space, inde
 
 A useful visualization may render the projection as a high-dimensional or "semantic hyperspace," but that phrase is descriptive shorthand rather than a new runtime ontology. The authoritative structure remains the typed records, identities, relations, identifier assignments, temporal anchors, and retrieval-surface affordances represented in \(M_\sigma\).
 
-An Obsidian-style graph can expose one partial authored view of that structure: file-level nodes and authored wikilink incidence that may, after admission and materialization, contribute canonical objects and occurrence structure to the semantic projection. The complete projection additionally contains, as applicable:
+An Obsidian-style graph corresponds primarily to an object-level authored-wikilink view once resolved into the projection. The complete projection additionally contains, as applicable:
 
 - object → region → unit containment;
 - unit and object-field occurrence provenance;
