@@ -114,7 +114,7 @@ The semantic projection is not identical to any one graph, embedding space, inde
 
 A useful visualization may render the projection as a high-dimensional or "semantic hyperspace," but that phrase is descriptive shorthand rather than a new runtime ontology. The authoritative structure remains the typed records, identities, relations, identifier assignments, temporal anchors, and retrieval-surface affordances represented in \(M_\sigma\).
 
-An Obsidian-style graph is one partial view of that structure: primarily canonical semantic objects connected by authored wikilink incidence. The complete projection additionally contains, as applicable:
+An Obsidian-style graph can expose one partial authored view of that structure: file-level nodes and authored wikilink incidence that may, after admission and materialization, contribute canonical objects and occurrence structure to the semantic projection. The complete projection additionally contains, as applicable:
 
 - object → region → unit containment;
 - unit and object-field occurrence provenance;
@@ -124,7 +124,7 @@ An Obsidian-style graph is one partial view of that structure: primarily canonic
 - temporal anchors and temporal incidence;
 - exact, lexical, vector, graph, and temporal access affordances over the same canonical identities.
 
-No retrieval surface individually defines the semantic space. Graph incidence is not privileged over exact, lexical, vector, or temporal access, and a vector neighbourhood does not create a canonical relation merely because two represented items are near one another.
+No retrieval surface individually defines the semantic space. Graph access is not privileged over exact, lexical, vector, or temporal access. Authored graph incidence remains represented corpus structure where admitted and resolved; a vector neighbourhood does not create a canonical relation merely because two represented items are near one another.
 
 Visual encodings may expose corpus-derived or Organon-derived properties—for example, color from admitted typing or node size from measured mention frequency—but those encodings remain derived views unless the underlying value is itself represented with provenance in the projection. Force-layout coordinates, visual cluster position, color, or node size must not silently acquire semantic, epistemic, relevance, or ranking authority.
 
