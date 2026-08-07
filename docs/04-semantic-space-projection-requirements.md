@@ -108,6 +108,26 @@ W_t \subseteq M_\sigma
 
 Absence from \(W_t\) does not establish absence from \(M_\sigma\).
 
+### 5.1 Multiplex projection, not one graph surface
+
+The semantic projection is not identical to any one graph, embedding space, index, or retrieval surface.
+
+A useful visualization may render the projection as a high-dimensional or "semantic hyperspace," but that phrase is descriptive shorthand rather than a new runtime ontology. The authoritative structure remains the typed records, identities, relations, identifier assignments, temporal anchors, and retrieval-surface affordances represented in \(M_\sigma\).
+
+An Obsidian-style graph is one partial view of that structure: primarily canonical semantic objects connected by authored wikilink incidence. The complete projection additionally contains, as applicable:
+
+- object → region → unit containment;
+- unit and object-field occurrence provenance;
+- incoming as well as outgoing incidence;
+- identifier assignments and inheritance;
+- contextual relation participation;
+- temporal anchors and temporal incidence;
+- exact, lexical, vector, graph, and temporal access affordances over the same canonical identities.
+
+No retrieval surface individually defines the semantic space. Graph incidence is not privileged over exact, lexical, vector, or temporal access, and a vector neighbourhood does not create a canonical relation merely because two represented items are near one another.
+
+Visual encodings may expose corpus-derived or Organon-derived properties—for example, color from admitted typing or node size from measured mention frequency—but those encodings remain derived views unless the underlying value is itself represented with provenance in the projection. Force-layout coordinates, visual cluster position, color, or node size must not silently acquire semantic, epistemic, relevance, or ranking authority.
+
 ## 6. Required semantic-object representation
 
 For each semantic object, expose:
@@ -430,4 +450,6 @@ A valid projection must prove:
 16. every valid transition is represented;
 17. activation provenance is available;
 18. no mandatory semantic structure is discarded by prompt-size constraints;
-19. absence from an activated view cannot be mistaken for corpus absence.
+19. absence from an activated view cannot be mistaken for corpus absence;
+20. no single retrieval surface is treated as the whole semantic projection;
+21. visualization encodings do not create canonical identities, relations, or semantic authority.
