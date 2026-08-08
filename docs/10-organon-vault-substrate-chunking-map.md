@@ -812,9 +812,18 @@ Semantic-unit materialization is therefore not a generic preprocessing utility. 
 The supplied materials and accepted clean-room contracts support the complete mapping above. These remaining decisions should be resolved explicitly during schema design:
 
 1. Whether quote-plus-commentary adjacency is one authored semantic unit or two related semantic units.
+    Pages will be under headings like such so I think it will be okay how the chunking is currently 
+    ### P. 008
+        > *"Besides this, **certainty** and **clarity** with regard to its **form** are two essential demands that may very properly be made on an author who ventures on so slippery an undertaking."*
+        - He's talking on the nature of knowledge itself in seeking **complete and comprehensive** understanding of through critical inquiry of what we might hope to achieve with reason when **all** the material assistance of experience are taken away (*[[a priori]]*) — sounds like I'm reading [[Myself]] from the future earlier this year, searching outside ourself for answers—though I believe we've come to different conclusions about the ability to do this (talk from the perspective he proposes) at all, considering Seed Axiom F, finitude. Our [[Perspective]] allows construction of a 1 sided [[Inferential Bridge (Rule)|bridge]] that only reaches halfway, and requires a leap of faith to cross, of which we're not in the business of doing, we've no firm knowledge of the other side.
+        - Through our framework, pages 9 and 10 see him expounding on certainty—splitting registers, and demands [[Register]] typing—with clarity.
 2. The explicit relation connecting book-note objects to source-material objects for the same work, if such a relation is desired.
+    semantic objects of the source material (`book name.md`) will be linked to notes like → (`BOOK NOTES — book name.md`) with the quotes from source material in the notes
 3. The complete admitted-field registry and each field’s applicability, inheritance, relation, and temporal affordances.
+    huh? produce a report or decision matrix or something for me to fill for this
 4. The admission policy for `VAULT DESIGN`, attachments, canvases, PDFs, and inbox material.
+    vault design, attachments, canvases, pdfs can all be skipped from being put into the space. nothing special about inbox material it can be ingested like everything else
 5. The exact transport-segmentation algorithm and reconstruction guarantees, which must remain non-semantic.
+    huh? produce a report or decision matrix or something for me to fill for this
 
 These decisions belong in the semantic projection and unit-materialization contracts. They must not be deferred to post-retrieval interpretation.
