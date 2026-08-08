@@ -2,8 +2,8 @@
 
 ## Status and provenance
 
-**Action state:** Drafted for operator review.  
-**Source basis:** the supplied Organon, full vault tree, representative mini-vault, semantic identifier list, chunk-representation example, and accepted clean-room kernel documents.
+**Action state:** Operator decisions incorporated; two schema decision worksheets remain open.  
+**Source basis:** the supplied Organon, full vault tree, representative mini-vault, semantic identifier list, chunk-representation example, accepted clean-room kernel documents, and explicit operator decisions recorded during review.
 
 This document specifies the constitutive mapping from the Organon into the authored vault and from the vault into the semantic space available to semantic-access inference.
 
@@ -192,6 +192,33 @@ A clean projection should describe at least the following roles:
 
 A field descriptor must state its role and applicability. Treating every field as an interchangeable searchable scalar would erase the Organon’s typing discipline.
 
+### 4.1 Admitted-field registry decision sheet
+
+The complete admitted-field registry is not frozen from the representative list above. Under the substrate-first recovery boundary, the registry must be generated from whole-corpus raw frontmatter observation before schema admission. The raw inventory is corpus actuality; admission is an explicit representational decision.
+
+The whole-corpus report must contain one row for every observed frontmatter key, including irregular or one-off keys. The operator-facing decision matrix is:
+
+| Field | Raw value shapes and examples | Observed object families / paths | Admit? | Semantic role | Applicability | Inherited by units? | Creates canonical occurrence? | Temporal affordance | Enabled retrieval surfaces | Preserved / excluded information | Operator decision |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `<observed key>` | corpus observation | corpus observation | `yes / no / quarantine / unresolved` | choose declared role | choose declared domain | `yes / no / contextual only` | `yes / no`; if yes, declare target shape | `none / intrinsic anchor / contextual anchor / other` | exact / lexical / vector / graph / temporal as structurally capable | state loss explicitly | required when not already fixed by an accepted contract |
+
+The matrix must not be completed by extrapolating from field names. It is populated from raw authored observations and then reviewed against the Organon, runtime invariants, and accepted object/unit/projection contracts.
+
+The following seed decisions are already supported by the supplied materials and existing contracts; they do not make the registry exhaustive:
+
+| Field or family | Current accepted role | Boundary |
+|---|---|---|
+| `uuid` | semantic-object individuation anchor | Units retain the parent object UUID as provenance/context; it is not the unit identity. |
+| `note_type` | object class | Inherited by units with parent-field provenance. |
+| `aliases`, `tags` | naming/grouping surfaces | Non-individuating; do not create canonical identity. |
+| `journal_entry_date` | journal temporal anchor | Applies to the dated journal context; does not become an intrinsic identifier of linked targets. |
+| `book_read_today`, `dream_motif` | contextual relation-bearing fields when authored as canonical links | Materialize object-field occurrences with source-field provenance and reverse incidence. |
+| `original_year_published` or admitted publication-year field | publication temporal metadata | Intrinsic to the carrying object when materially sourced; exact field naming remains registry-controlled. |
+| `entity_type`, `canonical_name` | entity classification/naming | Object-level identifiers inherited by contained units. |
+| `first_met`, `birthday` | entity temporal metadata when admitted | Intrinsic to the carrying entity object; temporal affordance must preserve field provenance. |
+
+Fields such as journal telemetry, bridge fields, `publish_studio`, `origin`, and any additional whole-vault keys remain registry rows to be classified from observation rather than silently assigned semantics here.
+
 ## 5. From authored note to canonical semantic object
 
 Let a Markdown note be represented as an authored source record:
@@ -200,7 +227,7 @@ Let a Markdown note be represented as an authored source record:
 N = (path, filename, frontmatter, Markdown body)
 ```
 
-A note becomes a canonical semantic object only when it has a stable individuation anchor:
+After admission, a note becomes a canonical semantic object only when it has a stable individuation anchor:
 
 ```text
 O = object(uuid, topology, identifiers, body structure, occurrences)
@@ -234,6 +261,20 @@ object existence ≠ semantic-unit existence
 ```
 
 The projection inventory must enumerate canonical objects independently of whether unit materialization produced body units.
+
+### 5.3 Corpus admission boundary
+
+The operator has fixed the following admission policy for the current corpus boundary:
+
+- `VAULT DESIGN/` is excluded from the semantic space;
+- attachments are excluded;
+- Obsidian Canvas files are excluded;
+- PDFs are excluded;
+- `INBOX/` has no special quarantine or draft semantics merely because of its path; eligible Markdown there is observed, admitted, and materialized under the same rules as eligible Markdown elsewhere.
+
+These are admission decisions, not claims that excluded material is semantically irrelevant in every possible future corpus. Raw observation should retain enough path and exclusion provenance to show what was omitted and by which rule.
+
+An excluded source does not become a semantic object, region, unit, occurrence source, or retrieval candidate in the resulting projection. A later admission-policy change requires a new corpus/projection identity and rematerialization of the affected sources.
 
 ## 6. From authored Markdown structure to semantic units
 
@@ -312,6 +353,25 @@ Other compound Markdown blocks should be treated as authored structures:
 
 They should not be flattened into undifferentiated prose before unit creation.
 
+Quote-plus-commentary adjacency does not create a special fused semantic unit. The operator’s book-note convention places the material under a page heading such as:
+
+```text
+### P. 008
+> quoted source passage
+- commentary item
+- commentary item
+```
+
+The page heading defines one semantic region. Within that region, the block quote and the following commentary retain their authored Markdown block boundaries. Adjacency supplies local structural context but does not merge the quote and commentary into one canonical unit. A contiguous Markdown list remains one authored list block unless the authored structure itself establishes additional block boundaries.
+
+This preserves both requirements:
+
+```text
+shared page-heading context
+≠
+shared semantic-unit identity
+```
+
 ### 6.4 Oversized semantic units and transport segments
 
 Provider, tokenizer, and embedding limits are technical constraints rather than authored semantic boundaries.
@@ -334,6 +394,22 @@ A transport segment must:
 - remain non-canonical as an independently authored semantic unit.
 
 A token limit therefore cannot silently create new semantic units or alter authored ontology.
+
+The exact segmentation algorithm is intentionally not inferred from implementation convenience. The remaining operator decision is bounded to the technical policy below:
+
+| Transport decision | Existing contract constraint | Operator choice |
+|---|---|---|
+| Trigger | Segmentation may occur only because a technical provider/tokenizer/input limit prevents whole-unit processing. | `<fill>` |
+| Measurement basis | Must be deterministic and versioned for the operation that uses it. | `named tokenizer / bytes / characters / other: <fill>` |
+| Maximum segment size | Must remain a technical bound and cannot redefine canonical unit identity. | `<fill>` |
+| Markdown-boundary preference | Preserve complete Markdown constructs where possible; any forced split retains exact source spans. | `<fill boundary preference order>` |
+| Overlap | Any overlap is transport duplication only and must not create duplicate evidence identity. | `none / fixed technical overlap / other: <fill>` |
+| Reconstruction guarantee | Segment order and spans must permit deterministic reconstruction of the parent unit representation used by that operation. | `byte-exact / authored-Markdown exact / normalized-representation exact / other: <fill>` |
+| Segment identity | Must include or resolve to parent unit identity and deterministic segment ordinal; it remains non-canonical. | `<confirm or amend>` |
+| Provider specificity | Different provider limits may use different transport policies without changing the parent semantic unit. | `shared policy / provider-specific policies: <fill>` |
+| Versioning | If segment descriptors are projected, a policy change changes projection identity; it does not create new semantic units. | `<confirm or amend>` |
+
+Until these cells are explicitly decided, implementations may preserve the invariant shape of `TransportSegment` but must not elevate one concrete splitting algorithm into representational authority.
 
 ## 7. Top-down inheritance
 
@@ -646,7 +722,50 @@ source object S
 
 Both units inherit source title, creator, format, and publication identifiers.
 
-### 10.5 Inferential bridge object → bridge units
+### 10.5 Book notes ↔ source material
+
+The operator has fixed that a canonical source-material object such as:
+
+```text
+book name.md
+```
+
+is explicitly linked to its distinct book-notes object such as:
+
+```text
+BOOK NOTES — book name.md
+```
+
+and the book-notes object contains the authored quotations and commentary about that source.
+
+The constitutive connection is the authored canonical link occurrence, not filename similarity and not quote-text matching. In projection terms:
+
+```text
+source-material object S
+    authored canonical occurrence O
+    → book-notes object N
+
+book-notes object N
+    ← reverse incidence for O
+    source-material context remains traceable
+```
+
+If the authored link is placed in the opposite direction or in both directions, the projection preserves the actual occurrence direction(s) and exposes reverse incidence. The runtime does not invent a separate `same_work`, `notes_for`, or equivalent relation merely because the filenames correspond.
+
+Quotations inside `N` remain semantic units of the book-notes object. They do not become canonical source-material units merely because their text was quoted from `S`. A source-unit identity or region identity is available only when the authored substrate supplies an explicit canonical target/address or another later-admitted relation that licenses it.
+
+Thus:
+
+```text
+explicit object link
+    establishes canonical object-to-object connectivity
+
+quoted text
+    preserves authored note content
+    but does not by itself establish source-unit identity
+```
+
+### 10.6 Inferential bridge object → bridge units
 
 Authored object fields define:
 
@@ -786,44 +905,49 @@ The mapping forbids the runtime from:
 
 ## 15. Clean implementation consequence
 
-The new runtime should be built around this sequence:
+The substrate path must respect the current substrate-first recovery order:
 
 ```text
-1. ingest authored vault structure into canonical objects, units,
-   identifiers, occurrences, anchors, and addresses;
+1. observe the whole authored vault as raw corpus actuality;
 
-2. project the complete accessible semantic space;
+2. classify observations through explicit admission rules while retaining
+   excluded, quarantined, malformed, ambiguous, and unresolved material;
 
-3. let semantic-access inference connect the thread problem space to paths in that projection;
+3. materialize admitted Markdown structure into canonical objects, regions,
+   units, identifiers, occurrences, anchors, and addresses;
 
-4. structurally confirm that the proposed paths exist;
+4. project the complete admitted semantic space;
 
-5. execute them;
+5. validate the projection against the whole-corpus observation and accepted
+   representational contracts;
 
-6. preserve returned units and provenance in the synthesis packet;
+6. let semantic-access inference connect the thread problem space to paths in
+   that validated projection;
 
-7. let synthesis interpret the result.
+7. structurally confirm that proposed paths exist;
+
+8. execute them;
+
+9. preserve returned units and provenance in the synthesis packet;
+
+10. let synthesis interpret the result.
 ```
 
 Semantic-unit materialization is therefore not a generic preprocessing utility. It is the boundary at which authored internal structure becomes the addressable unit layer of the semantic substrate. Technical segmentation occurs later and remains subordinate to canonical unit identity.
 
-## 16. Operator-review points
+## 16. Operator-review resolution
 
-The supplied materials and accepted clean-room contracts support the complete mapping above. These remaining decisions should be resolved explicitly during schema design:
+The original review points are no longer an undifferentiated open list.
 
-1. Whether quote-plus-commentary adjacency is one authored semantic unit or two related semantic units.
-    Pages will be under headings like such so I think it will be okay how the chunking is currently 
-    ### P. 008
-        > *"Besides this, **certainty** and **clarity** with regard to its **form** are two essential demands that may very properly be made on an author who ventures on so slippery an undertaking."*
-        - He's talking on the nature of knowledge itself in seeking **complete and comprehensive** understanding of through critical inquiry of what we might hope to achieve with reason when **all** the material assistance of experience are taken away (*[[a priori]]*) — sounds like I'm reading [[Myself]] from the future earlier this year, searching outside ourself for answers—though I believe we've come to different conclusions about the ability to do this (talk from the perspective he proposes) at all, considering Seed Axiom F, finitude. Our [[Perspective]] allows construction of a 1 sided [[Inferential Bridge (Rule)|bridge]] that only reaches halfway, and requires a leap of faith to cross, of which we're not in the business of doing, we've no firm knowledge of the other side.
-        - Through our framework, pages 9 and 10 see him expounding on certainty—splitting registers, and demands [[Register]] typing—with clarity.
-2. The explicit relation connecting book-note objects to source-material objects for the same work, if such a relation is desired.
-    semantic objects of the source material (`book name.md`) will be linked to notes like → (`BOOK NOTES — book name.md`) with the quotes from source material in the notes
-3. The complete admitted-field registry and each field’s applicability, inheritance, relation, and temporal affordances.
-    huh? produce a report or decision matrix or something for me to fill for this
-4. The admission policy for `VAULT DESIGN`, attachments, canvases, PDFs, and inbox material.
-    vault design, attachments, canvases, pdfs can all be skipped from being put into the space. nothing special about inbox material it can be ingested like everything else
-5. The exact transport-segmentation algorithm and reconstruction guarantees, which must remain non-semantic.
-    huh? produce a report or decision matrix or something for me to fill for this
+### Resolved by explicit operator decision
 
-These decisions belong in the semantic projection and unit-materialization contracts. They must not be deferred to post-retrieval interpretation.
+1. **Quote-plus-commentary materialization:** page headings provide shared semantic-region context; quote and commentary Markdown blocks are not fused merely by adjacency. Section 6.3 now states the materialization rule.
+2. **Book notes and source material:** distinct canonical objects are connected by authored canonical links with preserved direction and reverse incidence. Filename similarity and quote-text matching do not create the relation. Section 10.5 now states the mapping.
+3. **Corpus admission:** `VAULT DESIGN`, attachments, Canvas files, and PDFs are excluded; `INBOX` Markdown has no special path-based quarantine and follows ordinary admission/materialization rules. Section 5.3 now states the boundary.
+
+### Open only where the operator requested a decision surface
+
+4. **Complete admitted-field registry:** no semantics are inferred from field names. Section 4.1 defines the whole-corpus decision matrix that must be populated from raw frontmatter observation and then explicitly accepted.
+5. **Transport segmentation:** the non-semantic invariants are fixed, but the concrete technical splitting policy remains undecided. Section 6.4 defines the bounded operator decision matrix without choosing an algorithm by convenience.
+
+These two remaining sheets are design inputs, not permission for implementation to guess. Until they are completed and accepted, the project may observe the corpus and preserve existing contract invariants, but it may not silently freeze unresolved field semantics or a transport algorithm as representational authority.
