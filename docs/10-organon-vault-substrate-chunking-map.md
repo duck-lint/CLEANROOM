@@ -210,7 +210,8 @@ The following seed decisions are already supported by the supplied materials and
 |---|---|---|
 | `uuid` | semantic-object individuation anchor | Units retain the parent object UUID as provenance/context; it is not the unit identity. |
 | `note_type` | object class | Inherited by units with parent-field provenance. |
-| `aliases`, `tags` | naming/grouping surfaces | Non-individuating; do not create canonical identity. |
+| `aliases` | alternate authored names/shorthand/address surfaces | Non-individuating; do not create canonical identity. |
+| `tags` | grouping/categorization surfaces | Non-individuating; do not create canonical identity. |
 | `journal_entry_date` | journal temporal anchor | Applies to the dated journal context; does not become an intrinsic identifier of linked targets. |
 | `book_read_today`, `dream_motif` | contextual relation-bearing fields when authored as canonical links | Materialize object-field occurrences with source-field provenance and reverse incidence. |
 | `original_year_published` or admitted publication-year field | publication temporal metadata | Intrinsic to the carrying object when materially sourced; exact field naming remains registry-controlled. |
