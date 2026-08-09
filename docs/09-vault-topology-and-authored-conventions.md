@@ -2,7 +2,7 @@
 
 ## Status and provenance
 
-**Action state:** Evidence-grounded observation document; later operator resolutions are cross-referenced without rewriting the original evidence boundary.  
+**Action state:** Evidence-grounded observation document; later operator resolutions are cross-referenced without rewriting the original evidence boundary.
 **Source basis:**
 
 - the supplied full vault tree;
