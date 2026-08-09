@@ -2,8 +2,8 @@
 
 ## Status and provenance
 
-**Action state:** Operator decisions incorporated; the concrete transport-segmentation policy remains open.  
-**Source basis:** the supplied Organon, full vault tree, representative mini-vault, semantic identifier list, chunk-representation example, and accepted clean-room kernel documents.
+**Action state:** Admitted-field/operator review closed; transport semantic invariants fixed; concrete transport mechanics intentionally consumer-bound.
+**Source basis:** the supplied Organon; accepted CLEANROOM contracts; the accepted authored-vault observation and repository-safe audit record for the named specimen; explicit operator decisions recorded in this document; and the supplied vault tree, representative examples, semantic identifier list, and unit-materialization example as supporting evidence. The mini-vault, examples, paths, and legacy implementation are not independent semantic authorities.
 
 This document specifies the constitutive mapping from the Organon into the authored vault and from the vault into the semantic space available to semantic-access inference.
 
@@ -481,30 +481,41 @@ semantic unit U
 
 A transport segment must:
 
+- be subordinate to exactly one canonical semantic unit;
+- never create a new canonical semantic unit;
+- never create authored ontology or authored boundaries;
 - retain the parent semantic-unit identity;
-- preserve source-span provenance;
-- carry a deterministic segment ordinal;
-- preserve complete reconstruction order;
+- retain deterministic segment order and ordinal;
+- retain source-span provenance;
+- preserve deterministic reconstruction;
 - avoid breaking complete Markdown constructs where possible;
-- remain non-canonical as an independently authored semantic unit.
+- remain technical/provider transport only and non-canonical as an independently authored semantic unit.
 
 A token limit therefore cannot silently create new semantic units or alter authored ontology.
 
-The exact segmentation algorithm is intentionally not inferred from implementation convenience. The remaining operator decision is bounded to the technical policy below:
+No universal transport-segmentation algorithm is part of the semantic-substrate contract. Canonical semantic units are materialized whole. A concrete transport-segmentation policy is instantiated only when a named technical operation or provider cannot accept the complete canonical semantic unit under a demonstrated hard input constraint.
 
-| Transport decision | Existing contract constraint | Operator choice |
-|---|---|---|
-| Trigger | Segmentation may occur only because a technical provider/tokenizer/input limit prevents whole-unit processing. | `<fill>` |
-| Measurement basis | Must be deterministic and versioned for the operation that uses it. | `named tokenizer / bytes / characters / other: <fill>` |
-| Maximum segment size | Must remain a technical bound and cannot redefine canonical unit identity. | `<fill>` |
-| Markdown-boundary preference | Preserve complete Markdown constructs where possible; any forced split retains exact source spans. | `<fill boundary preference order>` |
-| Overlap | Any overlap is transport duplication only and must not create duplicate evidence identity. | `none / fixed technical overlap / other: <fill>` |
-| Reconstruction guarantee | Segment order and spans must permit deterministic reconstruction of the parent unit representation used by that operation. | `byte-exact / authored-Markdown exact / normalized-representation exact / other: <fill>` |
-| Segment identity | Must include or resolve to parent unit identity and deterministic segment ordinal; it remains non-canonical. | `<confirm or amend>` |
-| Provider specificity | Different provider limits may use different transport policies without changing the parent semantic unit. | `shared policy / provider-specific policies: <fill>` |
-| Versioning | If segment descriptors are projected, a policy change changes projection identity; it does not create new semantic units. | `<confirm or amend>` |
+Until such a consumer exists:
 
-Until these cells are explicitly decided, implementations may preserve the invariant shape of `TransportSegment` but must not elevate one concrete splitting algorithm into representational authority.
+- no tokenizer is selected;
+- no token, byte, or character maximum is selected;
+- no overlap size is selected;
+- no concrete split-preference algorithm is selected;
+- no provider-specific transport representation is granted representational authority.
+
+When a concrete consumer requires segmentation, its bounded technical policy must record at least:
+
+- **Trigger:** the named operation, the demonstrated hard whole-input constraint, and proof that the complete unit exceeds it;
+- **Measurement basis:** the exact deterministic measurement used by that consumer, such as a named/versioned tokenizer, bytes, characters, or another explicitly identified measurement;
+- **Maximum segment size:** an operation-specific configured technical bound that does not redefine canonical semantic identity;
+- **Boundary handling:** preservation of complete authored/Markdown constructs where possible, with exact provenance/source spans for any forced split, and a deterministic preference order belonging to that consumer policy;
+- **Overlap:** no overlap by default unless the concrete consumer demonstrates a technical need; any overlap is transport duplication only and cannot create duplicate semantic/evidence identity;
+- **Reconstruction:** ordered segments must deterministically reconstruct the exact parent representation supplied to that operation;
+- **Segment identity:** deterministic technical identity resolving to the canonical parent semantic-unit identity, with deterministic ordinal/order, while remaining non-canonical;
+- **Consumer/provider specificity:** different technical consumers may require different policies; no universal corpus segment size is inferred from one provider;
+- **Versioning:** every concrete transport policy is versioned. If transport-segment descriptors are included in a frozen `SemanticSpaceProjection`, a policy change requires a new projection identity; a runtime-only technical transport-policy change does not alter the canonical parent semantic-unit identity.
+
+This is an accepted consumer-bound deferral contract, not an unresolved operator worksheet. No new provider-policy type or schema is introduced here, and any future need for an explicit policy identity in `TransportSegmentRecord` requires a separate evidence-backed contract amendment when the consumer exists.
 
 ## 7. Top-down inheritance
 
@@ -1025,8 +1036,8 @@ The original review points are no longer an undifferentiated open list.
 3. **Corpus admission:** `VAULT DESIGN`, attachments, Canvas files, and PDFs are excluded; `INBOX` Markdown has no special path-based quarantine and follows ordinary admission/materialization rules. Section 5.3 states the boundary.
 4. **Admitted-field registry:** the 60 observed fields in the accepted specimen have accepted operator classifications for admission, role, applicability, inheritance, occurrence semantics, temporal semantics, and preservation/provenance. Section 4.1 records those classifications. Repository-safe audit linkage is recorded separately and does not grant the registry authority over embedding or index design.
 
-### Remaining operator decision surface
+### Closed review surface
 
-5. **Transport segmentation only:** the non-semantic invariants are fixed, but the concrete technical splitting policy remains undecided. Section 6.4 defines the bounded operator decision matrix without choosing an algorithm by convenience.
+5. **Transport mechanics:** the non-semantic invariants are fixed and concrete segmentation is intentionally consumer-bound. There is no unresolved operator choice requiring completion before substrate materialization. Future segmentation parameters are technical policy decisions activated only by demonstrated consumer constraints; Section 6.4 records the contract.
 
-The unresolved transport policy is not permission for implementation to guess. No other retrieval, embedding, ranking, or index architecture is introduced by this review resolution.
+No other retrieval, embedding, ranking, index, or provider architecture is introduced by this review resolution.
