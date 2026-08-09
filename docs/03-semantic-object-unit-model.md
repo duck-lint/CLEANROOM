@@ -139,6 +139,30 @@ creation of a semantic unit.
 
 A block target may resolve to one explicitly addressed unit.
 
+### 4.1 Canonical heading-region identity
+
+Heading-derived regions are structurally individuated from their canonical
+semantic object, their canonical parent region when one exists, and their
+authored structural heading address within that parent. If equivalent sibling
+headings would otherwise share that address, authored order supplies a
+collision-local ordinal scoped only to those equivalent siblings. Unrelated
+siblings do not increment it. Parent identities are resolved root-down before
+child identities are constructed, so equal leaf headings beneath different
+parents remain distinct.
+
+The resulting `SemanticRegionAddress` remains a pair of object identity and
+authored structural address. Its serialized structural component must be
+deterministic, injective, and independent of private paths, byte offsets, and
+runtime state. Canonical identity should remain unchanged under unrelated prose
+or content edits and insertion or removal of differently addressed siblings.
+It may change when the region's own heading address changes, its parent changes,
+or equivalent duplicate siblings are added, removed, or reordered.
+
+An exact source span is provenance and a deterministic correspondence surface,
+not part of canonical region identity. In particular, heading-target evidence
+joins its accepted matched span to the already-materialized region span and
+then uses that region's existing canonical address.
+
 ## 5. Top-down structure
 
 The semantic object supplies context to its units:
