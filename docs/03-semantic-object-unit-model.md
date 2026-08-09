@@ -183,11 +183,11 @@ The target must expose reverse incidence:
 ```text
 semantic object, region, or unit
     incoming occurrence → source semantic unit, semantic region, or object field
+```
 
 An occurrence authored in a heading marker uses the region's canonical address
 plus its exact source span as provenance. The region remains structural
 addressability, not a third epistemic object class.
-```
 
 ## 7. Canonical authored links
 

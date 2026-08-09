@@ -947,7 +947,7 @@
       "additionalProperties": false
     },
     "OccurrenceSource": {
-      "description": "Authored source surface of one occurrence.\n\nIt distinguishes object-field context from semantic-unit body context and cannot transfer identifiers between source and target.",
+      "description": "Authored source surface of one occurrence.\n\nIt distinguishes object-field, semantic-region marker, and semantic-unit body contexts and cannot transfer identifiers between source and target.",
       "oneOf": [
         {
           "description": "Occurrence authored in an object field.",
@@ -1499,7 +1499,7 @@
           }
         },
         "body_occurrence_ids": {
-          "description": "Occurrences authored in body units.",
+          "description": "Occurrences authored in non-frontmatter body syntax, including semantic-unit bodies and semantic-region markers.",
           "type": "array",
           "items": {
             "type": "string"

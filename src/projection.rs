@@ -121,7 +121,8 @@ pub struct SemanticObjectRecord {
     pub identifier_assignment_ids: Vec<String>,
     /// Occurrences authored in object fields.
     pub object_field_occurrence_ids: Vec<OccurrenceId>,
-    /// Occurrences authored in body units.
+    /// Occurrences authored in non-frontmatter body syntax, including
+    /// semantic-unit bodies and semantic-region markers.
     pub body_occurrence_ids: Vec<OccurrenceId>,
     /// Incoming occurrences targeting this object.
     pub incoming_occurrence_ids: Vec<OccurrenceId>,
@@ -504,8 +505,8 @@ pub struct OccurrenceRecord {
 
 /// Authored source surface of one occurrence.
 ///
-/// It distinguishes object-field context from semantic-unit body context and
-/// cannot transfer identifiers between source and target.
+/// It distinguishes object-field, semantic-region marker, and semantic-unit
+/// body contexts and cannot transfer identifiers between source and target.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum OccurrenceSource {

@@ -312,6 +312,26 @@ The projection must represent at least:
 
 An occurrence is an addressable record with its own provenance, not merely an untyped pair of strings.
 
+### Corpus-contact evidence — region-sourced occurrence
+
+The accepted factual observation was produced by `duck-lint/semantic-traversal`
+at commit `99d0d4556684000f0ed585e47158a5f7fe9ce7e1`, using observer schema
+`vault-observation/v2`, against corpus snapshot
+`25fb8f13dd17efb62abbb52c48f526bc0aedd887b29001c1e60f1642d322b688`.
+It found 1 affected occurrence in 1 source object, 6 heading observations, 0
+non-heading authored block candidates, and 0 unit candidates overlapping the
+occurrence span; the occurrence span was fully contained by a heading-marker
+span.
+
+These are corpus observations, not representational authority. CLEANROOM's
+response for Phase 5 real-corpus projection construction is to represent a
+heading-marker occurrence with a `SemanticRegion` source and exact source span.
+An occurrence inside a semantic-unit body remains `SemanticUnit`-sourced even
+when a heading region contains that unit. This preserves canonical region
+address, exact authored span, occurrence identity, authored direction, target
+identity, and reverse incidence. The projection must not manufacture a unit,
+drop the occurrence, or degrade its provenance to an object-level source.
+
 ## 13. Authored-target resolution
 
 The projection must provide deterministic mappings from authored Obsidian targets to canonical addresses.

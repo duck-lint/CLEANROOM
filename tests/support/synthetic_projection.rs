@@ -27,6 +27,7 @@ pub const MCCARTHY_OBJECT: &str = "019fc58d-7a15-7e1f-8cf0-4b36e9d54c21";
 pub const JOURNAL_ONE_OBJECT: &str = "019fc58d-8b62-7f0a-9d24-5e7b1c3a4401";
 pub const JOURNAL_TWO_OBJECT: &str = "019fc58d-9c73-7a1b-8e35-6f8c2d4b5502";
 pub const CLEO_OBJECT: &str = "019fc58d-ad84-7b2c-9f46-7a9d3e5c6603";
+pub const HEADING_ONLY_OBJECT: &str = "019fc58d-be95-7c3d-8047-8bae4f6d7704";
 
 pub fn object(value: &str) -> SemanticObjectId {
     SemanticObjectId::parse(value).expect("fixture UUID is valid")
@@ -287,10 +288,12 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
     let journal_one = object(JOURNAL_ONE_OBJECT);
     let journal_two = object(JOURNAL_TWO_OBJECT);
     let cleo = object(CLEO_OBJECT);
+    let heading_only = object(HEADING_ONLY_OBJECT);
     let marx_region = region(&marx, "heading:Chapter 2");
     let blood_region = region(&mccarthy, "heading:Chapter 1");
     let journal_one_region = region(&journal_one, "root");
     let journal_two_region = region(&journal_two, "root");
+    let heading_only_region = region(&heading_only, "heading:Reference");
     let capital_one = unit("unit:capital:chapter-2:1");
     let capital_two = unit("unit:capital:chapter-2:2");
     let blood_one = unit("unit:blood-meridian:chapter-1:1");
@@ -462,6 +465,22 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
             direction: Direction::Outgoing,
             source_span: None,
         },
+        OccurrenceRecord {
+            occurrence_id: occurrence("occurrence:heading-only:capital"),
+            source: OccurrenceSource::SemanticRegion {
+                region_address: heading_only_region.clone(),
+            },
+            authored_target_text: "synthetic-capital-target".into(),
+            display_alias: None,
+            resolved_target: SemanticAddress::Object(marx.clone()),
+            presentation_mode: OccurrencePresentation::Link,
+            direction: Direction::Outgoing,
+            source_span: Some(SourceSpan {
+                source: "synthetic:heading-only-source.md".into(),
+                start_byte: Some(12),
+                end_byte: Some(42),
+            }),
+        },
     ];
 
     let surfaces = [
@@ -574,7 +593,10 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
             ],
             object_field_occurrence_ids: vec![],
             body_occurrence_ids: vec![],
-            incoming_occurrence_ids: vec![occurrence("occurrence:journal-one:capital-object")],
+            incoming_occurrence_ids: vec![
+                occurrence("occurrence:journal-one:capital-object"),
+                occurrence("occurrence:heading-only:capital"),
+            ],
             temporal_anchor_ids: vec![],
             retrieval_surface_ids: vec![
                 "surface:exact".into(),
@@ -698,6 +720,28 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
                 "surface:graph".into(),
             ],
         },
+        SemanticObjectRecord {
+            object_id: heading_only.clone(),
+            source_identity: "synthetic:heading-only-source.md".into(),
+            source_kind: SourceKind::Markdown,
+            canonical_path: "SYNTHETIC/heading-only-source.md".into(),
+            filename: "heading-only-source.md".into(),
+            title: "Heading-only occurrence source".into(),
+            aliases: vec![],
+            object_class: "source_material".into(),
+            region_addresses: vec![heading_only_region.clone()],
+            unit_ids: vec![],
+            identifier_assignment_ids: vec![],
+            object_field_occurrence_ids: vec![],
+            body_occurrence_ids: vec![occurrence("occurrence:heading-only:capital")],
+            incoming_occurrence_ids: vec![],
+            temporal_anchor_ids: vec![],
+            retrieval_surface_ids: vec![
+                "surface:exact".into(),
+                "surface:lexical".into(),
+                "surface:graph".into(),
+            ],
+        },
     ];
 
     let regions = vec![
@@ -793,6 +837,27 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
                 "surface:vector".into(),
                 "surface:graph".into(),
                 "surface:temporal".into(),
+            ],
+        },
+        SemanticRegionRecord {
+            address: heading_only_region.clone(),
+            heading_path: vec!["Reference".into()],
+            heading_identity: "heading:heading-only:reference".into(),
+            source_span: Some(SourceSpan {
+                source: "synthetic:heading-only-source.md".into(),
+                start_byte: Some(0),
+                end_byte: Some(48),
+            }),
+            child_region_addresses: vec![],
+            contained_unit_ids: vec![],
+            block_target_mappings: vec![],
+            incoming_occurrence_ids: vec![],
+            outgoing_occurrence_ids: vec![occurrence("occurrence:heading-only:capital")],
+            inherited_identifier_assignment_ids: vec![],
+            retrieval_surface_ids: vec![
+                "surface:exact".into(),
+                "surface:lexical".into(),
+                "surface:graph".into(),
             ],
         },
     ];
@@ -985,6 +1050,14 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
             Some("surface:graph"),
         ),
         (
+            "region-occurrence-outgoing",
+            AddressKind::SemanticRegion,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Outgoing,
+            AddressKind::Occurrence,
+            Some("surface:graph"),
+        ),
+        (
             "occurrence-object-target",
             AddressKind::Occurrence,
             StructuralTransitionOperation::Occurrence,
@@ -1049,6 +1122,14 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
             Some("surface:graph"),
         ),
         (
+            "occurrence-region-source",
+            AddressKind::Occurrence,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Incoming,
+            AddressKind::SemanticRegion,
+            Some("surface:graph"),
+        ),
+        (
             "identifier",
             AddressKind::SemanticObject,
             StructuralTransitionOperation::Identifier,
@@ -1096,11 +1177,11 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
 
     objects.sort_by_key(|record| record.object_id.to_string());
     SemanticSpaceProjection {
-        projection_snapshot_id: "projection:tiny-synthetic:v1".into(),
-        ingest_identity: "ingest:tiny-synthetic:v1".into(),
+        projection_snapshot_id: "projection:tiny-synthetic:v2".into(),
+        ingest_identity: "ingest:tiny-synthetic:v2".into(),
         schema_version: "v0.1.0".into(),
-        logical_hash: "sha256:tiny-synthetic-projection-v1".into(),
-        corpus_snapshot_identity: "corpus:tiny-synthetic:v1".into(),
+        logical_hash: "sha256:tiny-synthetic-projection-v2".into(),
+        corpus_snapshot_identity: "corpus:tiny-synthetic:v2".into(),
         configuration_snapshot_id: "configuration:tiny-synthetic:v1".into(),
         validation_status: ProjectionValidationStatus::Validated,
         object_classes: classes(),

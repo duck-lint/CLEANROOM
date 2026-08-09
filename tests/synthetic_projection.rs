@@ -4,9 +4,7 @@ use std::collections::HashSet;
 
 use semantic_traversal_core::{
     SemanticObjectId,
-    model::{
-        AddressKind, Direction, RecordProvenance, RetrievalSurfaceKind, SemanticAddress, SourceSpan,
-    },
+    model::{AddressKind, Direction, RecordProvenance, RetrievalSurfaceKind, SemanticAddress},
     projection::{
         CoverageSemantics, IdentifierAssignmentMode, IdentifierRole, OccurrenceSource,
         SemanticUnitContent, StructuralTransitionOperation, SurfaceMatchMode, TemporalAffordance,
@@ -15,7 +13,8 @@ use semantic_traversal_core::{
 };
 
 use support::synthetic_projection::{
-    CLEO_OBJECT, JOURNAL_ONE_OBJECT, MARX_OBJECT, MCCARTHY_OBJECT, occurrence, tiny_projection,
+    CLEO_OBJECT, HEADING_ONLY_OBJECT, JOURNAL_ONE_OBJECT, MARX_OBJECT, MCCARTHY_OBJECT, occurrence,
+    tiny_projection,
 };
 
 #[test]
@@ -23,31 +22,31 @@ fn fixed_projection_identity_and_exact_fixture_inventory_are_stable() {
     let projection = tiny_projection();
     assert_eq!(
         projection.projection_snapshot_id,
-        "projection:tiny-synthetic:v1"
+        "projection:tiny-synthetic:v2"
     );
-    assert_eq!(projection.ingest_identity, "ingest:tiny-synthetic:v1");
+    assert_eq!(projection.ingest_identity, "ingest:tiny-synthetic:v2");
     assert_eq!(projection.schema_version, "v0.1.0");
     assert_eq!(
         projection.logical_hash,
-        "sha256:tiny-synthetic-projection-v1"
+        "sha256:tiny-synthetic-projection-v2"
     );
     assert_eq!(
         projection.corpus_snapshot_identity,
-        "corpus:tiny-synthetic:v1"
+        "corpus:tiny-synthetic:v2"
     );
     assert_eq!(
         projection.configuration_snapshot_id,
         "configuration:tiny-synthetic:v1"
     );
-    assert_eq!(projection.objects.len(), 5);
-    assert_eq!(projection.regions.len(), 4);
+    assert_eq!(projection.objects.len(), 6);
+    assert_eq!(projection.regions.len(), 5);
     assert_eq!(projection.units.len(), 5);
     assert_eq!(projection.identifier_descriptors.len(), 9);
     assert_eq!(projection.identifier_assignments.len(), 16);
-    assert_eq!(projection.occurrences.len(), 4);
+    assert_eq!(projection.occurrences.len(), 5);
     assert_eq!(projection.temporal_anchors.len(), 2);
     assert_eq!(projection.retrieval_surfaces.len(), 5);
-    assert_eq!(projection.valid_transitions.len(), 19);
+    assert_eq!(projection.valid_transitions.len(), 21);
     assert_eq!(
         projection
             .units
@@ -365,7 +364,6 @@ fn every_fixture_reference_resolves() {
 fn authored_occurrences_are_listed_by_source_and_target_and_body_markdown() {
     let projection = tiny_projection();
     for occurrence in &projection.occurrences {
-        assert!(occurrence.source_span.is_none());
         let authored_link = match &occurrence.display_alias {
             Some(alias) => format!("[[{}|{alias}]]", occurrence.authored_target_text),
             None => format!("[[{}]]", occurrence.authored_target_text),
@@ -414,8 +412,27 @@ fn authored_occurrences_are_listed_by_source_and_target_and_body_markdown() {
                 };
                 assert!(authored_markdown.contains(&authored_link));
             }
-            OccurrenceSource::SemanticRegion { .. } => {
-                panic!("tiny fixture has no region-sourced occurrence")
+            OccurrenceSource::SemanticRegion { region_address } => {
+                let region = projection
+                    .regions
+                    .iter()
+                    .find(|region| &region.address == region_address)
+                    .unwrap();
+                assert!(
+                    region
+                        .outgoing_occurrence_ids
+                        .contains(&occurrence.occurrence_id)
+                );
+                let object = projection
+                    .objects
+                    .iter()
+                    .find(|object| object.object_id == region_address.object_id)
+                    .unwrap();
+                assert!(
+                    object
+                        .body_occurrence_ids
+                        .contains(&occurrence.occurrence_id)
+                );
             }
         }
         match &occurrence.resolved_target {
@@ -512,58 +529,86 @@ fn actual_occurrence_topology_has_complete_typed_transition_possibilities() {
 
 #[test]
 fn heading_region_can_source_occurrence_without_manufacturing_a_unit() {
-    let mut projection = tiny_projection();
-    let region = projection.regions[0].address.clone();
-    let target = projection.objects[0].object_id.clone();
-    let occurrence_id = occurrence("occurrence:heading-region");
-    projection.regions[0].contained_unit_ids.clear();
-    projection.regions[0]
-        .outgoing_occurrence_ids
-        .push(occurrence_id.clone());
-    projection.objects[0]
-        .incoming_occurrence_ids
-        .push(occurrence_id.clone());
-    projection
+    let projection = tiny_projection();
+    let source_object_id = SemanticObjectId::parse(HEADING_ONLY_OBJECT).unwrap();
+    let source_object = projection
+        .objects
+        .iter()
+        .find(|object| object.object_id == source_object_id)
+        .unwrap();
+    let region = projection
+        .regions
+        .iter()
+        .find(|region| region.address.object_id == source_object_id)
+        .unwrap();
+    let occurrence_id = occurrence("occurrence:heading-only:capital");
+    let occurrence = projection
         .occurrences
-        .push(semantic_traversal_core::projection::OccurrenceRecord {
-            occurrence_id: occurrence_id.clone(),
-            source: OccurrenceSource::SemanticRegion {
-                region_address: region.clone(),
-            },
-            authored_target_text: "synthetic-target".into(),
-            display_alias: None,
-            resolved_target: SemanticAddress::Object(target.clone()),
-            presentation_mode: semantic_traversal_core::projection::OccurrencePresentation::Link,
-            direction: Direction::Outgoing,
-            source_span: Some(SourceSpan {
-                source: "synthetic-source".into(),
-                start_byte: Some(10),
-                end_byte: Some(28),
-            }),
-        });
+        .iter()
+        .find(|record| record.occurrence_id == occurrence_id)
+        .unwrap();
 
-    assert!(projection.regions[0].contained_unit_ids.is_empty());
-    assert!(
-        projection.regions[0]
-            .outgoing_occurrence_ids
-            .contains(&occurrence_id)
-    );
-    let occurrence = projection.occurrences.last().unwrap();
+    assert!(region.contained_unit_ids.is_empty());
+    assert!(region.block_target_mappings.is_empty());
+    assert!(source_object.unit_ids.is_empty());
+    assert!(!projection.units.iter().any(|unit| {
+        unit.parent_region_address == region.address || unit.parent_object_id == source_object_id
+    }));
+    assert!(region.outgoing_occurrence_ids.contains(&occurrence_id));
+    assert!(source_object.body_occurrence_ids.contains(&occurrence_id));
     assert_eq!(
         occurrence.source,
         OccurrenceSource::SemanticRegion {
-            region_address: region
+            region_address: region.address.clone()
         }
     );
-    assert_eq!(
-        occurrence.source_span.as_ref().unwrap().start_byte,
-        Some(10)
-    );
+    let SemanticAddress::Object(target_id) = &occurrence.resolved_target else {
+        panic!("dedicated region occurrence must target an object")
+    };
     assert!(
-        projection.objects[0]
+        projection
+            .objects
+            .iter()
+            .find(|object| &object.object_id == target_id)
+            .unwrap()
             .incoming_occurrence_ids
             .contains(&occurrence_id)
     );
+
+    let region_span = region
+        .source_span
+        .as_ref()
+        .expect("region span represented");
+    let occurrence_span = occurrence
+        .source_span
+        .as_ref()
+        .expect("occurrence span represented");
+    assert_eq!(region_span.source, occurrence_span.source);
+    let region_start = region_span.start_byte.expect("region start represented");
+    let region_end = region_span.end_byte.expect("region end represented");
+    let occurrence_start = occurrence_span
+        .start_byte
+        .expect("occurrence start represented");
+    let occurrence_end = occurrence_span
+        .end_byte
+        .expect("occurrence end represented");
+    assert!(region_start <= occurrence_start);
+    assert!(occurrence_end <= region_end);
+
+    assert!(projection.valid_transitions.iter().any(|transition| {
+        transition.transition_id == "transition:region-occurrence-outgoing"
+            && transition.from == AddressKind::SemanticRegion
+            && transition.operation == StructuralTransitionOperation::Occurrence
+            && transition.direction == Direction::Outgoing
+            && transition.to == AddressKind::Occurrence
+    }));
+    assert!(projection.valid_transitions.iter().any(|transition| {
+        transition.transition_id == "transition:occurrence-region-source"
+            && transition.from == AddressKind::Occurrence
+            && transition.operation == StructuralTransitionOperation::Occurrence
+            && transition.direction == Direction::Incoming
+            && transition.to == AddressKind::SemanticRegion
+    }));
 }
 
 #[test]
