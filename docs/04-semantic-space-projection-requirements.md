@@ -148,6 +148,10 @@ For each semantic object, expose:
 - temporal anchors or temporal relations when materially sourced;
 - retrieval-surface affordances.
 
+The object's body-occurrence aggregation includes authored non-frontmatter
+occurrences sourced from semantic regions as well as semantic units. This
+aggregation does not change the occurrence's canonical source provenance.
+
 The projection must preserve the distinction between:
 
 ```text
@@ -166,6 +170,8 @@ For each addressable authored region, expose:
 - contained child-region addresses;
 - contained semantic-unit addresses;
 - block-target mappings where present;
+- authored outgoing occurrence addresses when the heading or region marker
+  itself contains authored occurrence syntax;
 - incoming occurrences that target the region;
 - inherited object identifiers;
 - retrieval-surface affordances.
@@ -289,6 +295,9 @@ The projection must represent at least:
 - unit situated in region;
 - unit inherits object identifier;
 - object-field authored occurrence;
+- region-to-object authored occurrence;
+- region-to-region authored occurrence;
+- region-to-unit authored occurrence;
 - unit-to-object authored occurrence;
 - unit-to-region authored occurrence;
 - unit-to-unit authored occurrence;
@@ -302,6 +311,26 @@ The projection must represent at least:
 - occurrence source surface.
 
 An occurrence is an addressable record with its own provenance, not merely an untyped pair of strings.
+
+### Corpus-contact evidence — region-sourced occurrence
+
+The accepted factual observation was produced by `duck-lint/semantic-traversal`
+at commit `99d0d4556684000f0ed585e47158a5f7fe9ce7e1`, using observer schema
+`vault-observation/v2`, against corpus snapshot
+`25fb8f13dd17efb62abbb52c48f526bc0aedd887b29001c1e60f1642d322b688`.
+It found 1 affected occurrence in 1 source object, 6 heading observations, 0
+non-heading authored block candidates, and 0 unit candidates overlapping the
+occurrence span; the occurrence span was fully contained by a heading-marker
+span.
+
+These are corpus observations, not representational authority. CLEANROOM's
+response for Phase 5 real-corpus projection construction is to represent a
+heading-marker occurrence with a `SemanticRegion` source and exact source span.
+An occurrence inside a semantic-unit body remains `SemanticUnit`-sourced even
+when a heading region contains that unit. This preserves canonical region
+address, exact authored span, occurrence identity, authored direction, target
+identity, and reverse incidence. The projection must not manufacture a unit,
+drop the occurrence, or degrade its provenance to an object-level source.
 
 ## 13. Authored-target resolution
 
@@ -339,9 +368,15 @@ source unit
 ```
 
 ```text
+source semantic region
+→ outgoing occurrence
+→ target object, region, or unit
+```
+
+```text
 target object, region, or unit
 → incoming occurrence
-→ source unit or object field
+→ source unit, semantic region, or object field
 ```
 
 Stored reverse edges are optional. Reverse addressability is mandatory.

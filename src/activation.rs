@@ -468,7 +468,7 @@ pub struct ActivatedIdentifierAssignmentRecord {
 pub struct ActivatedOccurrenceRecord {
     /// Canonical authored-occurrence identity.
     pub occurrence_id: OccurrenceId,
-    /// Authored object-field or semantic-unit source.
+    /// Authored object-field, semantic-region, or semantic-unit source.
     pub source: OccurrenceSource,
     /// Authored target text retained by the projection.
     pub authored_target_text: String,

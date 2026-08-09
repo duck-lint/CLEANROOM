@@ -132,6 +132,11 @@ A region is not a third epistemic object class competing with semantic objects a
 
 A heading region may contain several semantic units.
 
+A heading region may also contain zero semantic units. If authored occurrence
+syntax appears in the heading marker itself, that occurrence remains sourced by
+the canonical semantic region and exact source span; it does not force the
+creation of a semantic unit.
+
 A block target may resolve to one explicitly addressed unit.
 
 ## 5. Top-down structure
@@ -160,21 +165,29 @@ semantic unit
     situated_in → semantic region
 ```
 
-A unit may also create addressable occurrences:
+A semantic unit, canonical semantic region, or object field may create
+addressable occurrences:
 
 ```text
 semantic unit
     outgoing occurrence → semantic object
     outgoing occurrence → semantic region
     outgoing occurrence → semantic unit
+
+semantic region
+    outgoing occurrence → semantic object, region, or unit
 ```
 
 The target must expose reverse incidence:
 
 ```text
 semantic object, region, or unit
-    incoming occurrence → source semantic unit or object field
+    incoming occurrence → source semantic unit, semantic region, or object field
 ```
+
+An occurrence authored in a heading marker uses the region's canonical address
+plus its exact source span as provenance. The region remains structural
+addressability, not a third epistemic object class.
 
 ## 7. Canonical authored links
 

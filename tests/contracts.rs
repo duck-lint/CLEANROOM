@@ -269,6 +269,7 @@ fn projection() -> SemanticSpaceProjection {
                 target_unit_id: unit.clone(),
             }],
             incoming_occurrence_ids: vec![occurrence.clone()],
+            outgoing_occurrence_ids: vec![],
             inherited_identifier_assignment_ids: vec!["assignment:note_type".into()],
             retrieval_surface_ids: vec!["surface:exact".into()],
         }],

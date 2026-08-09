@@ -121,7 +121,8 @@ pub struct SemanticObjectRecord {
     pub identifier_assignment_ids: Vec<String>,
     /// Occurrences authored in object fields.
     pub object_field_occurrence_ids: Vec<OccurrenceId>,
-    /// Occurrences authored in body units.
+    /// Occurrences authored in non-frontmatter body syntax, including
+    /// semantic-unit bodies and semantic-region markers.
     pub body_occurrence_ids: Vec<OccurrenceId>,
     /// Incoming occurrences targeting this object.
     pub incoming_occurrence_ids: Vec<OccurrenceId>,
@@ -155,6 +156,8 @@ pub struct SemanticRegionRecord {
     pub block_target_mappings: Vec<BlockTargetMapping>,
     /// Incoming occurrences targeting this region.
     pub incoming_occurrence_ids: Vec<OccurrenceId>,
+    /// Authored occurrences whose syntax occurs in this region marker.
+    pub outgoing_occurrence_ids: Vec<OccurrenceId>,
     /// Inherited identifier assignments visible at the region.
     pub inherited_identifier_assignment_ids: Vec<String>,
     /// Retrieval surfaces capable of inspecting the region.
@@ -502,8 +505,8 @@ pub struct OccurrenceRecord {
 
 /// Authored source surface of one occurrence.
 ///
-/// It distinguishes object-field context from semantic-unit body context and
-/// cannot transfer identifiers between source and target.
+/// It distinguishes object-field, semantic-region marker, and semantic-unit
+/// body contexts and cannot transfer identifiers between source and target.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum OccurrenceSource {
@@ -513,6 +516,12 @@ pub enum OccurrenceSource {
         object_id: SemanticObjectId,
         /// Authored field path.
         field_path: String,
+    },
+    /// Occurrence authored in a canonical semantic-region marker, such as a
+    /// heading containing a link without any unit-worthy authored block.
+    SemanticRegion {
+        /// Canonical structural source region.
+        region_address: SemanticRegionAddress,
     },
     /// Occurrence authored in a semantic unit body.
     SemanticUnit {

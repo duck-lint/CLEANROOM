@@ -392,7 +392,7 @@
           ]
         },
         "source": {
-          "description": "Authored object-field or semantic-unit source.",
+          "description": "Authored object-field, semantic-region, or semantic-unit source.",
           "allOf": [
             {
               "$ref": "#/definitions/OccurrenceSource"
@@ -1719,7 +1719,7 @@
       ]
     },
     "OccurrenceSource": {
-      "description": "Authored source surface of one occurrence.\n\nIt distinguishes object-field context from semantic-unit body context and cannot transfer identifiers between source and target.",
+      "description": "Authored source surface of one occurrence.\n\nIt distinguishes object-field, semantic-region marker, and semantic-unit body contexts and cannot transfer identifiers between source and target.",
       "oneOf": [
         {
           "description": "Occurrence authored in an object field.",
@@ -1743,6 +1743,31 @@
             "object_id": {
               "description": "Source canonical object.",
               "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Occurrence authored in a canonical semantic-region marker, such as a heading containing a link without any unit-worthy authored block.",
+          "type": "object",
+          "required": [
+            "kind",
+            "region_address"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "semantic_region"
+              ]
+            },
+            "region_address": {
+              "description": "Canonical structural source region.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/SemanticRegionAddress"
+                }
+              ]
             }
           },
           "additionalProperties": false
