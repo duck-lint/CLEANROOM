@@ -326,6 +326,7 @@ fn projection() -> SemanticSpaceProjection {
             identifier_name: "note_type".into(),
             subject: SemanticAddress::Object(object.clone()),
             value: IdentifierValue::String("source_material".into()),
+            authored_raw_value: None,
             provenance: RecordProvenance::ObjectField {
                 object_id: object.clone(),
                 field_path: "note_type".into(),
@@ -338,7 +339,7 @@ fn projection() -> SemanticSpaceProjection {
             },
             authored_target_text: "Marx, Karl — Capital#Chapter 2".into(),
             display_alias: Some("Chapter 2".into()),
-            resolved_target: SemanticAddress::Region(region.clone()),
+            resolved_target: Some(SemanticAddress::Region(region.clone())),
             presentation_mode: OccurrencePresentation::Link,
             direction: Direction::Outgoing,
             source_span: None,

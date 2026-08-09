@@ -343,6 +343,10 @@
           "description": "Snapshot-local assignment identity.",
           "type": "string"
         },
+        "authored_raw_value": {
+          "description": "Authored value preserved separately from its mechanically typed shape. Real observation adapters populate this field; synthetic records may leave it absent.",
+          "default": null
+        },
         "identifier_name": {
           "description": "Identifier descriptor name.",
           "type": "string"
@@ -693,6 +697,22 @@
       "description": "Value carried by one identifier assignment.\n\nThis is a closed structural union for exchange. It cannot be interpreted as evidence or a relation without its descriptor and provenance.",
       "oneOf": [
         {
+          "description": "Authored field is present with a null value.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
           "description": "One string value.",
           "type": "object",
           "required": [
@@ -881,7 +901,6 @@
         "direction",
         "occurrence_id",
         "presentation_mode",
-        "resolved_target",
         "source"
       ],
       "properties": {
@@ -917,10 +936,13 @@
           ]
         },
         "resolved_target": {
-          "description": "Canonical object, region, or unit target resolved by projection.",
-          "allOf": [
+          "description": "Canonical object, region, or unit target when factual resolution exists.\n\n`None` is an explicit unresolved authored state; it is not permission to infer a target from text, embeddings, or a filename heuristic.",
+          "anyOf": [
             {
               "$ref": "#/definitions/SemanticAddress"
+            },
+            {
+              "type": "null"
             }
           ]
         },

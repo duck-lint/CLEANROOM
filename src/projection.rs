@@ -447,6 +447,11 @@ pub struct IdentifierAssignment {
     pub subject: SemanticAddress,
     /// Scalar or collection value matching the descriptor's declared shape.
     pub value: IdentifierValue,
+    /// Authored value preserved separately from its mechanically typed shape.
+    /// Real observation adapters populate this field; synthetic records may
+    /// leave it absent.
+    #[serde(default)]
+    pub authored_raw_value: Option<serde_json::Value>,
     /// Exact assignment provenance.
     pub provenance: RecordProvenance,
 }
@@ -463,6 +468,8 @@ pub struct IdentifierAssignment {
     deny_unknown_fields
 )]
 pub enum IdentifierValue {
+    /// Authored field is present with a null value.
+    Null,
     /// One string value.
     String(String),
     /// One signed integer value.
@@ -493,8 +500,11 @@ pub struct OccurrenceRecord {
     pub authored_target_text: String,
     /// Optional authored display alias.
     pub display_alias: Option<String>,
-    /// Canonical object, region, or unit target resolved by projection.
-    pub resolved_target: SemanticAddress,
+    /// Canonical object, region, or unit target when factual resolution exists.
+    ///
+    /// `None` is an explicit unresolved authored state; it is not permission to
+    /// infer a target from text, embeddings, or a filename heuristic.
+    pub resolved_target: Option<SemanticAddress>,
     /// Link or embed presentation mode.
     pub presentation_mode: OccurrencePresentation,
     /// Authored incidence direction.

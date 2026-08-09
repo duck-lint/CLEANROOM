@@ -310,7 +310,7 @@ fn downstream_contract_records_discriminate_the_selected_region() {
         },
         authored_target_text: "#Foo".into(),
         display_alias: None,
-        resolved_target: SemanticAddress::Region(foo_b.clone()),
+        resolved_target: Some(SemanticAddress::Region(foo_b.clone())),
         presentation_mode: OccurrencePresentation::Link,
         direction: Direction::Outgoing,
         source_span: Some(heading(2, "Foo", 10).source_span.unwrap()),
@@ -338,7 +338,7 @@ fn downstream_contract_records_discriminate_the_selected_region() {
     );
     assert_eq!(
         occurrence.resolved_target,
-        SemanticAddress::Region(foo_b.clone())
+        Some(SemanticAddress::Region(foo_b.clone()))
     );
     assert_ne!(
         occurrence.source,
@@ -348,6 +348,6 @@ fn downstream_contract_records_discriminate_the_selected_region() {
     );
     assert_ne!(
         occurrence.resolved_target,
-        SemanticAddress::Region(foo_a.clone())
+        Some(SemanticAddress::Region(foo_a.clone()))
     );
 }
