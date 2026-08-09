@@ -12,8 +12,11 @@ embedding/index policy, ranking behavior, or transport policy.
 **Audit-completeness state:** **COMPLETE REPOSITORY-SAFE LINKAGE.** Public
 structural audit linkage is complete for the accepted observer/specimen pair.
 Private authored contents remain intentionally private. This manifest does not
-reproduce the private evidence bundle, and semantic authority remains the
-accepted observation plus explicit operator decisions, not this manifest alone.
+reproduce the private evidence bundle, and does not acquire semantic or
+representational authority by linking evidence. Corpus actuality is supplied by
+the versioned authored-vault observation; explicit operator decisions resolve
+constitutive questions; representational authority resides in the accepted,
+corpus-validated CLEANROOM contracts.
 
 ## 1. Observation identity
 
@@ -31,15 +34,15 @@ accepted observation plus explicit operator decisions, not this manifest alone.
 | Parseable UUID count | `1059` |
 | UUIDv7 count | `1059` |
 | Duplicate UUID groups | `0` |
-| Total authored-link occurrences | `4994` |
-| One-candidate occurrences | `4893` |
-| Zero-candidate occurrences | `101` |
-| Multiple-candidate occurrences | `0` |
+| Whole-resident total authored-link occurrences | `4994` |
+| Whole-resident one-candidate occurrences | `4893` |
+| Whole-resident zero-candidate occurrences | `101` |
+| Whole-resident multiple-candidate occurrences | `0` |
 | Observed frontmatter field count | `60` |
 | Private evidence JSON SHA-256 | `31cf9ba80fb947fc7bbd758d8e47e839cfb41b3d5cfe4fd6b7c9caa8e6c4fbde` |
 | Private decision-matrix SHA-256 | `1adb15b094fef29a23aebd7308b476e4d3d4489a57d7e1993fc83ca6a963b36d` |
 | Generator artifact SHA-256 | `11e23f64cbd7004d8ae3f2d4f9dcfb1627987069f13c181c3eaedf75dadfbc0f` |
-| Operator resolution identity/status | 60 field classifications accepted; 55 admitted; 5 excluded; 0 quarantined; 0 unresolved; R001 accepted |
+| Operator resolution identity/status | 60 field classifications accepted; 55 admitted; 5 excluded; 0 quarantined; 0 unresolved; private decision-matrix resolution `R001`: accepted |
 
 The observer repository/commit is recorded as evidence identity only. CLEANROOM
 does not import, imitate, or infer architectural authority from that

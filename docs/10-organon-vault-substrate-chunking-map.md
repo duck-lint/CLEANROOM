@@ -245,10 +245,21 @@ sensitive evidence remain outside this repository.
 | `relationship` | admitted; relational entity-profile metadata | entity objects; inherited with source-field provenance | does not itself create a canonical link occurrence or temporal anchor |
 | `address`, `email`, `phone`, `likes`, `dislikes` | observed but excluded from canonical substrate | raw observation/provenance only; not unit-inherited semantic metadata | no canonical occurrence or temporal affordance in the admitted substrate |
 | `title`, `creator`, `format`, `origin`, `publish_studio` | admitted; source-material naming/metadata | source-material objects; inherited with source-field provenance | no canonical occurrence unless separately authored; no independent temporal anchor |
-| `original_year_published` | admitted; publication temporal metadata | source-material object; inherited with provenance | object-carried publication temporal metadata |
-| `birthday` | admitted; entity temporal metadata | entity objects; inherited with provenance | object-carried temporal metadata; no canonical occurrence by itself |
-| `first_met` | admitted; object-carried temporal metadata recording a first-meeting relation/context | entity objects; inherited with provenance | supplies temporal access/context but does not itself create a canonical link occurrence |
-| `journal_entry_date` | admitted; object-carried temporal identifier/anchor of the journal entry | dated journal-entry object; inherited with provenance | through an authored occurrence it may provide contextual temporal provenance for the linked target; it does not become intrinsic to that target |
+| `original_year_published` | admitted; publication temporal metadata | source-material objects carrying the field; inherited with provenance | a materially year-valued assignment may materialize the publication temporal affordance/anchor; present-null creates no anchor; no year is invented from source chronology or other metadata |
+| `birthday` | admitted; entity temporal metadata | entity objects carrying the field; inherited with provenance | a materially date-valued assignment may materialize the corresponding temporal anchor; present-null creates no anchor; no canonical occurrence by itself |
+| `first_met` | admitted; object-carried temporal metadata recording a first-meeting relation/context | entity objects carrying the field; inherited with provenance | a materially date-valued assignment may supply temporal access/anchoring; present-null creates no anchor; it does not itself create a canonical linked occurrence |
+| `journal_entry_date` | admitted; temporally capable object-carried journal field | journal-entry objects carrying the field; inherited with provenance | when materially date-valued, it may act as the journal object's temporal identifier/anchor and supply contextual temporal provenance through an authored occurrence; present-null creates no anchor and the date does not become intrinsic to the linked target |
+
+#### Temporal capability and assignment actuality
+
+Temporal role in the field registry describes descriptor-level capability. An
+actual temporal anchor is materialized only from an authored assignment that
+materially supplies the corresponding date/year value under the accepted
+representation. Present-null preserves the authored assignment and provenance
+distinction but creates no temporal anchor. Field absence creates neither an
+assignment nor an anchor. This rule does not assert that every non-null string
+parses successfully and does not define a date/year parser, coercion, fallback,
+or normalization algorithm.
 
 #### Canonical contextual relation-bearing fields
 
@@ -493,7 +504,7 @@ A transport segment must:
 
 A token limit therefore cannot silently create new semantic units or alter authored ontology.
 
-No universal transport-segmentation algorithm is part of the semantic-substrate contract. Canonical semantic units are materialized whole. A concrete transport-segmentation policy is instantiated only when a named technical operation or provider cannot accept the complete canonical semantic unit under a demonstrated hard input constraint.
+No universal transport-segmentation algorithm is part of the semantic-substrate contract. Canonical semantic-unit identity and authored boundaries are materialized independently of transport segmentation. Unit content may remain inline or deterministically hydratable under the projection contract. Technical transport segmentation cannot define, divide, merge, or replace canonical semantic-unit identity or authored boundaries. A concrete transport-segmentation policy is instantiated only when a named technical operation or provider cannot accept the complete canonical semantic unit under a demonstrated hard input constraint.
 
 Until such a consumer exists:
 
@@ -509,7 +520,7 @@ When a concrete consumer requires segmentation, its bounded technical policy mus
 - **Measurement basis:** the exact deterministic measurement used by that consumer, such as a named/versioned tokenizer, bytes, characters, or another explicitly identified measurement;
 - **Maximum segment size:** an operation-specific configured technical bound that does not redefine canonical semantic identity;
 - **Boundary handling:** preservation of complete authored/Markdown constructs where possible, with exact provenance/source spans for any forced split, and a deterministic preference order belonging to that consumer policy;
-- **Overlap:** no overlap by default unless the concrete consumer demonstrates a technical need; any overlap is transport duplication only and cannot create duplicate semantic/evidence identity;
+- **Overlap:** the concrete consumer policy must state whether overlap is used and why; any overlap is transport duplication only and cannot create duplicate semantic/evidence identity;
 - **Reconstruction:** ordered segments must deterministically reconstruct the exact parent representation supplied to that operation;
 - **Segment identity:** deterministic technical identity resolving to the canonical parent semantic-unit identity, with deterministic ordinal/order, while remaining non-canonical;
 - **Consumer/provider specificity:** different technical consumers may require different policies; no universal corpus segment size is inferred from one provider;
