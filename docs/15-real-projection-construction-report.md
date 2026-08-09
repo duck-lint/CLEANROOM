@@ -21,9 +21,12 @@ performed.
 - Excluded source records: 8
 - Semantic regions: 4346
 - Semantic units: 17113
+- Object classes: 14
 - Identifier descriptors: 55
 - Identifier assignments: 12323
 - Present-null identifier assignments: 3599
+- Unit inherited-assignment references: 227431
+- Region inherited-assignment references: 52849
 - Temporal anchors: 547
 
 ## Occurrences and closure
@@ -54,6 +57,19 @@ performed.
 - Inherited-assignment reference failures: 0
 - Unit identity duplicates: 0
 - Inherited assignment references: 227431
+- Region inherited-assignment failures: 0
+- Excluded region inheritance: 0
+- Explicit block IDs: 0
+- Region block-target mappings: 0
+- Block mapping failures: 0
+- Assignment-mode conformance failures: 0
+- Retrieval-affordance conformance failures: 0
+- Object-class applicability failures: 0
+- Present-null temporal assignments with no anchor: 63
+- Present-null temporal assignments incorrectly anchored: 0
+- Authored block-kind distribution: paragraph 12806; list 3907; blockquote-or-callout 321; code fence 67; table 12
+- Unsupported block kinds: 0
+- Collapsed block kinds: 0
 
 The materializer uses the accepted root-down `canonical_region_identities`
 constructor. Its returned addresses are reused for object region lists,
@@ -63,21 +79,24 @@ exact matched heading span to an already materialized region address.
 
 ## Determinism and status
 
-- First construction logical hash: `fnv1a:0ad6c848e0219fdb`
-- Second construction logical hash: `fnv1a:0ad6c848e0219fdb`
+- First construction logical hash: `fnv1a:40dc5c75225c16fb`
+- Second construction logical hash: `fnv1a:40dc5c75225c16fb`
 - Deterministic equality: yes
 - Projection bytes identical across clean reruns: yes
 - Projection schema: `semantic-space-projection/v1`
 - Projection validation status: `Unvalidated`
 - Full projection artifact: private and not committed
 
-Unit identities use canonical object UUID, canonical parent region address, and
-region-local block ordinal. Source paths and source spans remain provenance or
-hydration data. Ordinary body occurrences resolve to the unique containing unit
-by exact source span; explicit block targets fail closed when no unit mapping
-exists. Admitted identifier descriptors preserve accepted roles, observed mixed
-value shapes/cardinalities, authored raw values, and object-field provenance
-for inherited unit references.
+Unit identities use canonical object UUID, canonical parent region address,
+region-local block ordinal, and an explicit authored block ID when present.
+Source paths and source spans remain provenance or hydration data. Ordinary body
+occurrences resolve to the unique containing unit by exact source span; explicit
+block targets fail closed when no unit mapping exists. Admitted identifier
+descriptors preserve accepted roles, observed mixed value shapes/cardinalities,
+authored raw values, and object-field provenance for inherited region/unit
+references. Combined blockquote-or-callout observations were mechanically
+classified from accepted authored syntax; no callout, equation, embedded-media,
+or unknown block kinds occurred in the admitted specimen.
 
 Phase 5 construction is complete against the accepted observation specimen.
 The projection remains explicitly unvalidated. Phase 6 has not begun;

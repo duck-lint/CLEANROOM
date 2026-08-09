@@ -109,13 +109,18 @@ fn canonical_unit_id_uses_object_region_and_local_ordinal_only() {
         [0]
     .address
     .clone();
-    let same_region_other_path = canonical_unit_id(&object_id, &region, 1).unwrap();
-    let same_again = canonical_unit_id(&object_id, &region, 1).unwrap();
-    let next = canonical_unit_id(&object_id, &region, 2).unwrap();
+    let same_region_other_path =
+        canonical_unit_id(&object_id, &region, 1, Some("block-a")).unwrap();
+    let same_again = canonical_unit_id(&object_id, &region, 1, Some("block-a")).unwrap();
+    let next = canonical_unit_id(&object_id, &region, 2, Some("block-a")).unwrap();
+    let no_block = canonical_unit_id(&object_id, &region, 1, None).unwrap();
+    let changed_block = canonical_unit_id(&object_id, &region, 1, Some("block-b")).unwrap();
     let other_region = SemanticRegionAddress::parse(object_id.clone(), "other").unwrap();
-    let moved = canonical_unit_id(&object_id, &other_region, 1).unwrap();
+    let moved = canonical_unit_id(&object_id, &other_region, 1, Some("block-a")).unwrap();
     assert_eq!(same_region_other_path, same_again);
     assert_ne!(same_region_other_path, next);
+    assert_ne!(same_region_other_path, no_block);
+    assert_ne!(same_region_other_path, changed_block);
     assert_ne!(same_region_other_path, moved);
 }
 
