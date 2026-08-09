@@ -25,10 +25,8 @@ corpus-validated CLEANROOM contracts.
 | Observer repository | `duck-lint/semantic-traversal` |
 | Observer commit | `e9bb2d95c14b1beb334dc2b8d83420f5998b9a53` |
 | Observer schema identifier/version | `vault-observation/v3` |
-| Vault manifest identity | `b06b6c2efe6c0590d3aa3d1100bc234c86dc362a8ebe8e8996f32d670eae2950` |
 | Authored-vault specimen identity | `f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4` |
-| Pinned run-1 artifact SHA-256 | `d3a340a1b203a64b2455f71a8d4f17003d5bfdba8be0583cbec1529692320bb9` |
-| Logical observation hash | `e7b22e291cd51026f435a7a373678bc3f5fda1f6b1c74770f13ffb6eaed05b4a` |
+| Pinned run-1 artifact byte SHA-256 | `d3a340a1b203a64b2455f71a8d4f17003d5bfdba8be0583cbec1529692320bb9` |
 | Resident source records | `1060` |
 | Resident Markdown count | `1060` |
 | Admission-eligible Markdown count | `1052` |
@@ -50,10 +48,47 @@ The observer repository/commit is recorded as evidence identity only. CLEANROOM
 does not import, imitate, or infer architectural authority from that
 implementation.
 
-The v3 observation was run twice. The specimen identity, logical observation
-hash, and summary bytes were identical. Complete serialized observation bytes
-are not expected to be identical because `generated_at` is an intentional run
-timestamp.
+The v3 observation was run twice. Both runs reproduced the same specimen
+identity, and their serialized summary bytes were reported identical. Complete
+serialized observation bytes are not expected to be identical because
+`generated_at` is an intentional run timestamp. The pinned run-1 digest above
+is an artifact-byte identity only; it is not a logical observation identity or
+a specimen/source identity. No unrecoverable vault-manifest or logical
+observation digest is used as current v3 audit authority.
+
+### 1.2 Current v3 specimen identity canonicalization
+
+The authored-vault specimen identity is the observer-defined
+`vault_resident_snapshot_identity`. At observer commit
+`e9bb2d95c14b1beb334dc2b8d83420f5998b9a53`, its input is:
+
+```text
+{
+  "directories": <complete resident directory observation records>,
+  "files": [
+    {
+      "relative_path": ...,
+      "source_kind": ...,
+      "extension": ...,
+      "byte_size": ...,
+      "source_byte_hash": ...,
+      "text_decoding_status": ...
+    },
+    ...
+  ]
+}
+```
+
+Only vault-resident directory and file observations participate. Directory
+records participate as complete resident records; file records are restricted
+to the six fields shown above. The observer supplies deterministic
+relative-path ordering. JSON object keys are recursively sorted with
+`sort_keys=True`, compact separators are exactly `(",", ":")`,
+`ensure_ascii=False` is used, and the serialization is UTF-8. The digest is
+SHA-256 rendered as lowercase hexadecimal. The implementation is the
+observer's `_sha256_bytes`, `_sha256_json`, and source-identity construction in
+`observe()` at the cited commit. Applying this procedure to both retained v3
+runs reproduced the recorded specimen identity exactly.
 
 ## 1.1 Historical v2 predecessor boundary
 
@@ -84,6 +119,13 @@ actuality boundary. The three historical digests above identify the original
 R001 evidence bundle and are not v3 artifact identities. Because the universe
 is unchanged, the existing semantic classifications carry forward without a
 new field-admission decision.
+
+The historical v2 specimen identity uses the observer-defined source identity
+over resident directory observations and the same six restricted resident
+file-record fields listed in §1.2. It uses deterministic JSON serialization
+with `sort_keys=True`, separators `(",", ":")`, `ensure_ascii=False`, UTF-8,
+and SHA-256. This definition is historical and remains bound only to the v2
+observer, schema, and specimen above.
 
 ## 2. Decision totals
 

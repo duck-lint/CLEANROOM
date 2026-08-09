@@ -200,7 +200,6 @@ for the current v3 observation:
 - observer repository/commit: `duck-lint/semantic-traversal@e9bb2d95c14b1beb334dc2b8d83420f5998b9a53`;
 - observer schema: `vault-observation/v3`;
 - accepted authored-vault specimen: `f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4`;
-- vault manifest identity: `b06b6c2efe6c0590d3aa3d1100bc234c86dc362a8ebe8e8996f32d670eae2950`;
 - observed field universe: **60 frontmatter keys**.
 
 The current repository-safe corpus census is:
@@ -320,6 +319,19 @@ ranking significance. `from_mode` and `to_mode` remain bridge constitutive
 metadata, `register_mode` remains register typing, `unity_level` remains
 Organon-position metadata, and `relationship` remains relational entity-profile
 metadata without creating a canonical graph occurrence merely by presence.
+
+#### Explicit authored-representation operator decision — 2026-08-09
+
+The 60-field registry classification carries forward from historical R001
+because exact v3 field-universe reconciliation found 60 historical fields,
+60 current fields, 0 added, 0 removed, and 60 unchanged. Separately, during
+authored-substrate repair, the operator explicitly fixed the canonical
+authored cardinalities above and the temporal representation categories and
+field applicability recorded in this section. Those authored-representation
+decisions are constitutive operator authority. The repaired v3 observation
+supplies corpus-actuality evidence that the substrate conforms to them; the
+observer did not infer or create these rules. No new decision matrix or R001
+revision is implied.
 
 #### Canonical contextual relation-bearing fields
 
