@@ -291,6 +291,7 @@ fn every_fixture_reference_resolves() {
             region
                 .incoming_occurrence_ids
                 .iter()
+                .chain(&region.outgoing_occurrence_ids)
                 .all(|id| occurrence_ids.contains(id))
         );
         assert!(
@@ -433,6 +434,29 @@ fn authored_occurrences_are_listed_by_source_and_target_and_body_markdown() {
                         .body_occurrence_ids
                         .contains(&occurrence.occurrence_id)
                 );
+                let region_span = region
+                    .source_span
+                    .as_ref()
+                    .expect("region-sourced occurrence requires a region span");
+                let occurrence_span = occurrence
+                    .source_span
+                    .as_ref()
+                    .expect("region-sourced occurrence requires an exact span");
+                assert_eq!(region_span.source, occurrence_span.source);
+                let region_start = region_span
+                    .start_byte
+                    .expect("region-sourced occurrence requires a region start");
+                let region_end = region_span
+                    .end_byte
+                    .expect("region-sourced occurrence requires a region end");
+                let occurrence_start = occurrence_span
+                    .start_byte
+                    .expect("region-sourced occurrence requires an occurrence start");
+                let occurrence_end = occurrence_span
+                    .end_byte
+                    .expect("region-sourced occurrence requires an occurrence end");
+                assert!(region_start <= occurrence_start);
+                assert!(occurrence_end <= region_end);
             }
         }
         match &occurrence.resolved_target {
