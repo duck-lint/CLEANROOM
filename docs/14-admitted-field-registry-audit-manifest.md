@@ -56,41 +56,7 @@ is an artifact-byte identity only; it is not a logical observation identity or
 a specimen/source identity. No unrecoverable vault-manifest or logical
 observation digest is used as current v3 audit authority.
 
-### 1.2 Current v3 specimen identity canonicalization
-
-The authored-vault specimen identity is the observer-defined
-`vault_resident_snapshot_identity`. At observer commit
-`e9bb2d95c14b1beb334dc2b8d83420f5998b9a53`, its input is:
-
-```text
-{
-  "directories": <complete resident directory observation records>,
-  "files": [
-    {
-      "relative_path": ...,
-      "source_kind": ...,
-      "extension": ...,
-      "byte_size": ...,
-      "source_byte_hash": ...,
-      "text_decoding_status": ...
-    },
-    ...
-  ]
-}
-```
-
-Only vault-resident directory and file observations participate. Directory
-records participate as complete resident records; file records are restricted
-to the six fields shown above. The observer supplies deterministic
-relative-path ordering. JSON object keys are recursively sorted with
-`sort_keys=True`, compact separators are exactly `(",", ":")`,
-`ensure_ascii=False` is used, and the serialization is UTF-8. The digest is
-SHA-256 rendered as lowercase hexadecimal. The implementation is the
-observer's `_sha256_bytes`, `_sha256_json`, and source-identity construction in
-`observe()` at the cited commit. Applying this procedure to both retained v3
-runs reproduced the recorded specimen identity exactly.
-
-## 1.1 Historical v2 predecessor boundary
+### 1.1 Historical v2 predecessor boundary
 
 The registry was originally resolved against the following immutable historical
 observation:
@@ -126,6 +92,38 @@ file-record fields listed in §1.2. It uses deterministic JSON serialization
 with `sort_keys=True`, separators `(",", ":")`, `ensure_ascii=False`, UTF-8,
 and SHA-256. This definition is historical and remains bound only to the v2
 observer, schema, and specimen above.
+
+### 1.2 Current v3 specimen identity canonicalization
+
+The authored-vault specimen identity is the observer-defined
+`vault_resident_snapshot_identity`. At observer commit
+`e9bb2d95c14b1beb334dc2b8d83420f5998b9a53`, its input is:
+
+```text
+{
+  "directories": <complete resident directory observation records>,
+  "files": [
+    {
+      "relative_path": ...,
+      "source_kind": ...,
+      "extension": ...,
+      "byte_size": ...,
+      "source_byte_hash": ...,
+      "text_decoding_status": ...
+    },
+    ...
+  ]
+}
+```
+
+Only vault-resident directory and file observations participate. Directory
+records participate as complete resident records; file records are restricted
+to the six fields shown above. The observer supplies deterministic
+relative-path ordering. JSON object keys are recursively sorted with
+`sort_keys=True`, compact separators are exactly `(",", ":")`,
+`ensure_ascii=False` is used, and the serialization is UTF-8. The digest is
+SHA-256 rendered as lowercase hexadecimal. Applying this procedure to both
+retained v3 runs reproduced the recorded specimen identity exactly.
 
 ## 2. Decision totals
 
