@@ -1,8 +1,12 @@
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use semantic_traversal_core::{
     AuthoredRegionHeading, RegionIdentityError, SemanticObjectId, canonical_region_identities,
-    model::{Direction, RecordProvenance, SemanticAddress, SourceSpan},
+    construction::{canonical_unit_id, containing_unit_for_span, resolve_explicit_block_target},
+    model::{
+        Direction, RecordProvenance, SemanticAddress, SemanticRegionAddress, SemanticUnitId,
+        SourceSpan,
+    },
     projection::{
         AuthoredBlockType, OccurrencePresentation, OccurrenceRecord, OccurrenceSource,
         SemanticRegionRecord, SemanticUnitContent, SemanticUnitRecord,
@@ -13,6 +17,106 @@ const OBJECT: &str = "00000000-0000-0000-0000-000000000001";
 
 fn object() -> SemanticObjectId {
     SemanticObjectId::parse(OBJECT).unwrap()
+}
+
+#[test]
+fn ordinary_body_occurrence_uses_the_second_containing_unit() {
+    let first = SemanticUnitId::parse("unit:first").unwrap();
+    let second = SemanticUnitId::parse("unit:second").unwrap();
+    let units = vec![
+        (
+            first.clone(),
+            SourceSpan {
+                source: "synthetic.md".into(),
+                start_byte: Some(0),
+                end_byte: Some(10),
+            },
+        ),
+        (
+            second.clone(),
+            SourceSpan {
+                source: "synthetic.md".into(),
+                start_byte: Some(10),
+                end_byte: Some(20),
+            },
+        ),
+    ];
+    let occurrence = SourceSpan {
+        source: "synthetic.md".into(),
+        start_byte: Some(12),
+        end_byte: Some(18),
+    };
+    let selected = containing_unit_for_span(&units, &occurrence).unwrap();
+    assert_eq!(selected, second);
+    assert_ne!(selected, first);
+}
+
+#[test]
+fn containing_unit_resolution_fails_closed_for_zero_or_multiple_matches() {
+    let first = SemanticUnitId::parse("unit:first").unwrap();
+    let second = SemanticUnitId::parse("unit:second").unwrap();
+    let overlapping = vec![
+        (
+            first,
+            SourceSpan {
+                source: "synthetic.md".into(),
+                start_byte: Some(0),
+                end_byte: Some(20),
+            },
+        ),
+        (
+            second,
+            SourceSpan {
+                source: "synthetic.md".into(),
+                start_byte: Some(10),
+                end_byte: Some(30),
+            },
+        ),
+    ];
+    let occurrence = SourceSpan {
+        source: "synthetic.md".into(),
+        start_byte: Some(12),
+        end_byte: Some(18),
+    };
+    assert!(containing_unit_for_span(&overlapping, &occurrence).is_err());
+    let outside = SourceSpan {
+        source: "synthetic.md".into(),
+        start_byte: Some(40),
+        end_byte: Some(45),
+    };
+    assert!(containing_unit_for_span(&overlapping, &outside).is_err());
+}
+
+#[test]
+fn unknown_block_target_does_not_degrade_to_object() {
+    let unit = SemanticUnitId::parse("unit:known-block").unwrap();
+    let mut mapping = BTreeMap::new();
+    mapping.insert(("target.md".into(), "known".into()), unit.clone());
+    assert_eq!(
+        resolve_explicit_block_target(&mapping, "target.md", "known"),
+        Some(unit)
+    );
+    assert_eq!(
+        resolve_explicit_block_target(&mapping, "target.md", "unknown"),
+        None
+    );
+}
+
+#[test]
+fn canonical_unit_id_uses_object_region_and_local_ordinal_only() {
+    let object_id = object();
+    let region = canonical_region_identities(object_id.clone(), &[heading(1, "Foo", 0)]).unwrap()
+        [0]
+    .address
+    .clone();
+    let same_region_other_path = canonical_unit_id(&object_id, &region, 1).unwrap();
+    let same_again = canonical_unit_id(&object_id, &region, 1).unwrap();
+    let next = canonical_unit_id(&object_id, &region, 2).unwrap();
+    let other_region = SemanticRegionAddress::parse(object_id.clone(), "other").unwrap();
+    let moved = canonical_unit_id(&object_id, &other_region, 1).unwrap();
+    assert_eq!(same_region_other_path, same_again);
+    assert_ne!(same_region_other_path, next);
+    assert_ne!(same_region_other_path, moved);
 }
 
 fn heading(level: u8, address: &str, start: u64) -> AuthoredRegionHeading {

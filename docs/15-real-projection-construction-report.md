@@ -43,6 +43,17 @@ performed.
 - Region containment failures: 0
 - Region-source incidence failures: 0
 - Region-target incoming-incidence failures: 0
+- Ordinary semantic-unit source attributions: 4306
+- Semantic-unit source-attribution failures: 0
+- Semantic-unit outgoing-incidence failures: 0
+- Block-fragment occurrences: 0
+- Resolved block targets: 0
+- Unresolved block targets: 0
+- Object-fallback block-target degradations: 0
+- Identifier descriptor/assignment conformance failures: 0
+- Inherited-assignment reference failures: 0
+- Unit identity duplicates: 0
+- Inherited assignment references: 227431
 
 The materializer uses the accepted root-down `canonical_region_identities`
 constructor. Its returned addresses are reused for object region lists,
@@ -52,13 +63,22 @@ exact matched heading span to an already materialized region address.
 
 ## Determinism and status
 
-- First construction logical hash: `fnv1a:e8f60dea6631a262`
-- Second construction logical hash: `fnv1a:e8f60dea6631a262`
+- First construction logical hash: `fnv1a:0ad6c848e0219fdb`
+- Second construction logical hash: `fnv1a:0ad6c848e0219fdb`
 - Deterministic equality: yes
+- Projection bytes identical across clean reruns: yes
 - Projection schema: `semantic-space-projection/v1`
 - Projection validation status: `Unvalidated`
 - Full projection artifact: private and not committed
 
+Unit identities use canonical object UUID, canonical parent region address, and
+region-local block ordinal. Source paths and source spans remain provenance or
+hydration data. Ordinary body occurrences resolve to the unique containing unit
+by exact source span; explicit block targets fail closed when no unit mapping
+exists. Admitted identifier descriptors preserve accepted roles, observed mixed
+value shapes/cardinalities, authored raw values, and object-field provenance
+for inherited unit references.
+
 Phase 5 construction is complete against the accepted observation specimen.
-Phase 6 has not begun; complete-vault projection validation remains outside this
-report.
+The projection remains explicitly unvalidated. Phase 6 has not begun;
+complete-vault projection validation remains outside this report.

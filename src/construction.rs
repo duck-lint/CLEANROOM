@@ -5,7 +5,7 @@
 //! build any retrieval index.
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs,
     path::Path,
 };
@@ -67,6 +67,19 @@ fn span_bounds(v: &Value) -> Option<(u64, u64)> {
     let span = span(v, "")?;
     Some((span.start_byte?, span.end_byte?))
 }
+fn span_contains(container: &SourceSpan, inner: &SourceSpan) -> bool {
+    match (
+        container.start_byte,
+        container.end_byte,
+        inner.start_byte,
+        inner.end_byte,
+    ) {
+        (Some(container_start), Some(container_end), Some(inner_start), Some(inner_end)) => {
+            container_start <= inner_start && inner_end <= container_end
+        }
+        _ => false,
+    }
+}
 fn fnv(bytes: &[u8]) -> String {
     let mut h: u64 = 14695981039346656037;
     for b in bytes {
@@ -82,19 +95,436 @@ where
     s.parse()
         .map_err(|e| ConstructionError::Contract(format!("{what}: {e}")))
 }
-fn typed_value(v: &Value) -> IdentifierValue {
+fn typed_value(v: &Value) -> Result<IdentifierValue, ConstructionError> {
     match v {
-        Value::Null => IdentifierValue::Null,
-        Value::Bool(b) => IdentifierValue::Boolean(*b),
-        Value::Number(n) => IdentifierValue::Integer(n.as_i64().unwrap_or_default()),
-        Value::String(s) => IdentifierValue::String(s.clone()),
-        Value::Array(a) => IdentifierValue::Strings(
-            a.iter()
-                .map(|x| x.as_str().unwrap_or_default().to_owned())
-                .collect(),
-        ),
-        Value::Object(_) => IdentifierValue::String(v.to_string()),
+        Value::Null => Ok(IdentifierValue::Null),
+        Value::Bool(b) => Ok(IdentifierValue::Boolean(*b)),
+        Value::Number(n) => Ok(IdentifierValue::Integer(n.as_i64().ok_or_else(|| {
+            ConstructionError::Contract("non-integer numeric identifier value".into())
+        })?)),
+        Value::String(s) => Ok(IdentifierValue::String(s.clone())),
+        Value::Array(values) => {
+            let typed: Vec<_> = values.iter().map(typed_value).collect::<Result<_, _>>()?;
+            if typed
+                .iter()
+                .all(|value| matches!(value, IdentifierValue::String(_)))
+            {
+                Ok(IdentifierValue::Strings(
+                    typed
+                        .into_iter()
+                        .map(|value| match value {
+                            IdentifierValue::String(value) => value,
+                            _ => unreachable!("validated string collection"),
+                        })
+                        .collect(),
+                ))
+            } else if typed
+                .iter()
+                .all(|value| matches!(value, IdentifierValue::Integer(_)))
+            {
+                Ok(IdentifierValue::Integers(
+                    typed
+                        .into_iter()
+                        .map(|value| match value {
+                            IdentifierValue::Integer(value) => value,
+                            _ => unreachable!("validated integer collection"),
+                        })
+                        .collect(),
+                ))
+            } else if typed
+                .iter()
+                .all(|value| matches!(value, IdentifierValue::Boolean(_)))
+            {
+                Ok(IdentifierValue::Booleans(
+                    typed
+                        .into_iter()
+                        .map(|value| match value {
+                            IdentifierValue::Boolean(value) => value,
+                            _ => unreachable!("validated boolean collection"),
+                        })
+                        .collect(),
+                ))
+            } else {
+                Ok(IdentifierValue::Values(typed))
+            }
+        }
+        Value::Object(_) => Err(ConstructionError::Contract(
+            "object-shaped identifier value has no accepted mechanical representation".into(),
+        )),
     }
+}
+
+fn value_shapes(value: &IdentifierValue) -> Vec<IdentifierValueShape> {
+    match value {
+        IdentifierValue::Null => vec![],
+        IdentifierValue::String(_) | IdentifierValue::Strings(_) => {
+            vec![IdentifierValueShape::String]
+        }
+        IdentifierValue::Integer(_) | IdentifierValue::Integers(_) => {
+            vec![IdentifierValueShape::Integer]
+        }
+        IdentifierValue::Boolean(_) | IdentifierValue::Booleans(_) => {
+            vec![IdentifierValueShape::Boolean]
+        }
+        IdentifierValue::SemanticAddress(_) | IdentifierValue::SemanticAddresses(_) => {
+            vec![IdentifierValueShape::SemanticAddress]
+        }
+        IdentifierValue::Values(values) => values.iter().flat_map(value_shapes).collect(),
+    }
+}
+
+fn shape_rank(shape: &IdentifierValueShape) -> u8 {
+    match shape {
+        IdentifierValueShape::String => 0,
+        IdentifierValueShape::Integer => 1,
+        IdentifierValueShape::Boolean => 2,
+        IdentifierValueShape::SemanticAddress => 3,
+        IdentifierValueShape::Mixed(_) => 4,
+    }
+}
+
+fn descriptor_shape(assignments: &[IdentifierAssignment], name: &str) -> IdentifierValueShape {
+    let mut shapes = Vec::new();
+    for assignment in assignments
+        .iter()
+        .filter(|assignment| assignment.identifier_name == name)
+    {
+        for shape in value_shapes(&assignment.value) {
+            if !shapes.contains(&shape) {
+                shapes.push(shape);
+            }
+        }
+    }
+    shapes.sort_by_key(shape_rank);
+    match shapes.as_slice() {
+        [shape] => shape.clone(),
+        _ => IdentifierValueShape::Mixed(shapes),
+    }
+}
+
+fn descriptor_cardinality(
+    assignments: &[IdentifierAssignment],
+    name: &str,
+) -> IdentifierCardinality {
+    let mut scalar = false;
+    let mut collection = false;
+    for assignment in assignments
+        .iter()
+        .filter(|assignment| assignment.identifier_name == name)
+    {
+        match assignment.value {
+            IdentifierValue::Null => {}
+            IdentifierValue::String(_)
+            | IdentifierValue::Integer(_)
+            | IdentifierValue::Boolean(_)
+            | IdentifierValue::SemanticAddress(_) => scalar = true,
+            IdentifierValue::Strings(_)
+            | IdentifierValue::Integers(_)
+            | IdentifierValue::Booleans(_)
+            | IdentifierValue::SemanticAddresses(_)
+            | IdentifierValue::Values(_) => collection = true,
+        }
+    }
+    match (scalar, collection) {
+        (true, true) => IdentifierCardinality::Mixed,
+        (false, true) => IdentifierCardinality::Collection,
+        _ => IdentifierCardinality::Scalar,
+    }
+}
+
+fn is_bridge_field(name: &str) -> bool {
+    matches!(
+        name,
+        "bridge_applicability_scope"
+            | "bridge_applied"
+            | "bridge_broken"
+            | "bridge_conditions"
+            | "bridge_isomorphism"
+            | "bridge_justification"
+            | "bridge_methods"
+            | "bridge_preservation"
+            | "bridge_required"
+            | "cash_out"
+            | "from_mode"
+            | "from_register"
+            | "interface"
+            | "iso_broken"
+            | "iso_justification"
+            | "iso_structure"
+            | "quarantine_reasons"
+            | "revision_triggers"
+            | "speculation_quarantine"
+            | "stop_rule"
+            | "to_mode"
+            | "to_register"
+    )
+}
+
+fn descriptor_role(name: &str) -> IdentifierRole {
+    match name {
+        "uuid" => IdentifierRole::Individuation,
+        "note_type" | "entity_type" | "format" => IdentifierRole::ObjectClass,
+        "layer" | "pillar" | "unity_level" => IdentifierRole::FrameworkPosition,
+        "register" | "register_mode" => IdentifierRole::RegisterTyping,
+        "vector_direction" => IdentifierRole::AnalysisOrientation,
+        "title" | "canonical_name" | "creator" | "aliases" => IdentifierRole::CanonicalNaming,
+        "journal_entry_date" | "birthday" | "first_met" | "original_year_published" => {
+            IdentifierRole::TemporalAnchoring
+        }
+        "book_read_today" | "dream_motif" => IdentifierRole::ContextualRelation,
+        "tags" => IdentifierRole::Grouping,
+        "dream_location"
+        | "dream_lucidity"
+        | "dream_motif_valence"
+        | "hypnagogic_resonance"
+        | "reactivity"
+        | "recall_ability"
+        | "temporal_pace" => IdentifierRole::IndexicalTelemetry,
+        "architect_or_operator" => IdentifierRole::JournalStateClassification,
+        "occupation" => IdentifierRole::EntityMetadata,
+        "origin" | "publish_studio" => IdentifierRole::SourceMetadata,
+        "relationship" => IdentifierRole::ProfileRelation,
+        name if is_bridge_field(name) => IdentifierRole::BridgeConstitutive,
+        _ => IdentifierRole::Declared {
+            name: "accepted_admitted_field".into(),
+        },
+    }
+}
+
+fn descriptor_assignment_mode(role: &IdentifierRole) -> IdentifierAssignmentMode {
+    match role {
+        IdentifierRole::ContextualRelation
+        | IdentifierRole::ProfileRelation
+        | IdentifierRole::BridgeConstitutive => IdentifierAssignmentMode::Relational,
+        _ => IdentifierAssignmentMode::Inherited,
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct ClosureMetrics {
+    semantic_unit_source_attribution_failures: usize,
+    semantic_unit_outgoing_incidence_failures: usize,
+    unresolved_block_target_degradations: usize,
+    identifier_descriptor_assignment_failures: usize,
+    inherited_assignment_reference_failures: usize,
+    unit_identity_duplicates: usize,
+    region_source_incidence_failures: usize,
+    target_incidence_failures: usize,
+    unit_parent_failures: usize,
+    region_containment_failures: usize,
+}
+
+fn occurrence_count<T: PartialEq>(ids: &[T], occurrence_id: &T) -> usize {
+    ids.iter().filter(|id| *id == occurrence_id).count()
+}
+
+fn identifier_value_matches(
+    value: &IdentifierValue,
+    shape: &IdentifierValueShape,
+    cardinality: &IdentifierCardinality,
+) -> bool {
+    if matches!(value, IdentifierValue::Null) {
+        return true;
+    }
+    let is_collection = matches!(
+        value,
+        IdentifierValue::Strings(_)
+            | IdentifierValue::Integers(_)
+            | IdentifierValue::Booleans(_)
+            | IdentifierValue::SemanticAddresses(_)
+            | IdentifierValue::Values(_)
+    );
+    let cardinality_ok = match cardinality {
+        IdentifierCardinality::Scalar => !is_collection,
+        IdentifierCardinality::Collection | IdentifierCardinality::Mixed => true,
+    };
+    let observed_shapes = value_shapes(value);
+    let shape_ok = match shape {
+        IdentifierValueShape::Mixed(allowed) => observed_shapes
+            .iter()
+            .all(|observed| allowed.contains(observed)),
+        expected => observed_shapes.iter().all(|observed| observed == expected),
+    };
+    cardinality_ok && shape_ok
+}
+
+fn validate_projection(
+    projection: &SemanticSpaceProjection,
+) -> Result<ClosureMetrics, ConstructionError> {
+    let mut metrics = ClosureMetrics::default();
+    let objects: HashSet<_> = projection
+        .objects
+        .iter()
+        .map(|record| record.object_id.clone())
+        .collect();
+    let regions: HashMap<_, _> = projection
+        .regions
+        .iter()
+        .map(|record| (record.address.clone(), record))
+        .collect();
+    let units: HashMap<_, _> = projection
+        .units
+        .iter()
+        .map(|record| (record.unit_id.clone(), record))
+        .collect();
+    let descriptors: BTreeMap<_, _> = projection
+        .identifier_descriptors
+        .iter()
+        .map(|descriptor| (descriptor.identifier_name.as_str(), descriptor))
+        .collect();
+    let assignments: BTreeMap<_, _> = projection
+        .identifier_assignments
+        .iter()
+        .map(|assignment| (assignment.assignment_id.as_str(), assignment))
+        .collect();
+    let mut unit_keys = HashSet::new();
+    for unit in &projection.units {
+        if !objects.contains(&unit.parent_object_id)
+            || !regions.contains_key(&unit.parent_region_address)
+            || !unit_keys.insert((unit.parent_region_address.clone(), unit.block_ordinal))
+        {
+            metrics.unit_parent_failures += 1;
+        }
+        if let Some(region) = regions.get(&unit.parent_region_address) {
+            if occurrence_count(&region.contained_unit_ids, &unit.unit_id) != 1 {
+                metrics.region_containment_failures += 1;
+            }
+        }
+    }
+    let mut unit_ids = HashSet::new();
+    for unit in &projection.units {
+        if !unit_ids.insert(unit.unit_id.clone()) {
+            metrics.unit_identity_duplicates += 1;
+        }
+        for assignment_id in &unit.inherited_identifier_assignment_ids {
+            let Some(assignment) = assignments.get(assignment_id.as_str()) else {
+                metrics.inherited_assignment_reference_failures += 1;
+                continue;
+            };
+            let valid_provenance = matches!(
+                assignment.provenance,
+                RecordProvenance::ObjectField { ref object_id, .. } if object_id == &unit.parent_object_id
+            );
+            let applicable = descriptors
+                .get(assignment.identifier_name.as_str())
+                .is_some_and(|descriptor| {
+                    descriptor
+                        .applicable_address_kinds
+                        .contains(&AddressKind::SemanticUnit)
+                });
+            if !valid_provenance || !applicable {
+                metrics.inherited_assignment_reference_failures += 1;
+            }
+        }
+    }
+    for assignment in &projection.identifier_assignments {
+        let valid_subject = match &assignment.subject {
+            SemanticAddress::Object(object_id) => objects.contains(object_id),
+            SemanticAddress::Unit(unit_id) => units.contains_key(unit_id),
+            SemanticAddress::Region(address) => regions.contains_key(address),
+            _ => false,
+        };
+        let valid_descriptor = descriptors
+            .get(assignment.identifier_name.as_str())
+            .is_some_and(|descriptor| {
+                identifier_value_matches(
+                    &assignment.value,
+                    &descriptor.value_shape,
+                    &descriptor.cardinality,
+                )
+            });
+        if !valid_subject || !valid_descriptor {
+            metrics.identifier_descriptor_assignment_failures += 1;
+        }
+    }
+    for occurrence in &projection.occurrences {
+        match &occurrence.source {
+            OccurrenceSource::ObjectField { object_id, .. } => {
+                if projection
+                    .objects
+                    .iter()
+                    .find(|object| &object.object_id == object_id)
+                    .is_none_or(|object| {
+                        occurrence_count(
+                            &object.object_field_occurrence_ids,
+                            &occurrence.occurrence_id,
+                        ) != 1
+                    })
+                {
+                    metrics.target_incidence_failures += 1;
+                }
+            }
+            OccurrenceSource::SemanticRegion { region_address } => {
+                if regions.get(region_address).is_none_or(|region| {
+                    occurrence_count(&region.outgoing_occurrence_ids, &occurrence.occurrence_id)
+                        != 1
+                }) {
+                    metrics.region_source_incidence_failures += 1;
+                }
+            }
+            OccurrenceSource::SemanticUnit { unit_id } => {
+                let valid = units.get(unit_id).is_some_and(|unit| {
+                    let span_ok = match (&occurrence.source_span, &unit.source_provenance) {
+                        (
+                            Some(occurrence_span),
+                            RecordProvenance::SemanticUnit {
+                                source_span: Some(unit_span),
+                                ..
+                            },
+                        ) => span_contains(unit_span, occurrence_span),
+                        _ => false,
+                    };
+                    span_ok
+                        && occurrence_count(
+                            &unit.outgoing_occurrence_ids,
+                            &occurrence.occurrence_id,
+                        ) == 1
+                });
+                if !valid {
+                    metrics.semantic_unit_source_attribution_failures += 1;
+                }
+            }
+        }
+        if let Some(target) = &occurrence.resolved_target {
+            let valid = match target {
+                SemanticAddress::Object(object_id) => projection.objects.iter().any(|object| {
+                    &object.object_id == object_id
+                        && occurrence_count(
+                            &object.incoming_occurrence_ids,
+                            &occurrence.occurrence_id,
+                        ) == 1
+                }),
+                SemanticAddress::Region(address) => regions.get(address).is_some_and(|region| {
+                    occurrence_count(&region.incoming_occurrence_ids, &occurrence.occurrence_id)
+                        == 1
+                }),
+                SemanticAddress::Unit(unit_id) => units.get(unit_id).is_some_and(|unit| {
+                    occurrence_count(&unit.incoming_occurrence_ids, &occurrence.occurrence_id) == 1
+                }),
+                _ => false,
+            };
+            if !valid {
+                metrics.target_incidence_failures += 1;
+            }
+        }
+    }
+    if metrics.semantic_unit_source_attribution_failures
+        + metrics.semantic_unit_outgoing_incidence_failures
+        + metrics.unresolved_block_target_degradations
+        + metrics.identifier_descriptor_assignment_failures
+        + metrics.inherited_assignment_reference_failures
+        + metrics.unit_identity_duplicates
+        + metrics.region_source_incidence_failures
+        + metrics.target_incidence_failures
+        + metrics.unit_parent_failures
+        + metrics.region_containment_failures
+        != 0
+    {
+        return Err(ConstructionError::Contract(format!(
+            "projection closure failed: {metrics:?}"
+        )));
+    }
+    Ok(metrics)
 }
 fn block_type(kind: &str) -> AuthoredBlockType {
     match kind {
@@ -122,6 +552,20 @@ fn candidate_path(link: &Value) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// Constructs a semantic-unit identity from the accepted canonical structure.
+/// Source paths, byte offsets, and block content remain provenance or hydration
+/// data and never substitute for the canonical object/region/ordinal tuple.
+pub fn canonical_unit_id(
+    object_id: &SemanticObjectId,
+    region_address: &SemanticRegionAddress,
+    block_ordinal: u32,
+) -> Result<SemanticUnitId, EmptyIdentityError> {
+    SemanticUnitId::parse(format!(
+        "unit:{}:{}:{}",
+        object_id, region_address.authored_structural_address, block_ordinal
+    ))
+}
+
 /// Join accepted heading-match provenance to an existing materialized region.
 pub fn join_region_by_exact_span(
     regions: &[SemanticRegionRecord],
@@ -147,6 +591,41 @@ pub fn join_region_by_exact_span(
             "heading target span matched multiple materialized semantic regions".into(),
         )),
     }
+}
+
+/// Resolve one ordinary body occurrence to the unique authored unit whose
+/// factual source span contains it. The caller must not substitute a parent
+/// object, heading region, or arbitrary neighboring unit on failure.
+pub fn containing_unit_for_span(
+    units: &[(SemanticUnitId, SourceSpan)],
+    occurrence_span: &SourceSpan,
+) -> Result<SemanticUnitId, ConstructionError> {
+    let matches: Vec<_> = units
+        .iter()
+        .filter(|(_, unit_span)| span_contains(unit_span, occurrence_span))
+        .map(|(unit_id, _)| unit_id.clone())
+        .collect();
+    match matches.as_slice() {
+        [unit_id] => Ok(unit_id.clone()),
+        [] => Err(ConstructionError::Contract(
+            "ordinary body occurrence has zero containing semantic units".into(),
+        )),
+        _ => Err(ConstructionError::Contract(
+            "ordinary body occurrence has multiple containing semantic units".into(),
+        )),
+    }
+}
+
+/// Resolve an explicit block target without degrading an unknown block to its
+/// parent object. Duplicate claims are rejected while the mapping is built.
+pub fn resolve_explicit_block_target(
+    mapping: &BTreeMap<(String, String), SemanticUnitId>,
+    target_path: &str,
+    block_id: &str,
+) -> Option<SemanticUnitId> {
+    mapping
+        .get(&(target_path.to_owned(), block_id.to_owned()))
+        .cloned()
 }
 
 /// Construct a private projection and a repository-safe numerical report.
@@ -228,8 +707,16 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         String,
         Vec<(SemanticRegionAddress, Option<SourceSpan>)>,
     > = BTreeMap::new();
+    let mut unit_bounds_by_object: BTreeMap<String, Vec<(SemanticUnitId, SourceSpan)>> =
+        BTreeMap::new();
     let mut unit_by_path_block_id: BTreeMap<(String, String), SemanticUnitId> = BTreeMap::new();
     let mut field_names = BTreeSet::new();
+    let mut semantic_unit_source_count = 0usize;
+    let mut zero_containing_unit_failures = 0usize;
+    let mut multiple_containing_unit_failures = 0usize;
+    let mut block_fragment_count = 0usize;
+    let mut resolved_block_target_count = 0usize;
+    let mut unresolved_block_target_count = 0usize;
     // Materialize every region before resolving any cross-object occurrence.
     // Target objects may appear later in authored order than their sources.
     for (_m, oid, path, _title, _aliases, root_region) in &objects {
@@ -384,20 +871,10 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
             .unwrap_or_default();
         let mut local_units = Vec::new();
         let mut region_ordinals: BTreeMap<String, u32> = BTreeMap::new();
-        for (ordinal, block) in array(m, "block_candidates")
+        for block in array(m, "block_candidates")
             .into_iter()
             .filter(|b| text(b, "block_kind_observation") != "heading")
-            .enumerate()
         {
-            let raw = text(&block, "raw_markdown");
-            let unit_id: SemanticUnitId = id(
-                format!(
-                    "unit:{}:{}",
-                    oid,
-                    fnv(format!("{}:{}:{}", path, ordinal, raw).as_bytes())
-                ),
-                "unit identity",
-            )?;
             let source_span = span(block.get("source_span").unwrap_or(&Value::Null), path);
             let (parent_region_address, heading_path) = source_span
                 .as_ref()
@@ -424,11 +901,29 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                 *next += 1;
                 *next
             };
+            let unit_id: SemanticUnitId = id(
+                canonical_unit_id(oid, &parent_region_address, block_ordinal)
+                    .map_err(|error| ConstructionError::Contract(error.to_string()))?
+                    .to_string(),
+                "unit identity",
+            )?;
+            if let Some(source_span) = source_span.clone() {
+                unit_bounds_by_object
+                    .entry(oid.to_string())
+                    .or_default()
+                    .push((unit_id.clone(), source_span));
+            }
             local_units.push(unit_id.clone());
             for block_id in array(&block, "explicit_block_ids") {
                 if let Some(block_id) = block_id.as_str() {
-                    unit_by_path_block_id
-                        .insert((path.clone(), block_id.to_owned()), unit_id.clone());
+                    if unit_by_path_block_id
+                        .insert((path.clone(), block_id.to_owned()), unit_id.clone())
+                        .is_some()
+                    {
+                        return Err(ConstructionError::Contract(format!(
+                            "multiple semantic units claim explicit block target in {path}"
+                        )));
+                    }
                 }
             }
             units.push(SemanticUnitRecord {
@@ -474,7 +969,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                 assignment_id: aid.clone(),
                 identifier_name: key.clone(),
                 subject: SemanticAddress::Object(oid.clone()),
-                value: typed_value(&raw),
+                value: typed_value(&raw)?,
                 authored_raw_value: Some(raw.clone()),
                 provenance: RecordProvenance::ObjectField {
                     object_id: oid.clone(),
@@ -548,17 +1043,28 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                     region_address: region_address.clone(),
                 }
             } else {
-                OccurrenceSource::SemanticUnit {
-                    unit_id: object_units
+                let occurrence_span = source_span.as_ref().ok_or_else(|| {
+                    ConstructionError::Contract(format!(
+                        "ordinary body occurrence lacks source span for {path}"
+                    ))
+                })?;
+                let unit_id = containing_unit_for_span(
+                    unit_bounds_by_object
                         .get(&oid.to_string())
-                        .and_then(|u| u.first())
-                        .cloned()
-                        .ok_or_else(|| {
-                            ConstructionError::Contract(format!(
-                                "body occurrence has no authored unit for {path}"
-                            ))
-                        })?,
-                }
+                        .map(Vec::as_slice)
+                        .unwrap_or(&[]),
+                    occurrence_span,
+                )
+                .map_err(|error| {
+                    if error.to_string().contains("zero") {
+                        zero_containing_unit_failures += 1;
+                    } else {
+                        multiple_containing_unit_failures += 1;
+                    }
+                    ConstructionError::Contract(format!("{error} for {path}"))
+                })?;
+                semantic_unit_source_count += 1;
+                OccurrenceSource::SemanticUnit { unit_id }
             };
             let target = if let Some(target_object) = target_object {
                 if link
@@ -605,15 +1111,20 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                         regions[region_index].address.clone(),
                     ))
                 } else if let Some(fragment) = link.get("block_fragment").and_then(Value::as_str) {
-                    candidate_source_path
-                        .as_ref()
-                        .and_then(|p| {
-                            unit_by_path_block_id
-                                .get(&(p.clone(), fragment.to_owned()))
-                                .cloned()
-                        })
-                        .map(SemanticAddress::Unit)
-                        .or_else(|| Some(SemanticAddress::Object(target_object)))
+                    block_fragment_count += 1;
+                    let mapping = candidate_source_path.as_ref().and_then(|p| {
+                        resolve_explicit_block_target(&unit_by_path_block_id, p, fragment)
+                    });
+                    match mapping {
+                        Some(unit_id) => {
+                            resolved_block_target_count += 1;
+                            Some(SemanticAddress::Unit(unit_id))
+                        }
+                        None => {
+                            unresolved_block_target_count += 1;
+                            None
+                        }
+                    }
                 } else {
                     Some(SemanticAddress::Object(target_object))
                 }
@@ -676,38 +1187,36 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
     }
     let descriptors = admitted_fields
         .iter()
-        .map(|name| IdentifierDescriptor {
-            identifier_name: name.clone(),
-            semantic_role: if name == "uuid" {
-                IdentifierRole::Individuation
-            } else if name == "note_type" {
-                IdentifierRole::ObjectClass
-            } else {
-                IdentifierRole::Declared {
-                    name: "admitted_frontmatter".into(),
-                }
-            },
-            value_shape: IdentifierValueShape::String,
-            cardinality: IdentifierCardinality::Scalar,
-            applicable_address_kinds: vec![AddressKind::SemanticObject],
-            assignment_mode: IdentifierAssignmentMode::Intrinsic,
-            source_surface: format!("frontmatter.{name}"),
-            may_contain_canonical_links: ["book_read_today", "dream_motif"]
-                .contains(&name.as_str()),
-            temporal_affordance: if [
-                "journal_entry_date",
-                "birthday",
-                "first_met",
-                "original_year_published",
-            ]
-            .contains(&name.as_str())
-            {
-                TemporalAffordance::CreatesAnchor
-            } else {
-                TemporalAffordance::None
-            },
-            retrieval_surface_ids: vec![],
-            enabled_transition_ids: vec!["transition:identifier".into()],
+        .map(|name| {
+            let role = descriptor_role(name);
+            IdentifierDescriptor {
+                identifier_name: name.clone(),
+                semantic_role: role.clone(),
+                value_shape: descriptor_shape(&assignments, name),
+                cardinality: descriptor_cardinality(&assignments, name),
+                applicable_address_kinds: vec![
+                    AddressKind::SemanticObject,
+                    AddressKind::SemanticUnit,
+                ],
+                assignment_mode: descriptor_assignment_mode(&role),
+                source_surface: format!("frontmatter.{name}"),
+                may_contain_canonical_links: ["book_read_today", "dream_motif"]
+                    .contains(&name.as_str()),
+                temporal_affordance: if [
+                    "journal_entry_date",
+                    "birthday",
+                    "first_met",
+                    "original_year_published",
+                ]
+                .contains(&name.as_str())
+                {
+                    TemporalAffordance::CreatesAnchor
+                } else {
+                    TemporalAffordance::None
+                },
+                retrieval_surface_ids: vec![],
+                enabled_transition_ids: vec!["transition:identifier".into()],
+            }
         })
         .collect();
     let surfaces = [
@@ -770,6 +1279,12 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         {
             region.contained_unit_ids.push(unit.unit_id.clone());
         }
+    }
+    for unit in &mut units {
+        unit.inherited_identifier_assignment_ids = object_assignments
+            .get(&unit.parent_object_id.to_string())
+            .cloned()
+            .unwrap_or_default();
     }
     let mut object_records = Vec::new();
     for (_m, oid, path, title, aliases, _region) in &objects {
@@ -879,6 +1394,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
             OccurrenceSource::SemanticRegion { .. } | OccurrenceSource::ObjectField { .. } => {}
         }
     }
+    let closure = validate_projection(&projection)?;
     let canonical = serde_json::to_vec(&projection)?;
     projection.logical_hash = format!("fnv1a:{}", fnv(&canonical));
     fs::write(output_path, serde_json::to_vec_pretty(&projection)?)?;
@@ -907,6 +1423,86 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         .get("file_observations")
         .and_then(Value::as_array)
         .map_or(0, Vec::len);
-    let report = serde_json::json!({"report_title":"PHASE 5 CONSTRUCTION EVIDENCE","input_identity":{"observer_repository":"duck-lint/semantic-traversal","observer_commit":"99d0d4556684000f0ed585e47158a5f7fe9ce7e1","observer_schema":"vault-observation/v2","corpus_snapshot_identity":snapshot},"admission":{"whole_resident_source_count":whole_resident_source_count,"admission_eligible_count":projection.objects.len(),"admitted_object_count":projection.objects.len(),"excluded_source_count":markdown_count.saturating_sub(admitted.len())},"projection_construction":{"canonical_object_count":projection.objects.len(),"canonical_region_count":projection.regions.len(),"canonical_semantic_unit_count":projection.units.len()},"identifier_materialization":{"descriptor_count":projection.identifier_descriptors.len(),"assignment_count":projection.identifier_assignments.len(),"present_null_assignment_count":projection.identifier_assignments.iter().filter(|a| matches!(a.value, IdentifierValue::Null)).count(),"admitted_field_coverage":projection.identifier_descriptors.len(),"excluded_field_count":EXCLUDED_FIELDS.len()},"occurrences":{"authored_occurrence_count":projection.occurrences.len(),"object_field_count":object_field_count,"semantic_region_count":region_count,"semantic_unit_count":unit_count,"resolved_count":resolved,"unresolved_count":unresolved,"ambiguous_count":0},"temporal":{"temporally_capable_descriptors":projection.identifier_descriptors.iter().filter(|d| matches!(d.temporal_affordance, TemporalAffordance::CreatesAnchor)).count(),"materially_created_temporal_anchor_count":projection.temporal_anchors.len(),"present_null_temporal_assignments_creating_no_anchor":0},"construction_status":"produced","contract_contact_failures":0,"projection":{"schema_version":projection.schema_version,"logical_hash":projection.logical_hash,"validation_status":"unvalidated"},"determinism":{"first_run_logical_hash":projection.logical_hash,"second_run_logical_hash":"rerun-required","equality_result":"not_run_by_library"}});
+    let inherited_assignment_reference_count: usize = projection
+        .units
+        .iter()
+        .map(|unit| unit.inherited_identifier_assignment_ids.len())
+        .sum();
+    let report = serde_json::json!({
+        "report_title": "PHASE 5 CONSTRUCTION EVIDENCE",
+        "input_identity": {
+            "observer_repository": "duck-lint/semantic-traversal",
+            "observer_commit": "99d0d4556684000f0ed585e47158a5f7fe9ce7e1",
+            "observer_schema": "vault-observation/v2",
+            "corpus_snapshot_identity": snapshot
+        },
+        "admission": {
+            "whole_resident_source_count": whole_resident_source_count,
+            "resident_markdown_count": markdown_count,
+            "admission_eligible_count": projection.objects.len(),
+            "admitted_object_count": projection.objects.len(),
+            "excluded_source_count": markdown_count.saturating_sub(admitted.len())
+        },
+        "projection_construction": {
+            "canonical_object_count": projection.objects.len(),
+            "canonical_region_count": projection.regions.len(),
+            "canonical_semantic_unit_count": projection.units.len(),
+            "unit_identity_basis": "canonical object UUID + canonical parent region + region-local block ordinal"
+        },
+        "identifier_materialization": {
+            "descriptor_count": projection.identifier_descriptors.len(),
+            "assignment_count": projection.identifier_assignments.len(),
+            "present_null_assignment_count": projection.identifier_assignments.iter().filter(|a| matches!(a.value, IdentifierValue::Null)).count(),
+            "admitted_field_coverage": projection.identifier_descriptors.len(),
+            "excluded_field_count": EXCLUDED_FIELDS.len(),
+            "inherited_assignment_reference_count": inherited_assignment_reference_count
+        },
+        "occurrences": {
+            "authored_occurrence_count": projection.occurrences.len(),
+            "object_field_count": object_field_count,
+            "semantic_region_count": region_count,
+            "semantic_unit_count": unit_count,
+            "resolved_count": resolved,
+            "unresolved_count": unresolved,
+            "ambiguous_count": 0,
+            "semantic_unit_source_attribution_failures": zero_containing_unit_failures + multiple_containing_unit_failures,
+            "correct_containing_unit_attributions": semantic_unit_source_count,
+            "zero_containing_unit_failures": zero_containing_unit_failures,
+            "multiple_containing_unit_failures": multiple_containing_unit_failures,
+            "block_fragment_count": block_fragment_count,
+            "resolved_block_target_count": resolved_block_target_count,
+            "unresolved_block_target_count": unresolved_block_target_count,
+            "object_fallback_degradations": closure.unresolved_block_target_degradations
+        },
+        "closure": {
+            "semantic_unit_source_attribution_failures": closure.semantic_unit_source_attribution_failures,
+            "semantic_unit_outgoing_incidence_failures": closure.semantic_unit_outgoing_incidence_failures,
+            "unresolved_block_target_degradations": closure.unresolved_block_target_degradations,
+            "identifier_descriptor_assignment_conformance_failures": closure.identifier_descriptor_assignment_failures,
+            "inherited_assignment_reference_failures": closure.inherited_assignment_reference_failures,
+            "unit_identity_duplicates": closure.unit_identity_duplicates,
+            "region_source_incidence_failures": closure.region_source_incidence_failures,
+            "target_incidence_failures": closure.target_incidence_failures,
+            "unit_parent_failures": closure.unit_parent_failures,
+            "region_containment_failures": closure.region_containment_failures
+        },
+        "temporal": {
+            "temporally_capable_descriptors": projection.identifier_descriptors.iter().filter(|d| matches!(d.temporal_affordance, TemporalAffordance::CreatesAnchor)).count(),
+            "materially_created_temporal_anchor_count": projection.temporal_anchors.len(),
+            "present_null_temporal_assignments_creating_no_anchor": 0
+        },
+        "construction_status": "produced",
+        "contract_contact_failures": 0,
+        "projection": {
+            "schema_version": projection.schema_version,
+            "logical_hash": projection.logical_hash,
+            "validation_status": "unvalidated"
+        },
+        "determinism": {
+            "first_run_logical_hash": projection.logical_hash,
+            "second_run_logical_hash": "rerun-required",
+            "equality_result": "not_run_by_library"
+        }
+    });
     Ok(report)
 }

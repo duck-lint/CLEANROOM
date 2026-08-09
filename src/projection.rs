@@ -351,6 +351,8 @@ pub enum IdentifierRole {
     ObjectClass,
     /// Organon or authored topological position.
     FrameworkPosition,
+    /// Analysis or constitutive orientation.
+    AnalysisOrientation,
     /// Public or indexical register typing.
     RegisterTyping,
     /// Canonical naming, title, alias, or attribution.
@@ -363,6 +365,16 @@ pub enum IdentifierRole {
     Grouping,
     /// Indexical telemetry carried by authored source material.
     IndexicalTelemetry,
+    /// Contextual journal-state classification.
+    JournalStateClassification,
+    /// Entity-profile metadata.
+    EntityMetadata,
+    /// Source-material metadata.
+    SourceMetadata,
+    /// Entity-profile relation metadata.
+    ProfileRelation,
+    /// Constitutive inferential-bridge metadata.
+    BridgeConstitutive,
     /// Named admitted role not hard-coded as corpus content.
     Declared {
         /// Stable role name.
@@ -385,6 +397,8 @@ pub enum IdentifierValueShape {
     Boolean,
     /// Canonical projected address.
     SemanticAddress,
+    /// More than one mechanically observed scalar shape.
+    Mixed(Vec<IdentifierValueShape>),
 }
 
 /// Cardinality of an identifier assignment.
@@ -397,6 +411,8 @@ pub enum IdentifierCardinality {
     Scalar,
     /// Zero or more represented values.
     Collection,
+    /// The accepted field occurs in both scalar and collection form.
+    Mixed,
 }
 
 /// Provenance and inheritance mode of an identifier assignment.
@@ -480,6 +496,12 @@ pub enum IdentifierValue {
     SemanticAddress(SemanticAddress),
     /// Collection of strings.
     Strings(Vec<String>),
+    /// Collection of signed integers.
+    Integers(Vec<i64>),
+    /// Collection of booleans.
+    Booleans(Vec<bool>),
+    /// Collection whose elements have more than one mechanical value shape.
+    Values(Vec<IdentifierValue>),
     /// Collection of canonical addresses.
     SemanticAddresses(Vec<SemanticAddress>),
 }

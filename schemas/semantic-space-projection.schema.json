@@ -427,6 +427,13 @@
           "enum": [
             "collection"
           ]
+        },
+        {
+          "description": "The accepted field occurs in both scalar and collection form.",
+          "type": "string",
+          "enum": [
+            "mixed"
+          ]
         }
       ]
     },
@@ -575,6 +582,22 @@
           "additionalProperties": false
         },
         {
+          "description": "Analysis or constitutive orientation.",
+          "type": "object",
+          "required": [
+            "role"
+          ],
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "analysis_orientation"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
           "description": "Public or indexical register typing.",
           "type": "object",
           "required": [
@@ -665,6 +688,86 @@
               "type": "string",
               "enum": [
                 "indexical_telemetry"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Contextual journal-state classification.",
+          "type": "object",
+          "required": [
+            "role"
+          ],
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "journal_state_classification"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Entity-profile metadata.",
+          "type": "object",
+          "required": [
+            "role"
+          ],
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "entity_metadata"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Source-material metadata.",
+          "type": "object",
+          "required": [
+            "role"
+          ],
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "source_metadata"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Entity-profile relation metadata.",
+          "type": "object",
+          "required": [
+            "role"
+          ],
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "profile_relation"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Constitutive inferential-bridge metadata.",
+          "type": "object",
+          "required": [
+            "role"
+          ],
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "bridge_constitutive"
               ]
             }
           },
@@ -817,6 +920,76 @@
           "additionalProperties": false
         },
         {
+          "description": "Collection of signed integers.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "integers"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Collection of booleans.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "booleans"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Collection whose elements have more than one mechanical value shape.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "values"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/IdentifierValue"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
           "description": "Collection of canonical addresses.",
           "type": "object",
           "required": [
@@ -871,6 +1044,22 @@
           "enum": [
             "semantic_address"
           ]
+        },
+        {
+          "description": "More than one mechanically observed scalar shape.",
+          "type": "object",
+          "required": [
+            "mixed"
+          ],
+          "properties": {
+            "mixed": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/IdentifierValueShape"
+              }
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },
