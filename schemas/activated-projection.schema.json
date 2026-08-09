@@ -1748,6 +1748,31 @@
           "additionalProperties": false
         },
         {
+          "description": "Occurrence authored in a canonical semantic-region marker, such as a heading containing a link without any unit-worthy authored block.",
+          "type": "object",
+          "required": [
+            "kind",
+            "region_address"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "semantic_region"
+              ]
+            },
+            "region_address": {
+              "description": "Canonical structural source region.",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/SemanticRegionAddress"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
           "description": "Occurrence authored in a semantic unit body.",
           "type": "object",
           "required": [

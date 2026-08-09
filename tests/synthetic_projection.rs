@@ -4,7 +4,9 @@ use std::collections::HashSet;
 
 use semantic_traversal_core::{
     SemanticObjectId,
-    model::{AddressKind, Direction, RecordProvenance, RetrievalSurfaceKind, SemanticAddress},
+    model::{
+        AddressKind, Direction, RecordProvenance, RetrievalSurfaceKind, SemanticAddress, SourceSpan,
+    },
     projection::{
         CoverageSemantics, IdentifierAssignmentMode, IdentifierRole, OccurrenceSource,
         SemanticUnitContent, StructuralTransitionOperation, SurfaceMatchMode, TemporalAffordance,
@@ -13,7 +15,7 @@ use semantic_traversal_core::{
 };
 
 use support::synthetic_projection::{
-    CLEO_OBJECT, JOURNAL_ONE_OBJECT, MARX_OBJECT, MCCARTHY_OBJECT, tiny_projection,
+    CLEO_OBJECT, JOURNAL_ONE_OBJECT, MARX_OBJECT, MCCARTHY_OBJECT, occurrence, tiny_projection,
 };
 
 #[test]
@@ -412,6 +414,9 @@ fn authored_occurrences_are_listed_by_source_and_target_and_body_markdown() {
                 };
                 assert!(authored_markdown.contains(&authored_link));
             }
+            OccurrenceSource::SemanticRegion { .. } => {
+                panic!("tiny fixture has no region-sourced occurrence")
+            }
         }
         match &occurrence.resolved_target {
             SemanticAddress::Object(id) => assert!(
@@ -466,6 +471,7 @@ fn actual_occurrence_topology_has_complete_typed_transition_possibilities() {
     for occurrence in &projection.occurrences {
         let source_kind = match occurrence.source {
             OccurrenceSource::ObjectField { .. } => AddressKind::SemanticObject,
+            OccurrenceSource::SemanticRegion { .. } => AddressKind::SemanticRegion,
             OccurrenceSource::SemanticUnit { .. } => AddressKind::SemanticUnit,
         };
         let target_kind = occurrence.resolved_target.kind();
@@ -502,6 +508,62 @@ fn actual_occurrence_topology_has_complete_typed_transition_possibilities() {
                 .any(|record| record.resolved_target.kind() == expected)
         );
     }
+}
+
+#[test]
+fn heading_region_can_source_occurrence_without_manufacturing_a_unit() {
+    let mut projection = tiny_projection();
+    let region = projection.regions[0].address.clone();
+    let target = projection.objects[0].object_id.clone();
+    let occurrence_id = occurrence("occurrence:heading-region");
+    projection.regions[0].contained_unit_ids.clear();
+    projection.regions[0]
+        .outgoing_occurrence_ids
+        .push(occurrence_id.clone());
+    projection.objects[0]
+        .incoming_occurrence_ids
+        .push(occurrence_id.clone());
+    projection
+        .occurrences
+        .push(semantic_traversal_core::projection::OccurrenceRecord {
+            occurrence_id: occurrence_id.clone(),
+            source: OccurrenceSource::SemanticRegion {
+                region_address: region.clone(),
+            },
+            authored_target_text: "synthetic-target".into(),
+            display_alias: None,
+            resolved_target: SemanticAddress::Object(target.clone()),
+            presentation_mode: semantic_traversal_core::projection::OccurrencePresentation::Link,
+            direction: Direction::Outgoing,
+            source_span: Some(SourceSpan {
+                source: "synthetic-source".into(),
+                start_byte: Some(10),
+                end_byte: Some(28),
+            }),
+        });
+
+    assert!(projection.regions[0].contained_unit_ids.is_empty());
+    assert!(
+        projection.regions[0]
+            .outgoing_occurrence_ids
+            .contains(&occurrence_id)
+    );
+    let occurrence = projection.occurrences.last().unwrap();
+    assert_eq!(
+        occurrence.source,
+        OccurrenceSource::SemanticRegion {
+            region_address: region
+        }
+    );
+    assert_eq!(
+        occurrence.source_span.as_ref().unwrap().start_byte,
+        Some(10)
+    );
+    assert!(
+        projection.objects[0]
+            .incoming_occurrence_ids
+            .contains(&occurrence_id)
+    );
 }
 
 #[test]

@@ -713,6 +713,7 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
                 target_unit_id: capital_two.clone(),
             }],
             incoming_occurrence_ids: vec![occurrence("occurrence:journal-one:capital-heading")],
+            outgoing_occurrence_ids: vec![],
             inherited_identifier_assignment_ids: vec![
                 "assignment:marx:note_type".into(),
                 "assignment:marx:title".into(),
@@ -735,6 +736,7 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
             contained_unit_ids: vec![blood_one.clone()],
             block_target_mappings: vec![],
             incoming_occurrence_ids: vec![],
+            outgoing_occurrence_ids: vec![],
             inherited_identifier_assignment_ids: vec![
                 "assignment:mccarthy:note_type".into(),
                 "assignment:mccarthy:title".into(),
@@ -757,6 +759,7 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
             contained_unit_ids: vec![journal_one_unit.clone()],
             block_target_mappings: vec![],
             incoming_occurrence_ids: vec![],
+            outgoing_occurrence_ids: vec![],
             inherited_identifier_assignment_ids: vec![
                 "assignment:journal-one:note_type".into(),
                 "assignment:journal-one:date".into(),
@@ -779,6 +782,7 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
             contained_unit_ids: vec![journal_two_unit.clone()],
             block_target_mappings: vec![],
             incoming_occurrence_ids: vec![],
+            outgoing_occurrence_ids: vec![],
             inherited_identifier_assignment_ids: vec![
                 "assignment:journal-two:note_type".into(),
                 "assignment:journal-two:date".into(),

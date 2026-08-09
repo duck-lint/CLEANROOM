@@ -155,6 +155,8 @@ pub struct SemanticRegionRecord {
     pub block_target_mappings: Vec<BlockTargetMapping>,
     /// Incoming occurrences targeting this region.
     pub incoming_occurrence_ids: Vec<OccurrenceId>,
+    /// Authored occurrences whose syntax occurs in this region marker.
+    pub outgoing_occurrence_ids: Vec<OccurrenceId>,
     /// Inherited identifier assignments visible at the region.
     pub inherited_identifier_assignment_ids: Vec<String>,
     /// Retrieval surfaces capable of inspecting the region.
@@ -513,6 +515,12 @@ pub enum OccurrenceSource {
         object_id: SemanticObjectId,
         /// Authored field path.
         field_path: String,
+    },
+    /// Occurrence authored in a canonical semantic-region marker, such as a
+    /// heading containing a link without any unit-worthy authored block.
+    SemanticRegion {
+        /// Canonical structural source region.
+        region_address: SemanticRegionAddress,
     },
     /// Occurrence authored in a semantic unit body.
     SemanticUnit {

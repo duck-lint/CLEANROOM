@@ -148,6 +148,10 @@ For each semantic object, expose:
 - temporal anchors or temporal relations when materially sourced;
 - retrieval-surface affordances.
 
+The object's body-occurrence aggregation includes authored non-frontmatter
+occurrences sourced from semantic regions as well as semantic units. This
+aggregation does not change the occurrence's canonical source provenance.
+
 The projection must preserve the distinction between:
 
 ```text
@@ -166,6 +170,8 @@ For each addressable authored region, expose:
 - contained child-region addresses;
 - contained semantic-unit addresses;
 - block-target mappings where present;
+- authored outgoing occurrence addresses when the heading or region marker
+  itself contains authored occurrence syntax;
 - incoming occurrences that target the region;
 - inherited object identifiers;
 - retrieval-surface affordances.
@@ -289,6 +295,9 @@ The projection must represent at least:
 - unit situated in region;
 - unit inherits object identifier;
 - object-field authored occurrence;
+- region-to-object authored occurrence;
+- region-to-region authored occurrence;
+- region-to-unit authored occurrence;
 - unit-to-object authored occurrence;
 - unit-to-region authored occurrence;
 - unit-to-unit authored occurrence;
@@ -339,9 +348,15 @@ source unit
 ```
 
 ```text
+source semantic region
+→ outgoing occurrence
+→ target object, region, or unit
+```
+
+```text
 target object, region, or unit
 → incoming occurrence
-→ source unit or object field
+→ source unit, semantic region, or object field
 ```
 
 Stored reverse edges are optional. Reverse addressability is mandatory.
