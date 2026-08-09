@@ -180,6 +180,37 @@ A heading target may resolve to a region containing multiple semantic units.
 
 The runtime must not arbitrarily collapse such a region to one unit.
 
+### 7.1 Canonical heading-region individuation
+
+Each heading-derived region must receive one deterministic canonical address by
+processing authored hierarchy root-down: canonical object, canonical parent
+region when present, authored structural heading address within that parent,
+then a one-based collision-local ordinal only when equivalent sibling
+addresses collide. The ordinal is scoped to equivalent siblings under the same
+canonical parent; unrelated siblings and prose do not affect it. This is
+structural individuation, not semantic inference.
+
+Canonical region identity should remain stable under unrelated prose edits,
+content changes in another region, and insertion or removal of a differently
+addressed sibling. Identity may change when its own heading address changes, it
+moves beneath another parent, or the authored order/cardinality of equivalent
+siblings changes. The serialized `authored_structural_address` must encode the
+hierarchy and discriminator deterministically and injectively without private
+paths, byte offsets, or runtime state. Source span remains exact provenance and
+the heading-target correspondence surface; it is not canonical identity.
+
+#### Repository-safe corpus-contact record
+
+Real-corpus contact exposed 62 duplicate canonical region-address groups across
+182 region records and 18 objects. The collision categories were 22 repeated
+equivalent-sibling groups, 40 flattened-parent groups, and 5 normalization
+collision groups; category counts overlap. Six groups contained nested duplicate
+regions, with maximum duplicate nesting depth four. A diagnostic remapping
+using root-down hierarchical parent identity plus collision-local sibling order
+closed duplicate region addresses and the observed unit-parent, containment, and
+region-source-incidence failures. The observation supplied the failure evidence;
+the CLEANROOM contract defines this representational identity rule.
+
 ## 8. Required semantic-unit representation
 
 For each semantic unit, expose:
