@@ -2,8 +2,8 @@
 
 ## Status and provenance
 
-**Action state:** Drafted for operator review.  
-**Source basis:** the supplied Organon, full vault tree, representative mini-vault, semantic identifier list, chunk-representation example, and accepted clean-room kernel documents.
+**Action state:** Admitted-field/operator review closed; transport semantic invariants fixed; concrete transport mechanics intentionally consumer-bound.
+**Source basis:** the supplied Organon; accepted CLEANROOM contracts; the accepted authored-vault observation and repository-safe audit record for the named specimen; explicit operator decisions recorded in this document; and the supplied vault tree, representative examples, semantic identifier list, and unit-materialization example as supporting evidence. The mini-vault, examples, paths, and legacy implementation are not independent semantic authorities.
 
 This document specifies the constitutive mapping from the Organon into the authored vault and from the vault into the semantic space available to semantic-access inference.
 
@@ -192,6 +192,139 @@ A clean projection should describe at least the following roles:
 
 A field descriptor must state its role and applicability. Treating every field as an interchangeable searchable scalar would erase the Organon’s typing discipline.
 
+### 4.1 Admitted-field registry — accepted operator classifications for the accepted specimen
+
+The whole-corpus admitted-field registry records **accepted operator classifications**
+for the following observation:
+
+- observer repository/commit: `duck-lint/semantic-traversal@99d0d4556684000f0ed585e47158a5f7fe9ce7e1`;
+- accepted authored-vault specimen: `25fb8f13dd17efb62abbb52c48f526bc0aedd887b29001c1e60f1642d322b688`;
+- observed field universe: **60 frontmatter keys**.
+
+The registry is exhaustive for that accepted specimen. `note_version`,
+`schema_version`, and `note_status` are not observed keys in that specimen and
+are not registry members. The CLEANROOM-resident Organon copy predates the
+accepted authored-vault specimen used for this registry. Its repository
+frontmatter is not part of the measured specimen and must not be used to infer
+the accepted specimen's field universe.
+
+A future field universe requires new observation, explicit classification and
+admission, registry revision, and any affected rematerialization or
+projection-identity change. A key is never silently admitted because it resembles
+an existing key or family.
+
+This registry decides semantic role, admission, applicability, inheritance,
+occurrence semantics, temporal semantics, and preservation/provenance. It does
+**not** decide whether a field receives a dedicated embedded representation,
+which indexes are built, how ranking works, or which downstream access strategy
+should prefer one representation over another. Retrieval-surface affordances are
+declared by the projection for the representations that materially exist.
+
+Repository-safe audit linkage for this registry is recorded in
+`14-admitted-field-registry-audit-manifest.md`. Private authored values and
+sensitive evidence remain outside this repository.
+
+#### Canonical object and Organon-position fields
+
+| Field | Admission and role | Applicability / inheritance | Occurrence / temporal semantics |
+|---|---|---|---|
+| `uuid` | admitted; canonical semantic-object individuation anchor | all admitted objects; retained by units as parent provenance, never unit identity | no authored relation or independent temporal anchor |
+| `note_type` | admitted; object/content class | carrying object; visible on materialized units with parent-field provenance | no canonical occurrence or independent temporal anchor |
+| `layer`, `pillar`, `unity_level` | admitted; Organon position | carrying object and inherited unit context with provenance | no canonical occurrence or independent temporal anchor |
+| `register`, `register_mode` | admitted; register typing | carrying object and inherited unit context with provenance | no canonical occurrence or independent temporal anchor |
+| `vector_direction` | admitted; analysis orientation | carrying object and inherited unit context with provenance | no canonical occurrence or independent temporal anchor |
+| `aliases` | admitted; alternate authored names/shorthand/address surfaces; non-individuating | carrying object and inherited address context; does not create identity | no canonical occurrence |
+| `tags` | admitted; grouping/categorization surface; non-individuating | carrying object and inherited grouping context; not an alias substitute | no canonical occurrence |
+
+#### Naming, entity, and source-material fields
+
+| Field | Admission and role | Applicability / inheritance | Occurrence / temporal semantics |
+|---|---|---|---|
+| `canonical_name`, `entity_type` | admitted; entity naming/classification | entity objects; inherited by contained units with provenance | no canonical occurrence or independent temporal anchor |
+| `occupation` | admitted; entity-profile metadata | entity objects; inherited with source-field provenance | no canonical occurrence or independent temporal anchor |
+| `relationship` | admitted; relational entity-profile metadata | entity objects; inherited with source-field provenance | does not itself create a canonical link occurrence or temporal anchor |
+| `address`, `email`, `phone`, `likes`, `dislikes` | observed but excluded from canonical substrate | raw observation/provenance only; not unit-inherited semantic metadata | no canonical occurrence or temporal affordance in the admitted substrate |
+| `title`, `creator`, `format`, `origin`, `publish_studio` | admitted; source-material naming/metadata | source-material objects; inherited with source-field provenance | no canonical occurrence unless separately authored; no independent temporal anchor |
+| `original_year_published` | admitted; publication temporal metadata | source-material objects carrying the field; inherited with provenance | a materially year-valued assignment may materialize the publication temporal affordance/anchor; present-null creates no anchor; no year is invented from source chronology or other metadata |
+| `birthday` | admitted; entity temporal metadata | entity objects carrying the field; inherited with provenance | a materially date-valued assignment may materialize the corresponding temporal anchor; present-null creates no anchor; no canonical occurrence by itself |
+| `first_met` | admitted; object-carried temporal metadata recording a first-meeting relation/context | entity objects carrying the field; inherited with provenance | a materially date-valued assignment may supply temporal access/anchoring; present-null creates no anchor; it does not itself create a canonical linked occurrence |
+| `journal_entry_date` | admitted; temporally capable object-carried journal field | journal-entry objects carrying the field; inherited with provenance | when materially date-valued, it may act as the journal object's temporal identifier/anchor and supply contextual temporal provenance through an authored occurrence; present-null creates no anchor and the date does not become intrinsic to the linked target |
+
+#### Temporal capability and assignment actuality
+
+Temporal role in the field registry describes descriptor-level capability. An
+actual temporal anchor is materialized only from an authored assignment that
+materially supplies the corresponding date/year value under the accepted
+representation. Present-null preserves the authored assignment and provenance
+distinction but creates no temporal anchor. Field absence creates neither an
+assignment nor an anchor. This rule does not assert that every non-null string
+parses successfully and does not define a date/year parser, coercion, fallback,
+or normalization algorithm.
+
+#### Canonical contextual relation-bearing fields
+
+| Field | Admission and role | Applicability / inheritance | Occurrence / temporal semantics |
+|---|---|---|---|
+| `book_read_today` | admitted contextual relation-bearing field | dated `journal_entry` objects carrying the field; parent-field provenance retained by units | creates a canonical occurrence only when authored as a canonical link; the dated journal context can supply contextual temporal provenance for the target |
+| `dream_motif` | admitted contextual relation-bearing field | journal-entry objects carrying the field; parent-field provenance retained by units | creates a canonical occurrence only when authored as a canonical link; no independent temporal anchor |
+
+#### Inferential-bridge constitutive metadata
+
+The following **22 fields** are admitted as the full observed inferential-bridge
+schema. Bridge units inherit the complete object-level bridge schema with field
+provenance. Authored graph behavior applies only where a field's authored
+structure licenses a canonical occurrence. No field below substitutes for an
+authored relation.
+
+`bridge_applicability_scope`, `bridge_applied`, `bridge_broken`,
+`bridge_conditions`, `bridge_isomorphism`, `bridge_justification`,
+`bridge_methods`, `bridge_preservation`, `bridge_required`, `cash_out`,
+`from_mode`, `from_register`, `interface`, `iso_broken`, `iso_justification`,
+`iso_structure`, `quarantine_reasons`, `revision_triggers`,
+`speculation_quarantine`, `stop_rule`, `to_mode`, `to_register`.
+
+The bridge schema list is exhaustive for the bridge fields observed in this
+accepted specimen. `architect_or_operator` is deliberately **not** bridge
+metadata.
+
+#### Journal/indexical state fields
+
+The following seven fields retain the contract-defined `indexical telemetry`
+role from §4:
+
+`dream_location`, `dream_lucidity`, `dream_motif_valence`,
+`hypnagogic_resonance`, `reactivity`, `recall_ability`, `temporal_pace`.
+
+They are admitted as contextual metadata on journal-entry objects carrying the
+field, inherited by contained units with parent-field provenance, and preserved
+losslessly. They do not create canonical occurrences or independent temporal
+anchors.
+
+`architect_or_operator` is separately admitted as **contextual journal-state
+classification**. This is an explicit accepted operator decision, not a
+retroactive telemetry classification and not bridge metadata. It applies to
+journal-entry objects carrying the field, is inherited with parent-field
+provenance, and creates no canonical occurrence or independent temporal anchor.
+Its observed values do not authorize an inferential-bridge interpretation.
+
+#### Common representational rules
+
+For every admitted frontmatter field, preserve the authored raw value/form, a
+normalized or typed representation where mechanically available, absent versus
+present-null/blank, source-object identity, source-field/key provenance, and
+authored array-element order. Preserving authored order does **not** assert that
+the order is semantically significant. Normalization must never replace or
+destroy the authored raw form.
+
+Excluded fields retain the raw observation and provenance required by the
+observation boundary and are not materialized in the admitted semantic
+substrate.
+
+The registry does not own embedding or index policy. If the projection
+materializes an embedded representation for an admitted identifier or other
+addressable representation, the accepted projection/access contracts determine
+the vector-surface affordance of that representation.
+
 ## 5. From authored note to canonical semantic object
 
 Let a Markdown note be represented as an authored source record:
@@ -200,7 +333,7 @@ Let a Markdown note be represented as an authored source record:
 N = (path, filename, frontmatter, Markdown body)
 ```
 
-A note becomes a canonical semantic object only when it has a stable individuation anchor:
+After admission, a note becomes a canonical semantic object only when it has a stable individuation anchor:
 
 ```text
 O = object(uuid, topology, identifiers, body structure, occurrences)
@@ -234,6 +367,20 @@ object existence ≠ semantic-unit existence
 ```
 
 The projection inventory must enumerate canonical objects independently of whether unit materialization produced body units.
+
+### 5.3 Corpus admission boundary
+
+The operator has fixed the following admission policy for the current corpus boundary:
+
+- `VAULT DESIGN/` is excluded from the semantic space;
+- attachments are excluded;
+- Obsidian Canvas files are excluded;
+- PDFs are excluded;
+- `INBOX/` has no special quarantine or draft semantics merely because of its path; eligible Markdown there is observed, admitted, and materialized under the same rules as eligible Markdown elsewhere.
+
+These are admission decisions, not claims that excluded material is semantically irrelevant in every possible future corpus. Raw observation should retain enough path and exclusion provenance to show what was omitted and by which rule.
+
+An excluded source does not become a semantic object, region, unit, occurrence source, or retrieval candidate in the resulting projection. A later admission-policy change requires a new corpus/projection identity and rematerialization of the affected sources.
 
 ## 6. From authored Markdown structure to semantic units
 
@@ -312,6 +459,25 @@ Other compound Markdown blocks should be treated as authored structures:
 
 They should not be flattened into undifferentiated prose before unit creation.
 
+Quote-plus-commentary adjacency does not create a special fused semantic unit. The operator's book-note convention places the material under a page heading such as:
+
+```text
+### P. 008
+> quoted source passage
+- commentary item
+- commentary item
+```
+
+The page heading defines one semantic region. Within that region, the block quote and the following commentary retain their authored Markdown block boundaries. Adjacency supplies local structural context but does not merge the quote and commentary into one canonical unit. A contiguous Markdown list remains one authored list block unless the authored structure itself establishes additional block boundaries.
+
+This preserves both requirements:
+
+```text
+shared page-heading context
+≠
+shared semantic-unit identity
+```
+
 ### 6.4 Oversized semantic units and transport segments
 
 Provider, tokenizer, and embedding limits are technical constraints rather than authored semantic boundaries.
@@ -326,14 +492,41 @@ semantic unit U
 
 A transport segment must:
 
+- be subordinate to exactly one canonical semantic unit;
+- never create a new canonical semantic unit;
+- never create authored ontology or authored boundaries;
 - retain the parent semantic-unit identity;
-- preserve source-span provenance;
-- carry a deterministic segment ordinal;
-- preserve complete reconstruction order;
+- retain deterministic segment order and ordinal;
+- retain source-span provenance;
+- preserve deterministic reconstruction;
 - avoid breaking complete Markdown constructs where possible;
-- remain non-canonical as an independently authored semantic unit.
+- remain technical/provider transport only and non-canonical as an independently authored semantic unit.
 
 A token limit therefore cannot silently create new semantic units or alter authored ontology.
+
+No universal transport-segmentation algorithm is part of the semantic-substrate contract. Canonical semantic-unit identity and authored boundaries are materialized independently of transport segmentation. Unit content may remain inline or deterministically hydratable under the projection contract. Technical transport segmentation cannot define, divide, merge, or replace canonical semantic-unit identity or authored boundaries. A concrete transport-segmentation policy is instantiated only when a named technical operation or provider cannot accept the complete canonical semantic unit under a demonstrated hard input constraint.
+
+Until such a consumer exists:
+
+- no tokenizer is selected;
+- no token, byte, or character maximum is selected;
+- no overlap size is selected;
+- no concrete split-preference algorithm is selected;
+- no provider-specific transport representation is granted representational authority.
+
+When a concrete consumer requires segmentation, its bounded technical policy must record at least:
+
+- **Trigger:** the named operation, the demonstrated hard whole-input constraint, and proof that the complete unit exceeds it;
+- **Measurement basis:** the exact deterministic measurement used by that consumer, such as a named/versioned tokenizer, bytes, characters, or another explicitly identified measurement;
+- **Maximum segment size:** an operation-specific configured technical bound that does not redefine canonical semantic identity;
+- **Boundary handling:** preservation of complete authored/Markdown constructs where possible, with exact provenance/source spans for any forced split, and a deterministic preference order belonging to that consumer policy;
+- **Overlap:** the concrete consumer policy must state whether overlap is used and why; any overlap is transport duplication only and cannot create duplicate semantic/evidence identity;
+- **Reconstruction:** ordered segments must deterministically reconstruct the exact parent representation supplied to that operation;
+- **Segment identity:** deterministic technical identity resolving to the canonical parent semantic-unit identity, with deterministic ordinal/order, while remaining non-canonical;
+- **Consumer/provider specificity:** different technical consumers may require different policies; no universal corpus segment size is inferred from one provider;
+- **Versioning:** every concrete transport policy is versioned. If transport-segment descriptors are included in a frozen `SemanticSpaceProjection`, a policy change requires a new projection identity; a runtime-only technical transport-policy change does not alter the canonical parent semantic-unit identity.
+
+This is an accepted consumer-bound deferral contract, not an unresolved operator worksheet. No new provider-policy type or schema is introduced here, and any future need for an explicit policy identity in `TransportSegmentRecord` requires a separate evidence-backed contract amendment when the consumer exists.
 
 ## 7. Top-down inheritance
 
@@ -646,7 +839,50 @@ source object S
 
 Both units inherit source title, creator, format, and publication identifiers.
 
-### 10.5 Inferential bridge object → bridge units
+### 10.5 Book notes and source-material connectivity
+
+The operator has fixed that a canonical source-material object such as:
+
+```text
+book name.md
+```
+
+is explicitly linked to its distinct book-notes object such as:
+
+```text
+BOOK NOTES — book name.md
+```
+
+and the book-notes object contains the authored quotations and commentary about that source.
+
+The constitutive connection is the authored canonical link occurrence, not filename similarity and not quote-text matching. In projection terms:
+
+```text
+source-material object S
+    authored canonical occurrence O
+    → book-notes object N
+
+book-notes object N
+    ← reverse incidence for O
+    source-material context remains traceable
+```
+
+If the authored link is placed in the opposite direction or in both directions, the projection preserves the actual occurrence direction(s) and exposes reverse incidence. The runtime does not invent a separate `same_work`, `notes_for`, or equivalent relation merely because the filenames correspond.
+
+Quotations inside `N` remain semantic units of the book-notes object. They do not become canonical source-material units merely because their text was quoted from `S`. A source-unit identity or region identity is available only when the authored substrate supplies an explicit canonical target/address or another later-admitted relation that licenses it.
+
+Thus:
+
+```text
+explicit object link
+    establishes canonical object-to-object connectivity
+
+quoted text
+    preserves authored note content
+    but does not by itself establish source-unit identity
+```
+
+### 10.6 Inferential bridge object → bridge units
 
 Authored object fields define:
 
@@ -786,44 +1022,33 @@ The mapping forbids the runtime from:
 
 ## 15. Clean implementation consequence
 
-The new runtime should be built around this sequence:
+This substrate/chunking map owns the recovery sequence only through complete-vault projection validation:
 
 ```text
-1. ingest authored vault structure into canonical objects, units,
-   identifiers, occurrences, anchors, and addresses;
-
-2. project the complete accessible semantic space;
-
-3. let semantic-access inference connect the thread problem space to paths in that projection;
-
-4. structurally confirm that the proposed paths exist;
-
-5. execute them;
-
-6. preserve returned units and provenance in the synthesis packet;
-
-7. let synthesis interpret the result.
+whole-corpus observation
+→ contract-contact reconciliation
+→ bounded contract amendment
+→ real projection construction
+→ complete-vault projection validation
 ```
+
+Everything downstream is governed by `05-clean-implementation-sequence.md`. This document does not restate or compress the later projection-access, activation, semantic-access, conformance, execution, packet/synthesis, or private-UAT gates.
 
 Semantic-unit materialization is therefore not a generic preprocessing utility. It is the boundary at which authored internal structure becomes the addressable unit layer of the semantic substrate. Technical segmentation occurs later and remains subordinate to canonical unit identity.
 
-## 16. Operator-review points
+## 16. Operator-review resolution
 
-The supplied materials and accepted clean-room contracts support the complete mapping above. These remaining decisions should be resolved explicitly during schema design:
+The original review points are no longer an undifferentiated open list.
 
-1. Whether quote-plus-commentary adjacency is one authored semantic unit or two related semantic units.
-    Pages will be under headings like such so I think it will be okay how the chunking is currently 
-    ### P. 008
-        > *"Besides this, **certainty** and **clarity** with regard to its **form** are two essential demands that may very properly be made on an author who ventures on so slippery an undertaking."*
-        - He's talking on the nature of knowledge itself in seeking **complete and comprehensive** understanding of through critical inquiry of what we might hope to achieve with reason when **all** the material assistance of experience are taken away (*[[a priori]]*) — sounds like I'm reading [[Myself]] from the future earlier this year, searching outside ourself for answers—though I believe we've come to different conclusions about the ability to do this (talk from the perspective he proposes) at all, considering Seed Axiom F, finitude. Our [[Perspective]] allows construction of a 1 sided [[Inferential Bridge (Rule)|bridge]] that only reaches halfway, and requires a leap of faith to cross, of which we're not in the business of doing, we've no firm knowledge of the other side.
-        - Through our framework, pages 9 and 10 see him expounding on certainty—splitting registers, and demands [[Register]] typing—with clarity.
-2. The explicit relation connecting book-note objects to source-material objects for the same work, if such a relation is desired.
-    semantic objects of the source material (`book name.md`) will be linked to notes like → (`BOOK NOTES — book name.md`) with the quotes from source material in the notes
-3. The complete admitted-field registry and each field’s applicability, inheritance, relation, and temporal affordances.
-    huh? produce a report or decision matrix or something for me to fill for this
-4. The admission policy for `VAULT DESIGN`, attachments, canvases, PDFs, and inbox material.
-    vault design, attachments, canvases, pdfs can all be skipped from being put into the space. nothing special about inbox material it can be ingested like everything else
-5. The exact transport-segmentation algorithm and reconstruction guarantees, which must remain non-semantic.
-    huh? produce a report or decision matrix or something for me to fill for this
+### Resolved by explicit operator decision
 
-These decisions belong in the semantic projection and unit-materialization contracts. They must not be deferred to post-retrieval interpretation.
+1. **Quote-plus-commentary materialization:** page headings provide shared semantic-region context; quote and commentary Markdown blocks are not fused merely by adjacency. Section 6.3 states the materialization rule.
+2. **Book notes and source material:** distinct canonical objects are connected by authored canonical links with preserved authored direction and reverse incidence. Filename similarity and quote-text matching do not create the relation. Section 10.5 states the mapping.
+3. **Corpus admission:** `VAULT DESIGN`, attachments, Canvas files, and PDFs are excluded; `INBOX` Markdown has no special path-based quarantine and follows ordinary admission/materialization rules. Section 5.3 states the boundary.
+4. **Admitted-field registry:** the 60 observed fields in the accepted specimen have accepted operator classifications for admission, role, applicability, inheritance, occurrence semantics, temporal semantics, and preservation/provenance. Section 4.1 records those classifications. Repository-safe audit linkage is recorded separately and does not grant the registry authority over embedding or index design.
+
+### Closed review surface
+
+5. **Transport mechanics:** the non-semantic invariants are fixed and concrete segmentation is intentionally consumer-bound. There is no unresolved operator choice requiring completion before substrate materialization. Future segmentation parameters are technical policy decisions activated only by demonstrated consumer constraints; Section 6.4 records the contract.
+
+No other retrieval, embedding, ranking, index, or provider architecture is introduced by this review resolution.

@@ -2,7 +2,7 @@
 
 ## Status and provenance
 
-**Action state:** Drafted for operator review.  
+**Action state:** Evidence-grounded observation document; later operator resolutions are cross-referenced without rewriting the original evidence boundary.
 **Source basis:**
 
 - the supplied full vault tree;
@@ -318,7 +318,7 @@ Its body is organized by authored chapter and section headings.
 
 **Structural inference:** A book-notes object and a source-material object about the same work are distinct canonical semantic objects. One is an index of the vault owner’s reading and commentary; the other is a representation of the imported source. Filename similarity does not itself create canonical identity or a typed same-work relation.
 
-**Open requirement:** If the clean runtime needs a guaranteed connection between book-note objects and source-material objects, that connection must be explicitly materialized through an admitted identifier or canonical link. It must not be inferred solely from filenames.
+**Open requirement at observation time:** The supplied evidence did not uniquely settle the canonical connection between book-note and source-material objects. It established only that any guaranteed connection must be explicit rather than inferred from filenames. This point was subsequently resolved by explicit operator decision; see `10-organon-vault-substrate-chunking-map.md` §10.5.
 
 ### 2.4 `VAULT DESIGN/`
 
@@ -337,13 +337,13 @@ This region contains vault-support artifacts: templates, images, PDFs, style tes
 
 **Structural inference:** `VAULT DESIGN` is operational infrastructure for authoring and maintaining the vault rather than one of the Organon’s primary content regions.
 
-**Open requirement:** The supplied material does not establish whether all, some, or none of this region should enter the semantic projection. Admission must be explicit. Physical presence in the vault is not enough to decide corpus inclusion.
+**Open requirement at observation time:** The supplied material did not establish whether all, some, or none of this region should enter the semantic projection. Admission therefore required an explicit decision rather than inference from physical presence. This point was subsequently resolved by explicit operator decision; see `10-organon-vault-substrate-chunking-map.md` §5.3.
 
 ### 2.5 `INBOX/`
 
 The supplied tree contains an `INBOX` directory but no listed contents.
 
-No semantic role beyond physical existence is established by the evidence. It should not be automatically typed as quarantine, draft, or capture space without an explicit policy.
+No semantic role beyond physical existence is established by the supplied evidence. It therefore could not be automatically typed as quarantine, draft, or capture space from the path alone. A subsequent operator decision established that `INBOX/` carries no special path-based quarantine or draft semantics and that eligible Markdown there follows ordinary admission/materialization rules; see `10-organon-vault-substrate-chunking-map.md` §5.3.
 
 ## 3. Canonical object families observed in the representative vault
 
@@ -496,7 +496,7 @@ Representative notes contain:
 
 Semantic-unit materialization must not flatten these structures. A list, table, code fence, display equation, or block quote remains one authored semantic unit unless the accepted authored-boundary rules establish otherwise. Technical provider limits may create ordered transport segments, not additional canonical semantic units.
 
-**Open requirement:** The supplied material does not completely determine whether an adjacent quotation and its immediately following commentary should materialize as one coupled unit or as two separately addressable units. This should be settled with representative acceptance cases rather than an arbitrary token rule.
+**Open requirement at observation time:** The supplied material did not completely determine whether an adjacent quotation and its immediately following commentary should materialize as one coupled unit or as two separately addressable units. This point was subsequently resolved by explicit operator decision: adjacency does not fuse authored Markdown blocks, while the shared page heading supplies semantic-region context; see `10-organon-vault-substrate-chunking-map.md` §6.3.
 
 ### 5.4 Headings without prose remain structural
 
@@ -697,15 +697,15 @@ The clean system needs an explicit admission policy covering:
 
 No path should be silently admitted or excluded solely because the legacy runtime did so.
 
-## 9. Operator-review points
+## 9. Operator-review points and later resolutions
 
-The supplied evidence is sufficient to draft the topology and conventions. The following points remain intentionally open because the evidence does not uniquely settle them:
+The supplied evidence was sufficient to draft the topology and authored conventions, but it did not uniquely settle every representational decision. This section preserves that historical evidence boundary while recording where later authority resolved it.
 
-1. Whether `VAULT DESIGN` notes participate in the semantic corpus, and under what scope.
-2. Whether `INBOX` is semantically admitted before classification.
-3. The canonical relation between `BOOK NOTES` and `SOURCE MATERIAL` objects representing the same work.
-4. The exact cardinality and identity semantics of `[[Note#Heading]]` targets when a heading contains multiple paragraph units.
-5. Whether a quotation and its immediately associated commentary form one unit or two.
-6. The final exhaustive admitted-field schema; the supplied list is explicitly provisional.
+1. **`VAULT DESIGN` admission:** unresolved by the supplied evidence; subsequently resolved by explicit operator decision in `10-organon-vault-substrate-chunking-map.md` §5.3.
+2. **`INBOX` admission semantics:** unresolved by the supplied evidence; subsequently resolved by explicit operator decision in #10 §5.3. The path itself does not create quarantine or draft semantics.
+3. **`BOOK NOTES` / `SOURCE MATERIAL` connectivity:** unresolved by filename/topology evidence alone; subsequently resolved by explicit operator decision in #10 §10.5 as authored canonical-link connectivity with preserved authored direction and reverse incidence.
+4. **`[[Note#Heading]]` target cardinality and identity when a heading contains multiple paragraph units:** this document's original evidence boundary does not itself resolve any additional semantics beyond the accepted region-address rules elsewhere in the projection contracts.
+5. **Quotation/commentary unit boundary:** unresolved by the supplied evidence; subsequently resolved by explicit operator decision in #10 §6.3. Adjacency does not fuse the authored blocks.
+6. **Final exhaustive admitted-field schema:** the representative evidence here was explicitly provisional. A later whole-corpus observation and explicit operator classification produced the accepted 60-field registry for its versioned specimen; see #10 §4.1 and `14-admitted-field-registry-audit-manifest.md`.
 
-These are not blockers to the clean-room project. They should become explicit projection and chunking acceptance tests rather than implicit runtime heuristics.
+The later resolutions do not retroactively turn the original observations into evidence that they were not. They are cross-domain decisions layered on top of this evidence record.
