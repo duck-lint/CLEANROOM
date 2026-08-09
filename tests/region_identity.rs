@@ -241,7 +241,7 @@ fn downstream_contract_records_discriminate_the_selected_region() {
         },
         inherited_identifier_assignment_ids: vec![],
         unit_local_identifier_assignment_ids: vec![],
-        outgoing_occurrence_ids: vec![occurrence_id.clone()],
+        outgoing_occurrence_ids: vec![],
         incoming_occurrence_ids: vec![],
         temporal_anchor_ids: vec![],
         retrieval_surface_ids: vec![],
@@ -318,6 +318,8 @@ fn downstream_contract_records_discriminate_the_selected_region() {
 
     assert_eq!(unit.parent_region_address, *foo_a);
     assert_ne!(unit.parent_region_address, *foo_b);
+    assert!(unit.outgoing_occurrence_ids.is_empty());
+    assert_eq!(foo_region_a.contained_unit_ids, [unit.unit_id.clone()]);
     assert_eq!(region_a.child_region_addresses, [foo_a.clone()]);
     assert_eq!(region_b.child_region_addresses, [foo_b.clone()]);
     assert_eq!(
