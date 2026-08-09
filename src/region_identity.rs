@@ -7,6 +7,28 @@ use std::collections::HashMap;
 
 use crate::model::{SemanticObjectId, SemanticRegionAddress, SourceSpan};
 
+/// Invalid authored input supplied to canonical region construction.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RegionIdentityError {
+    /// Heading depth zero cannot participate in authored hierarchy.
+    ZeroHeadingLevel,
+    /// A structural heading address must contain non-whitespace content.
+    EmptyStructuralAddress,
+}
+
+impl std::fmt::Display for RegionIdentityError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ZeroHeadingLevel => formatter.write_str("heading level must be positive"),
+            Self::EmptyStructuralAddress => {
+                formatter.write_str("authored structural address must not be empty")
+            }
+        }
+    }
+}
+
+impl std::error::Error for RegionIdentityError {}
+
 /// One authored heading observation supplied to the region materializer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AuthoredRegionHeading {
@@ -48,7 +70,18 @@ struct HeadingNode {
 pub fn canonical_region_identities(
     object_id: SemanticObjectId,
     headings: &[AuthoredRegionHeading],
-) -> Result<Vec<CanonicalRegionIdentity>, crate::model::EmptyIdentityError> {
+) -> Result<Vec<CanonicalRegionIdentity>, RegionIdentityError> {
+    // Validate the complete input before deriving parents, sibling groups, or
+    // encoded components. No invalid prefix may produce a partial topology.
+    for heading in headings {
+        if heading.level == 0 {
+            return Err(RegionIdentityError::ZeroHeadingLevel);
+        }
+        if heading.authored_structural_address.trim().is_empty() {
+            return Err(RegionIdentityError::EmptyStructuralAddress);
+        }
+    }
+
     let mut nodes = Vec::with_capacity(headings.len());
     let mut stack: Vec<(u8, usize)> = Vec::new();
 
@@ -97,7 +130,13 @@ pub fn canonical_region_identities(
             collision_ordinal: (sibling_count > 1).then_some(*sibling_ordinal),
         });
         let authored_structural_address = encode_components(&components);
-        let address = SemanticRegionAddress::parse(object_id.clone(), authored_structural_address)?;
+        // The encoded address is non-empty by construction after the input
+        // preflight above, so constructing the already-validated model value
+        // cannot introduce a second, weaker validation path.
+        let address = SemanticRegionAddress {
+            object_id: object_id.clone(),
+            authored_structural_address,
+        };
         let heading_path = components
             .iter()
             .map(|component| component.authored_structural_address.clone())

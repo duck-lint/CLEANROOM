@@ -35,7 +35,8 @@ pub use problem_space::{
 };
 pub use projection::SemanticSpaceProjection;
 pub use region_identity::{
-    AuthoredRegionHeading, CanonicalRegionIdentity, canonical_region_identities,
+    AuthoredRegionHeading, CanonicalRegionIdentity, RegionIdentityError,
+    canonical_region_identities,
 };
 pub use semantic_access::SemanticAccessPlan;
 pub use synthesis::SynthesisInput;

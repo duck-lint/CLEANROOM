@@ -1,7 +1,12 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use semantic_traversal_core::{
-    AuthoredRegionHeading, SemanticObjectId, canonical_region_identities, model::SourceSpan,
+    AuthoredRegionHeading, RegionIdentityError, SemanticObjectId, canonical_region_identities,
+    model::{Direction, RecordProvenance, SemanticAddress, SourceSpan},
+    projection::{
+        AuthoredBlockType, OccurrencePresentation, OccurrenceRecord, OccurrenceSource,
+        SemanticRegionRecord, SemanticUnitContent, SemanticUnitRecord,
+    },
 };
 
 const OBJECT: &str = "00000000-0000-0000-0000-000000000001";
@@ -20,6 +25,49 @@ fn heading(level: u8, address: &str, start: u64) -> AuthoredRegionHeading {
             end_byte: Some(start + 4),
         }),
     }
+}
+
+#[test]
+fn invalid_heading_input_is_rejected_before_topology_construction() {
+    let zero_level = canonical_region_identities(object(), &[heading(0, "Foo", 0)]);
+    assert_eq!(zero_level, Err(RegionIdentityError::ZeroHeadingLevel));
+
+    let empty_address = canonical_region_identities(object(), &[heading(1, "", 0)]);
+    assert_eq!(
+        empty_address,
+        Err(RegionIdentityError::EmptyStructuralAddress)
+    );
+
+    let whitespace_address = canonical_region_identities(object(), &[heading(1, "  \t", 0)]);
+    assert_eq!(
+        whitespace_address,
+        Err(RegionIdentityError::EmptyStructuralAddress)
+    );
+
+    let invalid_after_valid = canonical_region_identities(
+        object(),
+        &[heading(1, "Valid", 0), heading(0, "Invalid", 10)],
+    );
+    assert_eq!(
+        invalid_after_valid,
+        Err(RegionIdentityError::ZeroHeadingLevel)
+    );
+}
+
+#[test]
+fn equivalent_sibling_ordinals_are_one_based() {
+    let identities =
+        canonical_region_identities(object(), &[heading(1, "Foo", 0), heading(1, "Foo", 10)])
+            .unwrap();
+
+    assert_eq!(
+        identities[0].address.authored_structural_address,
+        "region-v1:3:Foo:1;"
+    );
+    assert_eq!(
+        identities[1].address.authored_structural_address,
+        "region-v1:3:Foo:2;"
+    );
 }
 
 #[test]
@@ -159,21 +207,145 @@ fn source_spans_are_provenance_not_canonical_identity() {
 }
 
 #[test]
-fn all_downstream_synthetic_references_use_the_selected_canonical_address() {
+fn downstream_contract_records_discriminate_the_selected_region() {
     let identities = canonical_region_identities(
         object(),
-        &[heading(1, "Parent", 0), heading(2, "Target", 10)],
+        &[
+            heading(1, "Parent A", 0),
+            heading(2, "Foo", 10),
+            heading(1, "Parent B", 20),
+            heading(2, "Foo", 30),
+        ],
     )
     .unwrap();
-    let target = identities[1].address.clone();
+    let parent_a = &identities[0].address;
+    let foo_a = &identities[1].address;
+    let parent_b = &identities[2].address;
+    let foo_b = &identities[3].address;
+    assert_ne!(foo_a, foo_b);
 
-    let unit_parents = HashMap::from([("unit:one", target.clone()), ("unit:two", target.clone())]);
-    let region_children = vec![target.clone()];
-    let outgoing_target = target.clone();
-    let incoming_region = target.clone();
+    let unit_id = semantic_traversal_core::SemanticUnitId::parse("unit:foo-a").unwrap();
+    let occurrence_id =
+        semantic_traversal_core::OccurrenceId::parse("occurrence:foo-a-to-b").unwrap();
+    let unit = SemanticUnitRecord {
+        unit_id: unit_id.clone(),
+        parent_object_id: object(),
+        parent_region_address: foo_a.clone(),
+        authored_block_type: AuthoredBlockType::Paragraph,
+        heading_path: vec!["Parent A".into(), "Foo".into()],
+        block_ordinal: 1,
+        explicit_block_id: None,
+        content: SemanticUnitContent::Inline {
+            authored_markdown: "synthetic body".into(),
+            normalized_text: "synthetic body".into(),
+        },
+        inherited_identifier_assignment_ids: vec![],
+        unit_local_identifier_assignment_ids: vec![],
+        outgoing_occurrence_ids: vec![occurrence_id.clone()],
+        incoming_occurrence_ids: vec![],
+        temporal_anchor_ids: vec![],
+        retrieval_surface_ids: vec![],
+        source_provenance: RecordProvenance::Materialization {
+            rule: "synthetic-region-identity-test".into(),
+            sources: vec![SemanticAddress::Region(foo_a.clone())],
+        },
+        transport_segments: vec![],
+    };
+    let region_a = SemanticRegionRecord {
+        address: parent_a.clone(),
+        heading_path: vec!["Parent A".into()],
+        heading_identity: "synthetic-parent-a".into(),
+        source_span: Some(heading(1, "Parent A", 0).source_span.unwrap()),
+        child_region_addresses: vec![foo_a.clone()],
+        contained_unit_ids: vec![],
+        block_target_mappings: vec![],
+        incoming_occurrence_ids: vec![],
+        outgoing_occurrence_ids: vec![],
+        inherited_identifier_assignment_ids: vec![],
+        retrieval_surface_ids: vec![],
+    };
+    let foo_region_a = SemanticRegionRecord {
+        address: foo_a.clone(),
+        heading_path: vec!["Parent A".into(), "Foo".into()],
+        heading_identity: "synthetic-foo-a".into(),
+        source_span: Some(heading(2, "Foo", 10).source_span.unwrap()),
+        child_region_addresses: vec![],
+        contained_unit_ids: vec![unit_id.clone()],
+        block_target_mappings: vec![],
+        incoming_occurrence_ids: vec![],
+        outgoing_occurrence_ids: vec![occurrence_id.clone()],
+        inherited_identifier_assignment_ids: vec![],
+        retrieval_surface_ids: vec![],
+    };
+    let region_b = SemanticRegionRecord {
+        address: parent_b.clone(),
+        heading_path: vec!["Parent B".into()],
+        heading_identity: "synthetic-parent-b".into(),
+        source_span: Some(heading(1, "Parent B", 20).source_span.unwrap()),
+        child_region_addresses: vec![foo_b.clone()],
+        contained_unit_ids: vec![],
+        block_target_mappings: vec![],
+        incoming_occurrence_ids: vec![],
+        outgoing_occurrence_ids: vec![],
+        inherited_identifier_assignment_ids: vec![],
+        retrieval_surface_ids: vec![],
+    };
+    let foo_region_b = SemanticRegionRecord {
+        address: foo_b.clone(),
+        heading_path: vec!["Parent B".into(), "Foo".into()],
+        heading_identity: "synthetic-foo-b".into(),
+        source_span: Some(heading(2, "Foo", 30).source_span.unwrap()),
+        child_region_addresses: vec![],
+        contained_unit_ids: vec![],
+        block_target_mappings: vec![],
+        incoming_occurrence_ids: vec![occurrence_id.clone()],
+        outgoing_occurrence_ids: vec![],
+        inherited_identifier_assignment_ids: vec![],
+        retrieval_surface_ids: vec![],
+    };
+    let occurrence = OccurrenceRecord {
+        occurrence_id,
+        source: OccurrenceSource::SemanticRegion {
+            region_address: foo_a.clone(),
+        },
+        authored_target_text: "#Foo".into(),
+        display_alias: None,
+        resolved_target: SemanticAddress::Region(foo_b.clone()),
+        presentation_mode: OccurrencePresentation::Link,
+        direction: Direction::Outgoing,
+        source_span: Some(heading(2, "Foo", 10).source_span.unwrap()),
+    };
 
-    assert!(unit_parents.values().all(|address| address == &target));
-    assert_eq!(region_children, [target.clone()]);
-    assert_eq!(outgoing_target, target);
-    assert_eq!(incoming_region, identities[1].address);
+    assert_eq!(unit.parent_region_address, *foo_a);
+    assert_ne!(unit.parent_region_address, *foo_b);
+    assert_eq!(region_a.child_region_addresses, [foo_a.clone()]);
+    assert_eq!(region_b.child_region_addresses, [foo_b.clone()]);
+    assert_eq!(
+        foo_region_a.outgoing_occurrence_ids,
+        [occurrence.occurrence_id.clone()]
+    );
+    assert_eq!(
+        foo_region_b.incoming_occurrence_ids,
+        [occurrence.occurrence_id.clone()]
+    );
+    assert_eq!(
+        occurrence.source,
+        OccurrenceSource::SemanticRegion {
+            region_address: foo_a.clone()
+        }
+    );
+    assert_eq!(
+        occurrence.resolved_target,
+        SemanticAddress::Region(foo_b.clone())
+    );
+    assert_ne!(
+        occurrence.source,
+        OccurrenceSource::SemanticRegion {
+            region_address: foo_b.clone()
+        }
+    );
+    assert_ne!(
+        occurrence.resolved_target,
+        SemanticAddress::Region(foo_a.clone())
+    );
 }
