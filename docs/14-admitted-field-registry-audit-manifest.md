@@ -10,7 +10,7 @@ summaries. It does not create semantic roles, retrieval surfaces,
 embedding/index policy, ranking behavior, or transport policy.
 
 **Audit-completeness state:** **COMPLETE REPOSITORY-SAFE LINKAGE.** Public
-structural audit linkage is complete for the accepted observer/specimen pair.
+structural audit linkage is complete for the current v3 observer/specimen pair.
 Private authored contents remain intentionally private. This manifest does not
 reproduce the private evidence bundle, and does not acquire semantic or
 representational authority by linking evidence. Corpus actuality is supplied by
@@ -18,35 +18,67 @@ the versioned authored-vault observation; explicit operator decisions resolve
 constitutive questions; representational authority resides in the accepted,
 corpus-validated CLEANROOM contracts.
 
-## 1. Observation identity
+## 1. Current v3 observation identity
 
 | Item | Repository-safe value |
 |---|---|
 | Observer repository | `duck-lint/semantic-traversal` |
-| Observer commit | `99d0d4556684000f0ed585e47158a5f7fe9ce7e1` |
-| Observer schema identifier/version | `vault-observation/v2` |
-| Authored-vault specimen identity | `25fb8f13dd17efb62abbb52c48f526bc0aedd887b29001c1e60f1642d322b688` |
-| Specimen identity algorithm/version | `SHA-256 over the UTF-8 JSON serialization of {directories: resident directory observations, files: resident file records restricted to relative_path, source_kind, extension, byte_size, source_byte_hash, text_decoding_status}; serialization uses sort_keys=true, separators=(',', ':'), ensure_ascii=false; observer schema vault-observation/v2` |
-| Whole-resident Markdown/source count | `1059` |
-| Admission-eligible Markdown count | `1051` |
-| Valid frontmatter count | `1059` |
+| Observer commit | `e9bb2d95c14b1beb334dc2b8d83420f5998b9a53` |
+| Observer schema identifier/version | `vault-observation/v3` |
+| Vault manifest identity | `b06b6c2efe6c0590d3aa3d1100bc234c86dc362a8ebe8e8996f32d670eae2950` |
+| Authored-vault specimen identity | `f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4` |
+| Pinned run-1 artifact SHA-256 | `d3a340a1b203a64b2455f71a8d4f17003d5bfdba8be0583cbec1529692320bb9` |
+| Logical observation hash | `e7b22e291cd51026f435a7a373678bc3f5fda1f6b1c74770f13ffb6eaed05b4a` |
+| Resident source records | `1060` |
+| Resident Markdown count | `1060` |
+| Admission-eligible Markdown count | `1052` |
+| Excluded Markdown count | `8` |
+| Valid frontmatter count | `1057` |
+| Absent frontmatter count | `3` |
 | Malformed-frontmatter count | `0` |
-| Parseable UUID count | `1059` |
-| UUIDv7 count | `1059` |
+| Parseable UUID count | `1057` |
+| UUIDv7 count | `1057` |
 | Duplicate UUID groups | `0` |
-| Whole-resident total authored-link occurrences | `4994` |
-| Whole-resident one-candidate occurrences | `4893` |
+| Whole-resident total authored-link occurrences | `5008` |
+| Whole-resident one-candidate occurrences | `4907` |
 | Whole-resident zero-candidate occurrences | `101` |
 | Whole-resident multiple-candidate occurrences | `0` |
 | Observed frontmatter field count | `60` |
-| Private evidence JSON SHA-256 | `31cf9ba80fb947fc7bbd758d8e47e839cfb41b3d5cfe4fd6b7c9caa8e6c4fbde` |
-| Private decision-matrix SHA-256 | `1adb15b094fef29a23aebd7308b476e4d3d4489a57d7e1993fc83ca6a963b36d` |
-| Generator artifact SHA-256 | `11e23f64cbd7004d8ae3f2d4f9dcfb1627987069f13c181c3eaedf75dadfbc0f` |
 | Operator resolution identity/status | 60 field classifications accepted; 55 admitted; 5 excluded; 0 quarantined; 0 unresolved; private decision-matrix resolution `R001`: accepted |
 
 The observer repository/commit is recorded as evidence identity only. CLEANROOM
 does not import, imitate, or infer architectural authority from that
 implementation.
+
+The v3 observation was run twice. The specimen identity, logical observation
+hash, and summary bytes were identical. Complete serialized observation bytes
+are not expected to be identical because `generated_at` is an intentional run
+timestamp.
+
+## 1.1 Historical v2 predecessor boundary
+
+The registry was originally resolved against the following immutable historical
+observation:
+
+| Item | Historical repository-safe value |
+|---|---|
+| Observer commit | `99d0d4556684000f0ed585e47158a5f7fe9ce7e1` |
+| Observer schema | `vault-observation/v2` |
+| Specimen identity | `25fb8f13dd17efb62abbb52c48f526bc0aedd887b29001c1e60f1642d322b688` |
+
+Exact field-universe reconciliation against v3 established:
+
+```text
+historical fields: 60
+current fields: 60
+added: 0
+removed: 0
+unchanged: 60
+```
+
+The v2 boundary remains historical provenance; it is not the current corpus
+actuality boundary. Because the universe is unchanged, the existing semantic
+classifications carry forward without a new field-admission decision.
 
 ## 2. Decision totals
 
@@ -74,7 +106,32 @@ dislikes
 These totals describe the accepted operator classification. They are linked to
 the private evidence bundle by the exact filesystem-byte digests above.
 
-## 3. Repository-safe per-field audit export
+## 3. Current v3 repository-safe authored-shape record
+
+The current repaired substrate establishes the following canonical authored
+cardinalities. These are structural authoring facts, not new semantic roles;
+authored list order remains preserved source form without automatic ranking
+significance.
+
+| Canonical list-valued fields | Canonical scalar-valued fields |
+|---|---|
+| `creator`, `register_mode`, `from_mode`, `to_mode`, `unity_level` | `format`, `layer`, `vector_direction`, `register`, `pillar`, `hypnagogic_resonance`, `reactivity`, `relationship` |
+
+The current temporal field rows preserve the distinction between parser-native
+shape and semantic representation:
+
+| Field | Current native shape evidence | Accepted semantic representations |
+|---|---|---|
+| `birthday` | date or string, as applicable | `FullDate`, `MonthDay` |
+| `first_met` | date or datetime, as applicable | `FullDate`, `DateTime` |
+| `original_year_published` | number or string, as applicable | `ExactYear`, `ApproximateYear` |
+| `journal_entry_date` | date | `FullDate` only |
+
+The table below is retained as the historical v2 per-field audit export. Its
+counts are not current v3 corpus counts; the current v3 census is the identity
+and boundary record in §1 and the repaired authored-shape record above.
+
+## 3.1 Historical v2 repository-safe per-field audit export
 
 The following table contains one row for every observed field, exactly once.
 Counts distinguish whole-resident presence from admission-eligible presence;
