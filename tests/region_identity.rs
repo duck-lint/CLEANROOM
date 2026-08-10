@@ -429,16 +429,19 @@ fn downstream_contract_records_discriminate_the_selected_region() {
     assert_eq!(unit.parent_region_address, *foo_a);
     assert_ne!(unit.parent_region_address, *foo_b);
     assert!(unit.outgoing_occurrence_ids.is_empty());
-    assert_eq!(foo_region_a.contained_unit_ids, [unit.unit_id.clone()]);
-    assert_eq!(region_a.child_region_addresses, [foo_a.clone()]);
-    assert_eq!(region_b.child_region_addresses, [foo_b.clone()]);
+    assert_eq!(
+        foo_region_a.contained_unit_ids,
+        std::slice::from_ref(&unit.unit_id)
+    );
+    assert_eq!(region_a.child_region_addresses, vec![foo_a.clone()]);
+    assert_eq!(region_b.child_region_addresses, vec![foo_b.clone()]);
     assert_eq!(
         foo_region_a.outgoing_occurrence_ids,
-        [occurrence.occurrence_id.clone()]
+        std::slice::from_ref(&occurrence.occurrence_id)
     );
     assert_eq!(
         foo_region_b.incoming_occurrence_ids,
-        [occurrence.occurrence_id.clone()]
+        std::slice::from_ref(&occurrence.occurrence_id)
     );
     assert_eq!(
         occurrence.source,

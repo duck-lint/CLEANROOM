@@ -158,7 +158,11 @@ fn fnv(bytes: &[u8]) -> String {
 // SHA-256 keeps hydration integrity independent from the containing note.
 // This small implementation avoids introducing a provider or external tool
 // into the Phase 5 constructor's deterministic boundary.
-fn sha256(bytes: &[u8]) -> String {
+/// Deterministic SHA-256 primitive shared by artifact-boundary tooling.
+///
+/// This function is deliberately limited to byte hashing. It carries no
+/// corpus mapping or construction authority.
+pub fn sha256(bytes: &[u8]) -> String {
     const K: [u32; 64] = [
         0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
         0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
@@ -598,10 +602,10 @@ fn validate_projection(
         {
             metrics.unit_parent_failures += 1;
         }
-        if let Some(region) = regions.get(&unit.parent_region_address) {
-            if occurrence_count(&region.contained_unit_ids, &unit.unit_id) != 1 {
-                metrics.region_containment_failures += 1;
-            }
+        if let Some(region) = regions.get(&unit.parent_region_address)
+            && occurrence_count(&region.contained_unit_ids, &unit.unit_id) != 1
+        {
+            metrics.region_containment_failures += 1;
         }
     }
     for region in &projection.regions {
@@ -677,13 +681,12 @@ fn validate_projection(
             continue;
         };
         for assignment_id in &object.identifier_assignment_ids {
-            if let Some(assignment) = assignments.get(assignment_id.as_str()) {
-                if !class
+            if let Some(assignment) = assignments.get(assignment_id.as_str())
+                && !class
                     .applicable_identifier_names
                     .contains(&assignment.identifier_name)
-                {
-                    metrics.class_applicability_failures += 1;
-                }
+            {
+                metrics.class_applicability_failures += 1;
             }
         }
     }
@@ -761,10 +764,9 @@ fn validate_projection(
             object_id,
             field_path,
         } = &anchor.provenance
+            && temporal_null_assignments.contains(&format!("{object_id}:{field_path}"))
         {
-            if temporal_null_assignments.contains(&format!("{object_id}:{field_path}")) {
-                metrics.present_null_temporal_anchor_failures += 1;
-            }
+            metrics.present_null_temporal_anchor_failures += 1;
         }
     }
     let mut unit_ids = HashSet::new();
@@ -814,12 +816,12 @@ fn validate_projection(
         }
     }
     for occurrence in &projection.occurrences {
-        let resolution_matches = match (&occurrence.resolution_state, &occurrence.resolved_target) {
-            (OccurrenceResolutionState::Resolved, Some(_)) => true,
-            (OccurrenceResolutionState::Unresolved, None)
-            | (OccurrenceResolutionState::Ambiguous { .. }, None) => true,
-            _ => false,
-        };
+        let resolution_matches = matches!(
+            (&occurrence.resolution_state, &occurrence.resolved_target),
+            (OccurrenceResolutionState::Resolved, Some(_))
+                | (OccurrenceResolutionState::Unresolved, None)
+                | (OccurrenceResolutionState::Ambiguous { .. }, None)
+        );
         if !resolution_matches {
             metrics.occurrence_resolution_state_mismatches += 1;
         }
@@ -1348,6 +1350,8 @@ pub fn canonical_unit_id(
     ))
 }
 
+type RegionBoundsByObject = BTreeMap<String, Vec<(SemanticRegionAddress, u64, u64, Vec<String>)>>;
+
 /// Join accepted heading-match provenance to an existing materialized region.
 pub fn join_region_by_exact_span(
     regions: &[SemanticRegionRecord],
@@ -1545,10 +1549,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
     let mut object_temporal: BTreeMap<String, Vec<TemporalAnchorId>> = BTreeMap::new();
     let mut region_by_object_span: BTreeMap<(String, u64, u64), Vec<usize>> = BTreeMap::new();
     let mut region_index_by_object_address: BTreeMap<(String, String), usize> = BTreeMap::new();
-    let mut region_bounds_by_object: BTreeMap<
-        String,
-        Vec<(SemanticRegionAddress, u64, u64, Vec<String>)>,
-    > = BTreeMap::new();
+    let mut region_bounds_by_object: RegionBoundsByObject = BTreeMap::new();
     let mut region_heading_spans_by_object: BTreeMap<
         String,
         Vec<(SemanticRegionAddress, Option<SourceSpan>)>,
@@ -1639,13 +1640,13 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                 (oid.to_string(), address.authored_structural_address.clone()),
                 region_index,
             );
-            if let Some(heading_span) = heading_span.as_ref() {
-                if let (Some(start), Some(end)) = (heading_span.start_byte, heading_span.end_byte) {
-                    region_by_object_span
-                        .entry((oid.to_string(), start, end))
-                        .or_default()
-                        .push(region_index);
-                }
+            if let Some(heading_span) = heading_span.as_ref()
+                && let (Some(start), Some(end)) = (heading_span.start_byte, heading_span.end_byte)
+            {
+                region_by_object_span
+                    .entry((oid.to_string(), start, end))
+                    .or_default()
+                    .push(region_index);
             }
             regions.push(SemanticRegionRecord {
                 address: address.clone(),
@@ -2027,13 +2028,12 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
             } else {
                 OccurrencePresentation::Link
             };
-            if let OccurrenceSource::SemanticRegion { region_address } = &source {
-                if let Some(region) = regions
+            if let OccurrenceSource::SemanticRegion { region_address } = &source
+                && let Some(region) = regions
                     .iter_mut()
                     .find(|region| &region.address == region_address)
-                {
-                    region.outgoing_occurrence_ids.push(occurrence_id.clone());
-                }
+            {
+                region.outgoing_occurrence_ids.push(occurrence_id.clone());
             }
             if source_surface == "frontmatter" {
                 object_field_occ
@@ -2278,7 +2278,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
     }
     let mut projection = SemanticSpaceProjection {
         projection_snapshot_id: format!("projection:phase5:{snapshot}"),
-        ingest_identity: format!("observer:e9bb2d95c14b1beb334dc2b8d83420f5998b9a53"),
+        ingest_identity: "observer:e9bb2d95c14b1beb334dc2b8d83420f5998b9a53".to_string(),
         schema_version: "semantic-space-projection/v1".into(),
         logical_hash: String::new(),
         corpus_snapshot_identity: snapshot.clone(),

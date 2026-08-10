@@ -17,6 +17,7 @@ pub mod projection;
 pub mod region_identity;
 pub mod semantic_access;
 pub mod synthesis;
+pub mod validation;
 
 pub use activation::{
     ActivatedIdentifierAssignmentRecord, ActivatedOccurrenceRecord, ActivatedProjection,
