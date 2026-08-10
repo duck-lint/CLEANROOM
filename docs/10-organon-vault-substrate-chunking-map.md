@@ -299,9 +299,7 @@ YAML date or datetime may correspond to `FullDate` or `DateTime` where the field
 contract permits it. The authored string `--MM-DD` is `MonthDay`, and `~N BCE`
 is `ApproximateYear`, only under the accepted authored grammar. A parser-native
 string is not automatically non-temporal, and a parser-native date/datetime is
-not automatically an anchor without field applicability. No generic string
-coercion, regex parser, field-name guessing, natural-language parsing, or
-`TemporalValue::Label` fallback is authorized.
+not automatically an anchor without field applicability. No generic string coercion, regex parser, field-name guessing, natural-language parsing, or generic label fallback is authorized.
 
 #### Canonical authored cardinalities
 
