@@ -1,103 +1,98 @@
 # Phase 5 Real Projection Construction Report
 
-Status: completed construction evidence; not Phase 6 validation.
+Status: construction closure passed; projection status remains `Unvalidated`.
+Phase 6 has not begun.
 
 ## Accepted input
 
 - Observer repository: `duck-lint/semantic-traversal`
-- Observer commit: `99d0d4556684000f0ed585e47158a5f7fe9ce7e1`
-- Observer schema: `vault-observation/v2`
-- Accepted specimen: `25fb8f13dd17efb62abbb52c48f526bc0aedd887b29001c1e60f1642d322b688`
+- Observer commit: `e9bb2d95c14b1beb334dc2b8d83420f5998b9a53`
+- Observer schema: `vault-observation/v3`
+- Specimen / corpus snapshot: `f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4`
+- Pinned private input artifact SHA-256: `d3a340a1b203a64b2455f71a8d4f17003d5bfdba8be0583cbec1529692320bb9`
 
-The accepted observation was used directly. No live-vault hydration was
-performed.
+The private observation artifact was consumed directly. The authored vault and
+observer repository were not mutated, and no live-vault hydration occurred.
 
-## Admission and materialization
+## Corpus and projection
 
-- Whole resident source records: 1098
-- Resident Markdown records: 1059
-- Admission eligible: 1051
-- Admitted objects: 1051
-- Excluded source records: 8
-- Semantic regions: 4346
-- Semantic units: 17113
-- Object classes: 14
-- Identifier descriptors: 55
-- Identifier assignments: 12323
-- Present-null identifier assignments: 3599
-- Unit inherited-assignment references: 227431
-- Region inherited-assignment references: 52849
-- Temporal anchors: 547
+| Measure | Count |
+|---|---:|
+| Resident source records | 1060 |
+| Resident Markdown | 1060 |
+| Admission eligible | 1052 |
+| Excluded Markdown | 8 |
+| Objects | 1052 |
+| Regions | 4356 |
+| Semantic units | 17118 |
+| Object classes | 14 |
+| Identifier descriptors | 55 |
+| Identifier assignments | 12351 |
+| Retrieval surfaces | 5 |
+| Valid structural transitions | 22 |
+
+Canonical class applicability is sourced from the accepted field registry and
+validated against observed assignments. It is not learned from class-member
+co-occurrence. Canonical list cardinalities remain collections even for one
+authored value.
+
+## Temporal materialization
+
+- FullDate: 532
+- DateTime: 1
+- ExactYear: 7
+- MonthDay: 3
+- ApproximateYear: 5
+- Total material non-null temporal anchors: 548
+- Present-null temporal assignments without anchors: 64
+- Present-null assignments incorrectly anchored: 0
+
+Parser-native date/datetime evidence is interpreted only under the accepted
+field-specific contract. Arbitrary strings do not become temporal labels.
 
 ## Occurrences and closure
 
-- Authored occurrences: 4989
-- Object-field occurrences: 498
-- Semantic-region occurrences: 185
-- Semantic-unit occurrences: 4306
-- Resolved occurrences: 4882
-- Unresolved occurrences: 107
-- Ambiguous occurrences: 0
-- Heading-fragment targets: 10
-- Heading-target exact-span joins: 10/10
-- Ambiguous heading-target joins: 0
-- Duplicate canonical region addresses: 0
-- Duplicate unit-parent keys: 0
-- Region containment failures: 0
-- Region-source incidence failures: 0
-- Region-target incoming-incidence failures: 0
-- Ordinary semantic-unit source attributions: 4306
-- Semantic-unit source-attribution failures: 0
-- Semantic-unit outgoing-incidence failures: 0
-- Block-fragment occurrences: 0
-- Resolved block targets: 0
-- Unresolved block targets: 0
-- Object-fallback block-target degradations: 0
-- Identifier descriptor/assignment conformance failures: 0
-- Inherited-assignment reference failures: 0
-- Unit identity duplicates: 0
-- Inherited assignment references: 227431
-- Region inherited-assignment failures: 0
-- Excluded region inheritance: 0
-- Explicit block IDs: 0
-- Region block-target mappings: 0
-- Block mapping failures: 0
-- Assignment-mode conformance failures: 0
-- Retrieval-affordance conformance failures: 0
-- Object-class applicability failures: 0
-- Present-null temporal assignments with no anchor: 63
-- Present-null temporal assignments incorrectly anchored: 0
-- Authored block-kind distribution: paragraph 12806; list 3907; blockquote-or-callout 321; code fence 67; table 12
-- Unsupported block kinds: 0
-- Collapsed block kinds: 0
+- Authored occurrences: 5003
+- Object-field occurrences: 501
+- Semantic-region occurrences: 184
+- Semantic-unit occurrences: 4318
+- Resolved: 4895
+- Unresolved: 108
+- Ambiguous: 0
+- Ordinary source-attribution failures: 0
+- Target-incidence failures: 0
+- Block-target fallback degradations: 0
+- Class-applicability failures: 0
+- Retrieval-affordance failures: 0
+- All constructor closure failure counters: 0
 
-The materializer uses the accepted root-down `canonical_region_identities`
-constructor. Its returned addresses are reused for object region lists,
-parent/child containment, unit parent regions, region occurrence sources, and
-heading-fragment targets. Heading targets join by accepted object identity plus
-exact matched heading span to an already materialized region address.
+Ordinary authored-target resolution retains unresolved and ambiguous states;
+there is no first-candidate fallback. Graph direct identity is an occurrence
+or incidence record, not an automatically hydrated semantic unit.
 
-## Determinism and status
+Semantic-unit hydration hashes are SHA-256 over the exact authored block bytes
+addressed by the hydration span. The source-file hash is not reused as a
+unit-content hash.
 
-- First construction logical hash: `fnv1a:40dc5c75225c16fb`
-- Second construction logical hash: `fnv1a:40dc5c75225c16fb`
-- Deterministic equality: yes
-- Projection bytes identical across clean reruns: yes
-- Projection schema: `semantic-space-projection/v1`
-- Projection validation status: `Unvalidated`
-- Full projection artifact: private and not committed
+## Capability topology
 
-Unit identities use canonical object UUID, canonical parent region address,
-region-local block ordinal, and an explicit authored block ID when present.
-Source paths and source spans remain provenance or hydration data. Ordinary body
-occurrences resolve to the unique containing unit by exact source span; explicit
-block targets fail closed when no unit mapping exists. Admitted identifier
-descriptors preserve accepted roles, observed mixed value shapes/cardinalities,
-authored raw values, and object-field provenance for inherited region/unit
-references. Combined blockquote-or-callout observations were mechanically
-classified from accepted authored syntax; no callout, equation, embedded-media,
-or unknown block kinds occurred in the admitted specimen.
+The five represented surfaces remain unavailable because Phase 5 creates no
+provider or executable index. Their structural visibility is nevertheless
+typed: vector has no Identifier visibility, graph returns occurrence/incidence
+identity, and temporal exposes only licensed temporal subjects/anchors.
+Descriptor surface references, transition references, surface IDs, and
+from/to visibility are closed.
 
-Phase 5 construction is complete against the accepted observation specimen.
-The projection remains explicitly unvalidated. Phase 6 has not begun;
-complete-vault projection validation remains outside this report.
+## Determinism and evidence
+
+- Run 1 logical hash: `sha256:aeac1135a7694cb7929f9dac9ced887e2399d3597a53471725274b5f650ccb0e`
+- Run 2 logical hash: `sha256:aeac1135a7694cb7929f9dac9ced887e2399d3597a53471725274b5f650ccb0e`
+- Run 1 projection bytes SHA-256: `e29256bcaa52bc819f2c194326dfd0418664c74e712e401180031da1f5e035dd`
+- Run 2 projection bytes SHA-256: `e29256bcaa52bc819f2c194326dfd0418664c74e712e401180031da1f5e035dd`
+- Logical hashes identical: yes
+- Private serialized projection bytes identical: yes
+- Private artifacts committed: no
+
+The projection remains `Unvalidated`; constructor self-consistency is not Phase
+6 validation. Historical v2 evidence is superseded pre-repair context only and
+is not current construction input.
