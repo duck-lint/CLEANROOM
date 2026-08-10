@@ -17,12 +17,16 @@ use serde_json::Value;
 use crate::{
     construction::sha256,
     model::{
-        RecordProvenance, SemanticAddress, SemanticObjectId, SemanticRegionAddress, SemanticUnitId,
-        SourceSpan,
+        AddressKind, Direction, RecordProvenance, RetrievalSurfaceKind, SemanticAddress,
+        SemanticObjectId, SemanticRegionAddress, SemanticUnitId, SourceSpan,
     },
     projection::{
-        AuthoredBlockType, IdentifierAssignment, IdentifierValue, OccurrenceResolutionState,
-        OccurrenceSource, SemanticSpaceProjection, SemanticUnitContent, TemporalValue,
+        AuthoredBlockType, CoverageSemantics, IdentifierAssignment, IdentifierAssignmentMode,
+        IdentifierCardinality, IdentifierDescriptor, IdentifierRole, IdentifierValue,
+        IdentifierValueShape, OccurrenceResolutionState, OccurrenceSource,
+        RetrievalSurfaceDescriptor, SemanticSpaceProjection, SemanticUnitContent,
+        StructuralTransition, StructuralTransitionOperation, SurfaceMatchMode, TemporalAffordance,
+        TemporalValue,
     },
     region_identity::{AuthoredRegionHeading, canonical_region_identities},
 };
@@ -384,6 +388,673 @@ fn object_id_from_markdown(markdown: &Value) -> Result<SemanticObjectId, String>
         .and_then(|id| SemanticObjectId::parse(id).map_err(|e| e.to_string()))
 }
 
+fn region_key(address: &SemanticRegionAddress) -> String {
+    format!(
+        "{}:{}",
+        address.object_id, address.authored_structural_address
+    )
+}
+
+// These are deliberately local restatements of accepted CLEANROOM authority.
+// They do not read descriptor or class values from the Phase 5 artifact under
+// test; that would turn construction output into the validation oracle.
+fn independent_typed_value(value: &Value) -> Result<IdentifierValue, String> {
+    match value {
+        Value::Null => Ok(IdentifierValue::Null),
+        Value::Bool(value) => Ok(IdentifierValue::Boolean(*value)),
+        Value::Number(value) => value
+            .as_i64()
+            .map(IdentifierValue::Integer)
+            .ok_or_else(|| "non-integer numeric identifier value".into()),
+        Value::String(value) => Ok(IdentifierValue::String(value.clone())),
+        Value::Array(values) => {
+            let typed = values
+                .iter()
+                .map(independent_typed_value)
+                .collect::<Result<Vec<_>, _>>()?;
+            if typed
+                .iter()
+                .all(|value| matches!(value, IdentifierValue::String(_)))
+            {
+                Ok(IdentifierValue::Strings(
+                    typed
+                        .into_iter()
+                        .map(|value| match value {
+                            IdentifierValue::String(value) => value,
+                            _ => unreachable!(),
+                        })
+                        .collect(),
+                ))
+            } else if typed
+                .iter()
+                .all(|value| matches!(value, IdentifierValue::Integer(_)))
+            {
+                Ok(IdentifierValue::Integers(
+                    typed
+                        .into_iter()
+                        .map(|value| match value {
+                            IdentifierValue::Integer(value) => value,
+                            _ => unreachable!(),
+                        })
+                        .collect(),
+                ))
+            } else if typed
+                .iter()
+                .all(|value| matches!(value, IdentifierValue::Boolean(_)))
+            {
+                Ok(IdentifierValue::Booleans(
+                    typed
+                        .into_iter()
+                        .map(|value| match value {
+                            IdentifierValue::Boolean(value) => value,
+                            _ => unreachable!(),
+                        })
+                        .collect(),
+                ))
+            } else {
+                Ok(IdentifierValue::Values(typed))
+            }
+        }
+        Value::Object(_) => Err("object-shaped identifier value is not accepted".into()),
+    }
+}
+
+fn independent_value_shapes(value: &IdentifierValue) -> Vec<IdentifierValueShape> {
+    match value {
+        IdentifierValue::Null => vec![],
+        IdentifierValue::String(_) | IdentifierValue::Strings(_) => {
+            vec![IdentifierValueShape::String]
+        }
+        IdentifierValue::Integer(_) | IdentifierValue::Integers(_) => {
+            vec![IdentifierValueShape::Integer]
+        }
+        IdentifierValue::Boolean(_) | IdentifierValue::Booleans(_) => {
+            vec![IdentifierValueShape::Boolean]
+        }
+        IdentifierValue::SemanticAddress(_) | IdentifierValue::SemanticAddresses(_) => {
+            vec![IdentifierValueShape::SemanticAddress]
+        }
+        IdentifierValue::Values(values) => {
+            values.iter().flat_map(independent_value_shapes).collect()
+        }
+    }
+}
+
+fn independent_role(name: &str) -> IdentifierRole {
+    match name {
+        "uuid" => IdentifierRole::Individuation,
+        "note_type" | "entity_type" | "format" => IdentifierRole::ObjectClass,
+        "layer" | "pillar" | "unity_level" => IdentifierRole::FrameworkPosition,
+        "register" | "register_mode" => IdentifierRole::RegisterTyping,
+        "vector_direction" => IdentifierRole::AnalysisOrientation,
+        "title" | "canonical_name" | "creator" | "aliases" => IdentifierRole::CanonicalNaming,
+        "journal_entry_date" | "birthday" | "first_met" | "original_year_published" => {
+            IdentifierRole::TemporalAnchoring
+        }
+        "book_read_today" | "dream_motif" => IdentifierRole::ContextualRelation,
+        "tags" => IdentifierRole::Grouping,
+        "dream_location"
+        | "dream_lucidity"
+        | "dream_motif_valence"
+        | "hypnagogic_resonance"
+        | "reactivity"
+        | "recall_ability"
+        | "temporal_pace" => IdentifierRole::IndexicalTelemetry,
+        "architect_or_operator" => IdentifierRole::JournalStateClassification,
+        "occupation" => IdentifierRole::EntityMetadata,
+        "origin" | "publish_studio" => IdentifierRole::SourceMetadata,
+        "relationship" => IdentifierRole::ProfileRelation,
+        name if name.starts_with("bridge_")
+            || name.starts_with("iso_")
+            || matches!(
+                name,
+                "cash_out"
+                    | "from_mode"
+                    | "from_register"
+                    | "interface"
+                    | "quarantine_reasons"
+                    | "revision_triggers"
+                    | "speculation_quarantine"
+                    | "stop_rule"
+                    | "to_mode"
+                    | "to_register"
+            ) =>
+        {
+            IdentifierRole::BridgeConstitutive
+        }
+        _ => IdentifierRole::Declared {
+            name: "accepted_admitted_field".into(),
+        },
+    }
+}
+
+fn independent_descriptor(
+    name: &str,
+    assignments: &[IdentifierAssignment],
+) -> IdentifierDescriptor {
+    let role = independent_role(name);
+    let mut shapes = BTreeSet::new();
+    let mut scalar = false;
+    let mut collection = false;
+    for assignment in assignments
+        .iter()
+        .filter(|assignment| assignment.identifier_name == name)
+    {
+        for shape in independent_value_shapes(&assignment.value) {
+            shapes.insert(format!("{shape:?}"));
+        }
+        match assignment.value {
+            IdentifierValue::Null => {}
+            IdentifierValue::String(_)
+            | IdentifierValue::Integer(_)
+            | IdentifierValue::Boolean(_)
+            | IdentifierValue::SemanticAddress(_) => scalar = true,
+            _ => collection = true,
+        }
+    }
+    let value_shape = match shapes.len() {
+        0 => IdentifierValueShape::Mixed(vec![]),
+        1 => match shapes.first().map(String::as_str) {
+            Some("String") => IdentifierValueShape::String,
+            Some("Integer") => IdentifierValueShape::Integer,
+            Some("Boolean") => IdentifierValueShape::Boolean,
+            Some("SemanticAddress") => IdentifierValueShape::SemanticAddress,
+            _ => IdentifierValueShape::Mixed(vec![]),
+        },
+        _ => IdentifierValueShape::Mixed(
+            [
+                IdentifierValueShape::String,
+                IdentifierValueShape::Integer,
+                IdentifierValueShape::Boolean,
+            ]
+            .into_iter()
+            .filter(|shape| shapes.contains(&format!("{shape:?}")))
+            .collect(),
+        ),
+    };
+    let cardinality = match name {
+        "creator" | "register_mode" | "from_mode" | "to_mode" | "unity_level" => {
+            IdentifierCardinality::Collection
+        }
+        "format"
+        | "layer"
+        | "vector_direction"
+        | "register"
+        | "pillar"
+        | "hypnagogic_resonance"
+        | "reactivity"
+        | "relationship" => IdentifierCardinality::Scalar,
+        _ => match (scalar, collection) {
+            (true, true) => IdentifierCardinality::Mixed,
+            (false, true) => IdentifierCardinality::Collection,
+            _ => IdentifierCardinality::Scalar,
+        },
+    };
+    let temporal = matches!(
+        name,
+        "journal_entry_date" | "birthday" | "first_met" | "original_year_published"
+    );
+    let links = matches!(name, "book_read_today" | "dream_motif");
+    let mut surfaces = vec!["surface:exact".into(), "surface:lexical".into()];
+    let mut transitions = vec!["transition:identifier".into()];
+    if temporal {
+        surfaces.push("surface:temporal".into());
+        transitions.push("transition:temporal-anchor".into());
+    }
+    if links {
+        surfaces.push("surface:graph".into());
+        transitions.push("transition:object-occurrence-outgoing".into());
+    }
+    IdentifierDescriptor {
+        identifier_name: name.into(),
+        semantic_role: role.clone(),
+        value_shape,
+        cardinality,
+        applicable_address_kinds: vec![
+            crate::model::AddressKind::SemanticObject,
+            crate::model::AddressKind::SemanticRegion,
+            crate::model::AddressKind::SemanticUnit,
+        ],
+        assignment_mode: if matches!(
+            role,
+            IdentifierRole::ContextualRelation | IdentifierRole::ProfileRelation
+        ) {
+            IdentifierAssignmentMode::Relational
+        } else {
+            IdentifierAssignmentMode::Intrinsic
+        },
+        source_surface: format!("frontmatter.{name}"),
+        may_contain_canonical_links: links,
+        temporal_affordance: if temporal {
+            TemporalAffordance::CreatesAnchor
+        } else {
+            TemporalAffordance::None
+        },
+        retrieval_surface_ids: surfaces,
+        enabled_transition_ids: transitions,
+    }
+}
+
+fn independent_class_fields(class_name: &str) -> BTreeSet<String> {
+    let mut fields: BTreeSet<String> = [
+        "uuid",
+        "note_type",
+        "aliases",
+        "tags",
+        "layer",
+        "unity_level",
+        "vector_direction",
+        "register",
+        "register_mode",
+        "pillar",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect();
+    let additions: &[&str] = match class_name {
+        "entity" => &[
+            "canonical_name",
+            "entity_type",
+            "occupation",
+            "relationship",
+            "first_met",
+            "birthday",
+        ],
+        "source_material" => &[
+            "title",
+            "creator",
+            "format",
+            "publish_studio",
+            "original_year_published",
+            "origin",
+        ],
+        "journal_entry" => &[
+            "journal_entry_date",
+            "book_read_today",
+            "dream_location",
+            "dream_lucidity",
+            "dream_motif",
+            "dream_motif_valence",
+            "hypnagogic_resonance",
+            "reactivity",
+            "recall_ability",
+            "temporal_pace",
+            "architect_or_operator",
+        ],
+        "inferential_bridge" => &[
+            "bridge_applicability_scope",
+            "bridge_applied",
+            "bridge_broken",
+            "bridge_conditions",
+            "bridge_isomorphism",
+            "bridge_justification",
+            "bridge_methods",
+            "bridge_preservation",
+            "bridge_required",
+            "cash_out",
+            "from_mode",
+            "from_register",
+            "interface",
+            "iso_broken",
+            "iso_justification",
+            "iso_structure",
+            "quarantine_reasons",
+            "revision_triggers",
+            "speculation_quarantine",
+            "stop_rule",
+            "to_mode",
+            "to_register",
+        ],
+        _ => &[],
+    };
+    fields.extend(additions.iter().map(|value| (*value).into()));
+    fields
+}
+
+fn independent_surfaces() -> Vec<RetrievalSurfaceDescriptor> {
+    [
+        (
+            "surface:exact",
+            RetrievalSurfaceKind::Exact,
+            SurfaceMatchMode::Literal,
+        ),
+        (
+            "surface:lexical",
+            RetrievalSurfaceKind::Lexical,
+            SurfaceMatchMode::Terms,
+        ),
+        (
+            "surface:vector",
+            RetrievalSurfaceKind::Vector,
+            SurfaceMatchMode::NearestNeighbours,
+        ),
+        (
+            "surface:graph",
+            RetrievalSurfaceKind::Graph,
+            SurfaceMatchMode::Incidence,
+        ),
+        (
+            "surface:temporal",
+            RetrievalSurfaceKind::Temporal,
+            SurfaceMatchMode::Temporal,
+        ),
+    ]
+    .into_iter()
+    .map(|(surface_id, kind, mode)| RetrievalSurfaceDescriptor {
+        surface_id: surface_id.into(),
+        kind,
+        available: false,
+        visible_address_kinds: match surface_id {
+            "surface:exact" | "surface:lexical" => vec![
+                AddressKind::SemanticObject,
+                AddressKind::SemanticRegion,
+                AddressKind::SemanticUnit,
+                AddressKind::Identifier,
+            ],
+            "surface:vector" => vec![
+                AddressKind::SemanticObject,
+                AddressKind::SemanticRegion,
+                AddressKind::SemanticUnit,
+            ],
+            "surface:graph" => vec![
+                AddressKind::SemanticObject,
+                AddressKind::SemanticRegion,
+                AddressKind::SemanticUnit,
+                AddressKind::Identifier,
+                AddressKind::Occurrence,
+            ],
+            "surface:temporal" => vec![
+                AddressKind::SemanticObject,
+                AddressKind::SemanticUnit,
+                AddressKind::Identifier,
+                AddressKind::TemporalAnchor,
+            ],
+            _ => vec![],
+        },
+        match_modes: vec![mode],
+        default_candidate_limit: 0,
+        hard_candidate_limit: 0,
+        returned_identity: if surface_id == "surface:graph" {
+            AddressKind::Occurrence
+        } else if surface_id == "surface:temporal" {
+            AddressKind::TemporalAnchor
+        } else {
+            AddressKind::SemanticUnit
+        },
+        hydrates_to_semantic_units: false,
+        coverage_semantics: CoverageSemantics::AvailabilityOnly,
+        exhaustive_total_count_supported: false,
+        continuation_supported: false,
+        technical_limitations: vec![
+            "Phase 5 representation only; no executable index or provider.".into(),
+        ],
+    })
+    .collect()
+}
+
+fn independent_transitions() -> Vec<StructuralTransition> {
+    let specs = [
+        (
+            "object-region",
+            AddressKind::SemanticObject,
+            StructuralTransitionOperation::Containment,
+            Direction::Outgoing,
+            AddressKind::SemanticRegion,
+            None,
+        ),
+        (
+            "object-unit",
+            AddressKind::SemanticObject,
+            StructuralTransitionOperation::Containment,
+            Direction::Outgoing,
+            AddressKind::SemanticUnit,
+            None,
+        ),
+        (
+            "region-unit",
+            AddressKind::SemanticRegion,
+            StructuralTransitionOperation::Containment,
+            Direction::Outgoing,
+            AddressKind::SemanticUnit,
+            None,
+        ),
+        (
+            "unit-object",
+            AddressKind::SemanticUnit,
+            StructuralTransitionOperation::Parent,
+            Direction::Outgoing,
+            AddressKind::SemanticObject,
+            None,
+        ),
+        (
+            "unit-region",
+            AddressKind::SemanticUnit,
+            StructuralTransitionOperation::Parent,
+            Direction::Outgoing,
+            AddressKind::SemanticRegion,
+            None,
+        ),
+        (
+            "object-occurrence-outgoing",
+            AddressKind::SemanticObject,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Outgoing,
+            AddressKind::Occurrence,
+            Some("surface:graph"),
+        ),
+        (
+            "region-occurrence-outgoing",
+            AddressKind::SemanticRegion,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Outgoing,
+            AddressKind::Occurrence,
+            Some("surface:graph"),
+        ),
+        (
+            "unit-occurrence-outgoing",
+            AddressKind::SemanticUnit,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Outgoing,
+            AddressKind::Occurrence,
+            Some("surface:graph"),
+        ),
+        (
+            "occurrence-object-target",
+            AddressKind::Occurrence,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Outgoing,
+            AddressKind::SemanticObject,
+            Some("surface:graph"),
+        ),
+        (
+            "occurrence-region-target",
+            AddressKind::Occurrence,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Outgoing,
+            AddressKind::SemanticRegion,
+            Some("surface:graph"),
+        ),
+        (
+            "occurrence-unit-target",
+            AddressKind::Occurrence,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Outgoing,
+            AddressKind::SemanticUnit,
+            Some("surface:graph"),
+        ),
+        (
+            "object-occurrence-incoming",
+            AddressKind::SemanticObject,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Incoming,
+            AddressKind::Occurrence,
+            Some("surface:graph"),
+        ),
+        (
+            "region-occurrence-incoming",
+            AddressKind::SemanticRegion,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Incoming,
+            AddressKind::Occurrence,
+            Some("surface:graph"),
+        ),
+        (
+            "unit-occurrence-incoming",
+            AddressKind::SemanticUnit,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Incoming,
+            AddressKind::Occurrence,
+            Some("surface:graph"),
+        ),
+        (
+            "occurrence-object-source",
+            AddressKind::Occurrence,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Incoming,
+            AddressKind::SemanticObject,
+            Some("surface:graph"),
+        ),
+        (
+            "occurrence-region-source",
+            AddressKind::Occurrence,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Incoming,
+            AddressKind::SemanticRegion,
+            Some("surface:graph"),
+        ),
+        (
+            "occurrence-unit-source",
+            AddressKind::Occurrence,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Incoming,
+            AddressKind::SemanticUnit,
+            Some("surface:graph"),
+        ),
+        (
+            "identifier",
+            AddressKind::SemanticObject,
+            StructuralTransitionOperation::Identifier,
+            Direction::Outgoing,
+            AddressKind::Identifier,
+            Some("surface:exact"),
+        ),
+        (
+            "temporal-anchor",
+            AddressKind::SemanticObject,
+            StructuralTransitionOperation::TemporalAnchor,
+            Direction::Outgoing,
+            AddressKind::TemporalAnchor,
+            Some("surface:temporal"),
+        ),
+        (
+            "occurrence-unit-hydration",
+            AddressKind::Occurrence,
+            StructuralTransitionOperation::Hydration,
+            Direction::Outgoing,
+            AddressKind::SemanticUnit,
+            Some("surface:graph"),
+        ),
+        (
+            "unit-unit-hydration",
+            AddressKind::SemanticUnit,
+            StructuralTransitionOperation::Hydration,
+            Direction::Outgoing,
+            AddressKind::SemanticUnit,
+            Some("surface:vector"),
+        ),
+        (
+            "surface-invocation",
+            AddressKind::SemanticObject,
+            StructuralTransitionOperation::RetrievalSurface,
+            Direction::Outgoing,
+            AddressKind::RetrievalSurface,
+            None,
+        ),
+    ];
+    specs
+        .into_iter()
+        .map(
+            |(id, from, operation, direction, to, retrieval_surface_id)| StructuralTransition {
+                transition_id: format!("transition:{id}"),
+                from,
+                operation,
+                direction,
+                to,
+                retrieval_surface_id: retrieval_surface_id.map(str::to_owned),
+            },
+        )
+        .collect()
+}
+
+fn independent_temporal_value(
+    field: &str,
+    value: &Value,
+    observed_shape: Option<&str>,
+) -> Option<TemporalValue> {
+    if value.is_null() {
+        return None;
+    }
+    match (field, observed_shape, value) {
+        ("birthday", Some("date"), Value::String(value)) => {
+            Some(TemporalValue::FullDate(value.clone()))
+        }
+        ("birthday", _, Value::String(value)) if valid_month_day(value) => {
+            Some(TemporalValue::MonthDay(value.clone()))
+        }
+        ("first_met", Some("date"), Value::String(value)) => {
+            Some(TemporalValue::FullDate(value.clone()))
+        }
+        ("first_met", Some("datetime"), Value::String(value)) => {
+            Some(TemporalValue::DateTime(value.clone()))
+        }
+        ("original_year_published", Some("number"), Value::Number(value)) => value
+            .as_i64()
+            .and_then(|value| i32::try_from(value).ok())
+            .map(TemporalValue::ExactYear),
+        ("original_year_published", Some("string"), Value::String(value))
+            if valid_approximate_year(value) =>
+        {
+            Some(TemporalValue::ApproximateYear(value.clone()))
+        }
+        ("journal_entry_date", Some("date"), Value::String(value)) => {
+            Some(TemporalValue::FullDate(value.clone()))
+        }
+        _ => None,
+    }
+}
+
+fn valid_month_day(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() != 7
+        || bytes[0] != b'-'
+        || bytes[1] != b'-'
+        || bytes[4] != b'-'
+        || !bytes[2..4].iter().all(u8::is_ascii_digit)
+        || !bytes[5..7].iter().all(u8::is_ascii_digit)
+    {
+        return false;
+    }
+    let month = u32::from(bytes[2] - b'0') * 10 + u32::from(bytes[3] - b'0');
+    let day = u32::from(bytes[5] - b'0') * 10 + u32::from(bytes[6] - b'0');
+    let max_day = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        2 => 29,
+        4 | 6 | 9 | 11 => 30,
+        _ => 0,
+    };
+    max_day != 0 && day >= 1 && day <= max_day
+}
+
+fn valid_approximate_year(value: &str) -> bool {
+    let Some(year) = value
+        .strip_prefix('~')
+        .and_then(|value| value.strip_suffix(" BCE"))
+    else {
+        return false;
+    };
+    !year.is_empty() && year.as_bytes().iter().all(u8::is_ascii_digit)
+}
+
 fn check_typed_topology(
     projection: &SemanticSpaceProjection,
     failures: &mut BTreeMap<String, usize>,
@@ -716,6 +1387,434 @@ fn check_typed_topology(
     }
 }
 
+fn check_reverse_incidence(
+    projection: &SemanticSpaceProjection,
+    failures: &mut BTreeMap<String, usize>,
+    violations: &mut Vec<String>,
+) {
+    let mut bump = |message: String| {
+        *failures.entry("reverse_incidence".into()).or_default() += 1;
+        violations.push(message);
+    };
+    let same = |left: &[String], right: Vec<String>| {
+        let mut left = left.to_vec();
+        let mut right = right;
+        left.sort();
+        right.sort();
+        left == right
+    };
+    for object in &projection.objects {
+        let regions = projection
+            .regions
+            .iter()
+            .filter(|region| region.address.object_id == object.object_id)
+            .map(|region| region_key(&region.address))
+            .collect::<Vec<_>>();
+        let actual = object
+            .region_addresses
+            .iter()
+            .map(region_key)
+            .collect::<Vec<_>>();
+        if !same(&actual, regions) {
+            bump(format!(
+                "object-region incidence mismatch: {}",
+                object.object_id
+            ));
+        }
+        let units = projection
+            .units
+            .iter()
+            .filter(|unit| unit.parent_object_id == object.object_id)
+            .map(|unit| unit.unit_id.to_string())
+            .collect::<Vec<_>>();
+        let actual = object
+            .unit_ids
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        if !same(&actual, units) {
+            bump(format!(
+                "object-unit incidence mismatch: {}",
+                object.object_id
+            ));
+        }
+        let assignments = projection
+            .identifier_assignments
+            .iter()
+            .filter(|assignment| {
+                assignment.subject == SemanticAddress::Object(object.object_id.clone())
+            })
+            .map(|assignment| assignment.assignment_id.clone())
+            .collect::<Vec<_>>();
+        if !same(&object.identifier_assignment_ids, assignments) {
+            bump(format!(
+                "object-assignment incidence mismatch: {}",
+                object.object_id
+            ));
+        }
+        let anchors = projection
+            .temporal_anchors
+            .iter()
+            .filter(|anchor| anchor.subject == SemanticAddress::Object(object.object_id.clone()))
+            .map(|anchor| anchor.anchor_id.to_string())
+            .collect::<Vec<_>>();
+        let actual = object
+            .temporal_anchor_ids
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        if !same(&actual, anchors) {
+            bump(format!(
+                "object-anchor incidence mismatch: {}",
+                object.object_id
+            ));
+        }
+    }
+    for region in &projection.regions {
+        let units = projection
+            .units
+            .iter()
+            .filter(|unit| unit.parent_region_address == region.address)
+            .map(|unit| unit.unit_id.to_string())
+            .collect::<Vec<_>>();
+        let actual = region
+            .contained_unit_ids
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        if !same(&actual, units) {
+            bump(format!(
+                "region-unit incidence mismatch: {}",
+                region.address.authored_structural_address
+            ));
+        }
+    }
+    for unit in &projection.units {
+        let incoming = projection
+            .occurrences
+            .iter()
+            .filter(|occurrence| {
+                occurrence.resolved_target == Some(SemanticAddress::Unit(unit.unit_id.clone()))
+            })
+            .map(|occurrence| occurrence.occurrence_id.to_string())
+            .collect::<Vec<_>>();
+        let actual = unit
+            .incoming_occurrence_ids
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        if !same(&actual, incoming) {
+            bump(format!(
+                "unit incoming incidence mismatch: {}",
+                unit.unit_id
+            ));
+        }
+    }
+}
+
+fn independent_contract_closure(
+    projection: &SemanticSpaceProjection,
+    admitted_notes: &[&Value],
+    failures: &mut BTreeMap<String, usize>,
+    violations: &mut Vec<String>,
+) {
+    let mut bump = |domain: &str, message: String| {
+        *failures.entry(domain.into()).or_default() += 1;
+        violations.push(message);
+    };
+    let mut expected_assignments = BTreeMap::new();
+    let mut expected_anchors = BTreeMap::new();
+    let mut expected_region_keys = BTreeSet::new();
+    let mut expected_unit_keys = BTreeSet::new();
+    let mut expected_classes = BTreeMap::<String, BTreeSet<String>>::new();
+    for note in admitted_notes {
+        let Ok(object_id) = object_id_from_markdown(note) else {
+            continue;
+        };
+        let Some(source) = note.get("source") else {
+            continue;
+        };
+        let Some(path) = text(source, "relative_path") else {
+            continue;
+        };
+        let regions = match expected_regions(&object_id, note, &path) {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        expected_region_keys.extend(regions.iter().map(|region| region_key(&region.address)));
+        if let Ok(units) = expected_units(&object_id, note, &path, &regions) {
+            expected_unit_keys.extend(units.iter().map(|unit| unit.id.clone()));
+        }
+        let class = note
+            .get("frontmatter")
+            .and_then(|frontmatter| frontmatter.get("values"))
+            .and_then(|values| values.get("note_type"))
+            .and_then(Value::as_str)
+            .unwrap_or("admitted_markdown")
+            .to_owned();
+        expected_classes.insert(class.clone(), independent_class_fields(&class));
+        let values = note
+            .get("frontmatter")
+            .and_then(|frontmatter| frontmatter.get("values"));
+        if let Some(values) = values.and_then(Value::as_object) {
+            for (name, raw) in values {
+                if EXCLUDED_FIELDS.contains(&name.as_str()) {
+                    continue;
+                }
+                let assignment_id = format!("assignment:{object_id}:{name}");
+                expected_assignments.insert(
+                    assignment_id.clone(),
+                    (
+                        name.clone(),
+                        SemanticAddress::Object(object_id.clone()),
+                        raw.clone(),
+                        independent_typed_value(raw),
+                        RecordProvenance::ObjectField {
+                            object_id: object_id.clone(),
+                            field_path: name.clone(),
+                        },
+                    ),
+                );
+                if [
+                    "birthday",
+                    "first_met",
+                    "original_year_published",
+                    "journal_entry_date",
+                ]
+                .contains(&name.as_str())
+                {
+                    let shape = note
+                        .get("frontmatter")
+                        .and_then(|frontmatter| frontmatter.get("value_shapes"))
+                        .and_then(|shapes| shapes.get(name))
+                        .and_then(Value::as_str);
+                    if let Some(value) = independent_temporal_value(name, raw, shape) {
+                        let anchor_id = format!("anchor:{object_id}:{name}");
+                        expected_anchors.insert(
+                            anchor_id,
+                            (
+                                SemanticAddress::Object(object_id.clone()),
+                                value,
+                                RecordProvenance::ObjectField {
+                                    object_id: object_id.clone(),
+                                    field_path: name.clone(),
+                                },
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    }
+    let actual_assignment_ids: BTreeSet<_> = projection
+        .identifier_assignments
+        .iter()
+        .map(|assignment| assignment.assignment_id.clone())
+        .collect();
+    let expected_assignment_ids: BTreeSet<_> = expected_assignments.keys().cloned().collect();
+    for id in expected_assignment_ids.difference(&actual_assignment_ids) {
+        bump("identifier", format!("missing accepted assignment: {id}"));
+    }
+    for id in actual_assignment_ids.difference(&expected_assignment_ids) {
+        bump("identifier", format!("invented assignment: {id}"));
+    }
+    for assignment in &projection.identifier_assignments {
+        let Some((name, subject, raw, typed, provenance)) =
+            expected_assignments.get(&assignment.assignment_id)
+        else {
+            continue;
+        };
+        if assignment.identifier_name != *name
+            || assignment.subject != *subject
+            || (!raw.is_null() && assignment.authored_raw_value.as_ref() != Some(raw))
+        {
+            bump(
+                "identifier",
+                format!(
+                    "assignment factual correspondence mismatch: {}",
+                    assignment.assignment_id
+                ),
+            );
+        }
+        match typed {
+            Ok(expected) if assignment.value != *expected => bump(
+                "identifier",
+                format!(
+                    "canonical typed value mismatch: {}",
+                    assignment.assignment_id
+                ),
+            ),
+            Err(_) => bump(
+                "identifier",
+                format!(
+                    "accepted value could not be typed: {}",
+                    assignment.assignment_id
+                ),
+            ),
+            _ => {}
+        }
+        if assignment.provenance != *provenance {
+            bump(
+                "provenance",
+                format!(
+                    "assignment provenance mismatch: {}",
+                    assignment.assignment_id
+                ),
+            );
+        }
+    }
+    let expected_descriptor_names: BTreeSet<_> = IDENTIFIER_FIELDS
+        .iter()
+        .map(|name| (*name).to_owned())
+        .collect();
+    let actual_descriptor_names: BTreeSet<_> = projection
+        .identifier_descriptors
+        .iter()
+        .map(|descriptor| descriptor.identifier_name.clone())
+        .collect();
+    for name in expected_descriptor_names.difference(&actual_descriptor_names) {
+        bump(
+            "identifier",
+            format!("missing identifier descriptor: {name}"),
+        );
+    }
+    for name in actual_descriptor_names.difference(&expected_descriptor_names) {
+        bump(
+            "identifier",
+            format!("invented identifier descriptor: {name}"),
+        );
+    }
+    let expected_assignment_records: Vec<_> = expected_assignments
+        .values()
+        .filter_map(|(name, subject, raw, typed, provenance)| {
+            typed.as_ref().ok().map(|value| IdentifierAssignment {
+                assignment_id: String::new(),
+                identifier_name: name.clone(),
+                subject: subject.clone(),
+                value: value.clone(),
+                authored_raw_value: Some(raw.clone()),
+                provenance: provenance.clone(),
+            })
+        })
+        .collect();
+    for descriptor in &projection.identifier_descriptors {
+        if !expected_descriptor_names.contains(&descriptor.identifier_name) {
+            continue;
+        }
+        let expected =
+            independent_descriptor(&descriptor.identifier_name, &expected_assignment_records);
+        if descriptor != &expected {
+            bump(
+                "identifier",
+                format!("descriptor field mismatch: {}", descriptor.identifier_name),
+            );
+        }
+    }
+    let expected_classes: BTreeMap<_, _> = expected_classes;
+    let actual_classes: BTreeMap<_, _> = projection
+        .object_classes
+        .iter()
+        .map(|class| {
+            (
+                class.class_name.clone(),
+                class
+                    .applicable_identifier_names
+                    .iter()
+                    .cloned()
+                    .collect::<BTreeSet<_>>(),
+            )
+        })
+        .collect();
+    if expected_classes.keys().collect::<BTreeSet<_>>()
+        != actual_classes.keys().collect::<BTreeSet<_>>()
+    {
+        bump("object", "object-class descriptor set mismatch".into());
+    }
+    for (class_name, fields) in &expected_classes {
+        let actual = projection
+            .object_classes
+            .iter()
+            .find(|class| class.class_name == *class_name);
+        if actual.is_none_or(|class| {
+            class
+                .applicable_identifier_names
+                .iter()
+                .cloned()
+                .collect::<BTreeSet<_>>()
+                != *fields
+                || class.permitted_source_kinds != vec![crate::projection::SourceKind::Markdown]
+        }) {
+            bump(
+                "object",
+                format!("object-class descriptor mismatch: {class_name}"),
+            );
+        }
+    }
+    let actual_region_ids: BTreeSet<_> = projection
+        .regions
+        .iter()
+        .map(|region| region_key(&region.address))
+        .collect();
+    for address in expected_region_keys.difference(&actual_region_ids) {
+        bump("region", format!("missing expected region: {address}"));
+    }
+    for address in actual_region_ids.difference(&expected_region_keys) {
+        bump("region", format!("invented region: {address}"));
+    }
+    let actual_unit_ids: BTreeSet<_> = projection
+        .units
+        .iter()
+        .map(|unit| unit.unit_id.to_string())
+        .collect();
+    for id in expected_unit_keys.difference(&actual_unit_ids) {
+        bump("unit", format!("missing expected unit: {id}"));
+    }
+    for id in actual_unit_ids.difference(&expected_unit_keys) {
+        bump("unit", format!("invented unit: {id}"));
+    }
+    if projection.retrieval_surfaces != independent_surfaces() {
+        bump(
+            "surface",
+            "retrieval-surface descriptor correspondence mismatch".into(),
+        );
+    }
+    if projection.valid_transitions != independent_transitions() {
+        bump(
+            "surface",
+            "structural-transition correspondence mismatch".into(),
+        );
+    }
+    let actual_anchor_ids: BTreeSet<_> = projection
+        .temporal_anchors
+        .iter()
+        .map(|anchor| anchor.anchor_id.to_string())
+        .collect();
+    let expected_anchor_ids: BTreeSet<_> = expected_anchors.keys().cloned().collect();
+    for id in expected_anchor_ids.difference(&actual_anchor_ids) {
+        bump("temporal", format!("missing temporal anchor: {id}"));
+    }
+    for id in actual_anchor_ids.difference(&expected_anchor_ids) {
+        bump("temporal", format!("invented temporal anchor: {id}"));
+    }
+    for anchor in &projection.temporal_anchors {
+        let Some((subject, value, provenance)) =
+            expected_anchors.get(&anchor.anchor_id.to_string())
+        else {
+            continue;
+        };
+        if anchor.subject != *subject || anchor.value != *value || anchor.provenance != *provenance
+        {
+            bump(
+                "temporal",
+                format!(
+                    "temporal anchor correspondence mismatch: {}",
+                    anchor.anchor_id
+                ),
+            );
+        }
+    }
+}
+
 fn compare_observation(
     projection: &SemanticSpaceProjection,
     root: &Value,
@@ -776,6 +1875,11 @@ fn compare_observation(
         .filter_map(|note| text(note.get("source").unwrap_or(&Value::Null), "relative_path"))
         .collect();
     let mut objects_by_id = HashMap::new();
+    let objects_by_path: HashMap<_, _> = projection
+        .objects
+        .iter()
+        .map(|object| (object.canonical_path.clone(), object.object_id.clone()))
+        .collect();
     let mut regions_by_address = HashMap::new();
     let mut units_by_id = HashMap::new();
     let mut occurrence_ids = HashSet::new();
@@ -977,6 +2081,94 @@ fn compare_observation(
                     format!("occurrence target text mismatch: {oid}"),
                 );
             }
+            let expected_span = span(link.get("source_span").unwrap_or(&Value::Null), &path);
+            if observed.source_span != expected_span {
+                bump(
+                    "provenance",
+                    format!("occurrence source span mismatch: {oid}"),
+                );
+            }
+            let expected_presentation = if link
+                .get("embedded")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            {
+                crate::projection::OccurrencePresentation::Embed
+            } else {
+                crate::projection::OccurrencePresentation::Link
+            };
+            if observed.presentation_mode != expected_presentation
+                || observed.direction != crate::model::Direction::Outgoing
+                || observed.display_alias != text(&link, "display_alias")
+            {
+                bump(
+                    "occurrence",
+                    format!("occurrence authored surface mismatch: {oid}"),
+                );
+            }
+            let link_start = expected_span
+                .as_ref()
+                .and_then(|source_span| source_span.start_byte);
+            let expected_source = if text(&link, "source_surface").as_deref() == Some("frontmatter")
+            {
+                Some(OccurrenceSource::ObjectField {
+                    object_id: id.clone(),
+                    field_path: text(&link, "frontmatter_key_path").unwrap_or_default(),
+                })
+            } else if let Some(start) = link_start {
+                array(note, "headings")
+                    .iter()
+                    .enumerate()
+                    .find(|(_, heading)| {
+                        heading
+                            .get("source_span")
+                            .and_then(Value::as_array)
+                            .is_some_and(|span| {
+                                span.first().and_then(Value::as_u64).unwrap_or(0) <= start
+                                    && start
+                                        < span.get(1).and_then(Value::as_u64).unwrap_or(u64::MAX)
+                            })
+                    })
+                    .and_then(|(index, _)| expected_regions.get(index + 1))
+                    .map(|region| OccurrenceSource::SemanticRegion {
+                        region_address: region.address.clone(),
+                    })
+                    .or_else(|| {
+                        expected_units
+                            .iter()
+                            .find(|unit| {
+                                unit.span.as_ref().is_some_and(|source_span| {
+                                    source_span.start_byte.unwrap_or(0) <= start
+                                        && start < source_span.end_byte.unwrap_or(u64::MAX)
+                                })
+                            })
+                            .map(|unit| OccurrenceSource::SemanticUnit {
+                                unit_id: SemanticUnitId::parse(unit.id.clone())
+                                    .expect("expected unit identity"),
+                            })
+                            .or_else(|| {
+                                expected_regions
+                                    .iter()
+                                    .find(|region| {
+                                        region.span.as_ref().is_some_and(|source_span| {
+                                            source_span.start_byte.unwrap_or(0) <= start
+                                                && start < source_span.end_byte.unwrap_or(u64::MAX)
+                                        })
+                                    })
+                                    .map(|region| OccurrenceSource::SemanticRegion {
+                                        region_address: region.address.clone(),
+                                    })
+                            })
+                    })
+            } else {
+                None
+            };
+            if expected_source.is_some_and(|source| observed.source != source) {
+                bump(
+                    "occurrence",
+                    format!("occurrence source attribution mismatch: {oid}"),
+                );
+            }
             let candidates: Vec<String> = array(
                 link.get("target_candidates").unwrap_or(&Value::Null),
                 "candidate_source_paths",
@@ -996,11 +2188,18 @@ fn compare_observation(
                     1 => OccurrenceResolutionState::Resolved,
                     0 => OccurrenceResolutionState::Unresolved,
                     _ => OccurrenceResolutionState::Ambiguous {
-                        candidate_source_paths: candidates,
+                        candidate_source_paths: candidates.clone(),
                     },
                 };
                 if observed.resolution_state != expected_state {
                     bump("target", format!("occurrence resolution mismatch: {oid}"));
+                }
+                let expected_target = candidates
+                    .first()
+                    .and_then(|candidate| objects_by_path.get(candidate))
+                    .map(|object_id| SemanticAddress::Object(object_id.clone()));
+                if observed.resolved_target != expected_target {
+                    bump("target", format!("occurrence exact target mismatch: {oid}"));
                 }
             }
         }
@@ -1115,6 +2314,7 @@ fn compare_observation(
             })
             .count(),
     );
+    independent_contract_closure(projection, &admitted_notes, failures, violations);
     counts
 }
 
@@ -1175,6 +2375,7 @@ pub fn validate(
     let mut violations = Vec::new();
     let counts = compare_observation(&projection, &root, &mut failures, &mut violations);
     check_typed_topology(&projection, &mut failures, &mut violations);
+    check_reverse_incidence(&projection, &mut failures, &mut violations);
     let expected_descriptors: BTreeSet<_> =
         IDENTIFIER_FIELDS.iter().map(|s| s.to_string()).collect();
     let actual_descriptors: BTreeSet<_> = projection
@@ -1357,6 +2558,33 @@ mod tests {
         failures.get(domain).copied().unwrap_or_default() > 0
     }
 
+    fn minimal_observation(frontmatter: Value) -> Value {
+        serde_json::json!({
+            "markdown_observations": [{
+                "source": {"relative_path": "note.md", "basename": "note.md"},
+                "uuid": {"parsed_value": "019dcf5c-ded1-70df-ab68-c25bbc4e8eb1"},
+                "frontmatter": {"values": frontmatter, "value_shapes": {}},
+                "headings": [], "block_candidates": [], "authored_links": []
+            }]
+        })
+    }
+
+    fn correspondence_failures(
+        projection: &SemanticSpaceProjection,
+        observation: &Value,
+    ) -> BTreeMap<String, usize> {
+        let notes = observation
+            .get("markdown_observations")
+            .and_then(Value::as_array)
+            .unwrap()
+            .iter()
+            .collect::<Vec<_>>();
+        let mut failures = BTreeMap::new();
+        let mut violations = Vec::new();
+        independent_contract_closure(projection, &notes, &mut failures, &mut violations);
+        failures
+    }
+
     #[test]
     fn detects_missing_or_duplicate_object_identity() {
         let mut p = base_projection();
@@ -1448,6 +2676,90 @@ mod tests {
         assert_ne!(
             independent_unit_id(&id, "root", 1, None),
             independent_unit_id(&id, "root", 1, Some("x"))
+        );
+    }
+
+    #[test]
+    fn correspondence_rejects_invented_region_and_unit() {
+        let observation = minimal_observation(Value::Object(serde_json::Map::new()));
+        let mut base = base_projection();
+        base.objects[0].object_class = "admitted_markdown".into();
+        base.objects[0].unit_ids.clear();
+        base.regions[0].contained_unit_ids.clear();
+        base.units.clear();
+        let baseline = correspondence_failures(&base, &observation);
+        let mut extra_region = base.clone();
+        extra_region.regions.push(extra_region.regions[0].clone());
+        extra_region.regions[1].address.authored_structural_address = "root/1:invented".into();
+        assert!(
+            correspondence_failures(&extra_region, &observation)
+                .get("region")
+                .unwrap_or(&0)
+                > baseline.get("region").unwrap_or(&0)
+        );
+        let mut extra_unit = base;
+        let unit = SemanticUnitId::parse("unit-extra").unwrap();
+        extra_unit
+            .units
+            .push(crate::projection::SemanticUnitRecord {
+                unit_id: unit.clone(),
+                parent_object_id: extra_unit.objects[0].object_id.clone(),
+                parent_region_address: extra_unit.regions[0].address.clone(),
+                authored_block_type: AuthoredBlockType::Paragraph,
+                heading_path: vec![],
+                block_ordinal: 1,
+                explicit_block_id: None,
+                content: SemanticUnitContent::Inline {
+                    authored_markdown: "x".into(),
+                    normalized_text: "x".into(),
+                },
+                inherited_identifier_assignment_ids: vec![],
+                unit_local_identifier_assignment_ids: vec![],
+                outgoing_occurrence_ids: vec![],
+                incoming_occurrence_ids: vec![],
+                temporal_anchor_ids: vec![],
+                retrieval_surface_ids: vec![],
+                source_provenance: RecordProvenance::SemanticUnit {
+                    unit_id: unit,
+                    source_span: None,
+                },
+                transport_segments: vec![],
+            });
+        assert!(
+            correspondence_failures(&extra_unit, &observation)
+                .get("unit")
+                .unwrap_or(&0)
+                > baseline.get("unit").unwrap_or(&0)
+        );
+    }
+
+    #[test]
+    fn correspondence_rejects_canonical_assignment_value_mutation() {
+        let object_id = base_projection().objects[0].object_id.clone();
+        let observation = minimal_observation(serde_json::json!({"layer": "1"}));
+        let mut projection = base_projection();
+        projection.objects[0].object_class = "admitted_markdown".into();
+        projection.objects[0].unit_ids.clear();
+        projection.regions[0].contained_unit_ids.clear();
+        projection.units.clear();
+        projection.identifier_assignments = vec![IdentifierAssignment {
+            assignment_id: format!("assignment:{object_id}:layer"),
+            identifier_name: "layer".into(),
+            subject: SemanticAddress::Object(object_id.clone()),
+            value: IdentifierValue::String("1".into()),
+            authored_raw_value: Some(Value::String("1".into())),
+            provenance: RecordProvenance::ObjectField {
+                object_id,
+                field_path: "layer".into(),
+            },
+        }];
+        let baseline = correspondence_failures(&projection, &observation);
+        projection.identifier_assignments[0].value = IdentifierValue::String("wrong".into());
+        assert!(
+            correspondence_failures(&projection, &observation)
+                .get("identifier")
+                .unwrap_or(&0)
+                > baseline.get("identifier").unwrap_or(&0)
         );
     }
 }

@@ -85,11 +85,20 @@ Each domain completed with zero deterministic structural violations:
 
 The validator derives admitted source membership, object correspondence,
 heading-region topology, authored block units, identifier assignments,
-authored occurrence identities and resolution states, and field-specific
-temporal anchors directly from the exact v3 observation. Typed checks then
+authored occurrence identities, exact occurrence source/target correspondence,
+and field-specific temporal anchors directly from the exact v3 observation.
+Expected and projected region, unit, assignment, descriptor, class, surface,
+transition, and anchor sets are checked in both directions. Typed checks then
 close canonical references, forward/reverse incidence, capabilities, bounds,
 provenance, and subordinate transport records. It does not call the Phase 5
 constructor or Phase 5 high-level closure helper as an oracle.
+
+The completeness correction added correspondence-path falsification coverage
+for invented regions and units and canonical assignment-value corruption, in
+addition to the existing identity, parent, exclusion, target, incidence,
+surface-bound, transition-reference, and deterministic-promotion cases. The
+production byte-hash pinning remains at the file boundary; synthetic tests use
+the same pure correspondence machinery after parsing.
 
 ## Determinism
 
