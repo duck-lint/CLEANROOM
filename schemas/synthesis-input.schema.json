@@ -3638,7 +3638,7 @@
             "precision": {
               "type": "string",
               "enum": [
-                "date"
+                "full_date"
               ]
             },
             "value": {
@@ -3668,7 +3668,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Calendar year.",
+          "description": "Exact calendar year.",
           "type": "object",
           "required": [
             "precision",
@@ -3678,7 +3678,7 @@
             "precision": {
               "type": "string",
               "enum": [
-                "year"
+                "exact_year"
               ]
             },
             "value": {
@@ -3689,7 +3689,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Relative or source-defined ordinal.",
+          "description": "Month and day without a year, in canonical `--MM-DD` form.",
           "type": "object",
           "required": [
             "precision",
@@ -3699,18 +3699,17 @@
             "precision": {
               "type": "string",
               "enum": [
-                "ordinal"
+                "month_day"
               ]
             },
             "value": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string"
             }
           },
           "additionalProperties": false
         },
         {
-          "description": "Named temporal label when no stronger syntax is admitted.",
+          "description": "Authored approximate year, in canonical `~<year> BCE` form.",
           "type": "object",
           "required": [
             "precision",
@@ -3720,7 +3719,7 @@
             "precision": {
               "type": "string",
               "enum": [
-                "label"
+                "approximate_year"
               ]
             },
             "value": {

@@ -1124,6 +1124,17 @@
             }
           ]
         },
+        "resolution_state": {
+          "description": "Factual authored-target resolution state. `resolved_target` is retained as the unique-target convenience field; this state prevents unresolved and ambiguous links from collapsing into the same representation.",
+          "default": {
+            "state": "unresolved"
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/OccurrenceResolutionState"
+            }
+          ]
+        },
         "resolved_target": {
           "description": "Canonical object, region, or unit target when factual resolution exists.\n\n`None` is an explicit unresolved authored state; it is not permission to infer a target from text, embeddings, or a filename heuristic.",
           "anyOf": [
@@ -1156,6 +1167,66 @@
         }
       },
       "additionalProperties": false
+    },
+    "OccurrenceResolutionState": {
+      "description": "Mechanical authored-target resolution result.",
+      "oneOf": [
+        {
+          "description": "No canonical candidate was observed.",
+          "type": "object",
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "unresolved"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Exactly one canonical candidate was observed and selected.",
+          "type": "object",
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "resolved"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "More than one canonical candidate was observed; no ranking occurred.",
+          "type": "object",
+          "required": [
+            "candidate_source_paths",
+            "state"
+          ],
+          "properties": {
+            "candidate_source_paths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "ambiguous"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "OccurrenceSource": {
       "description": "Authored source surface of one occurrence.\n\nIt distinguishes object-field, semantic-region marker, and semantic-unit body contexts and cannot transfer identifiers between source and target.",
@@ -2479,7 +2550,7 @@
             "precision": {
               "type": "string",
               "enum": [
-                "date"
+                "full_date"
               ]
             },
             "value": {
@@ -2509,7 +2580,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Calendar year.",
+          "description": "Exact calendar year.",
           "type": "object",
           "required": [
             "precision",
@@ -2519,7 +2590,7 @@
             "precision": {
               "type": "string",
               "enum": [
-                "year"
+                "exact_year"
               ]
             },
             "value": {
@@ -2530,7 +2601,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Relative or source-defined ordinal.",
+          "description": "Month and day without a year, in canonical `--MM-DD` form.",
           "type": "object",
           "required": [
             "precision",
@@ -2540,18 +2611,17 @@
             "precision": {
               "type": "string",
               "enum": [
-                "ordinal"
+                "month_day"
               ]
             },
             "value": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string"
             }
           },
           "additionalProperties": false
         },
         {
-          "description": "Named temporal label when no stronger syntax is admitted.",
+          "description": "Authored approximate year, in canonical `~<year> BCE` form.",
           "type": "object",
           "required": [
             "precision",
@@ -2561,7 +2631,7 @@
             "precision": {
               "type": "string",
               "enum": [
-                "label"
+                "approximate_year"
               ]
             },
             "value": {

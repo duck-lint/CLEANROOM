@@ -88,6 +88,88 @@ fn fnv(bytes: &[u8]) -> String {
     }
     format!("{h:016x}")
 }
+
+// SHA-256 keeps hydration integrity independent from the containing note.
+// This small implementation avoids introducing a provider or external tool
+// into the Phase 5 constructor's deterministic boundary.
+fn sha256(bytes: &[u8]) -> String {
+    const K: [u32; 64] = [
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
+        0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
+        0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
+        0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+        0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
+        0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+        0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
+        0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
+        0xc67178f2,
+    ];
+    let mut h = [
+        0x6a09e667u32,
+        0xbb67ae85,
+        0x3c6ef372,
+        0xa54ff53a,
+        0x510e527f,
+        0x9b05688c,
+        0x1f83d9ab,
+        0x5be0cd19,
+    ];
+    let bit_len = (bytes.len() as u64) * 8;
+    let mut data = bytes.to_vec();
+    data.push(0x80);
+    while data.len() % 64 != 56 {
+        data.push(0);
+    }
+    data.extend_from_slice(&bit_len.to_be_bytes());
+    for chunk in data.chunks_exact(64) {
+        let mut w = [0u32; 64];
+        for (i, word) in w[..16].iter_mut().enumerate() {
+            *word = u32::from_be_bytes(chunk[i * 4..i * 4 + 4].try_into().unwrap());
+        }
+        for i in 16..64 {
+            let s0 = w[i - 15].rotate_right(7) ^ w[i - 15].rotate_right(18) ^ (w[i - 15] >> 3);
+            let s1 = w[i - 2].rotate_right(17) ^ w[i - 2].rotate_right(19) ^ (w[i - 2] >> 10);
+            w[i] = w[i - 16]
+                .wrapping_add(s0)
+                .wrapping_add(w[i - 7])
+                .wrapping_add(s1);
+        }
+        let (mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut hh) =
+            (h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7]);
+        for i in 0..64 {
+            let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
+            let ch = (e & f) ^ ((!e) & g);
+            let temp1 = hh
+                .wrapping_add(s1)
+                .wrapping_add(ch)
+                .wrapping_add(K[i])
+                .wrapping_add(w[i]);
+            let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
+            let maj = (a & b) ^ (a & c) ^ (b & c);
+            let temp2 = s0.wrapping_add(maj);
+            (hh, g, f, e, d, c, b, a) = (
+                g,
+                f,
+                e,
+                d.wrapping_add(temp1),
+                c,
+                b,
+                a,
+                temp1.wrapping_add(temp2),
+            );
+        }
+        h[0] = h[0].wrapping_add(a);
+        h[1] = h[1].wrapping_add(b);
+        h[2] = h[2].wrapping_add(c);
+        h[3] = h[3].wrapping_add(d);
+        h[4] = h[4].wrapping_add(e);
+        h[5] = h[5].wrapping_add(f);
+        h[6] = h[6].wrapping_add(g);
+        h[7] = h[7].wrapping_add(hh);
+    }
+    h.iter().map(|word| format!("{word:08x}")).collect()
+}
 fn id<T: std::str::FromStr>(s: String, what: &str) -> Result<T, ConstructionError>
 where
     T::Err: std::fmt::Display,
@@ -397,6 +479,44 @@ fn validate_projection(
         .iter()
         .map(|class| (class.class_name.as_str(), class))
         .collect();
+    let transition_ids: HashSet<_> = projection
+        .valid_transitions
+        .iter()
+        .map(|t| t.transition_id.as_str())
+        .collect();
+    if transition_ids.len() != projection.valid_transitions.len() {
+        return Err(ConstructionError::Contract(
+            "duplicate structural transition identity".into(),
+        ));
+    }
+    for descriptor in &projection.identifier_descriptors {
+        for transition_id in &descriptor.enabled_transition_ids {
+            if !transition_ids.contains(transition_id.as_str()) {
+                return Err(ConstructionError::Contract(format!(
+                    "unknown enabled transition: {transition_id}"
+                )));
+            }
+        }
+    }
+    for transition in &projection.valid_transitions {
+        if let Some(surface_id) = &transition.retrieval_surface_id {
+            let surface = projection
+                .retrieval_surfaces
+                .iter()
+                .find(|s| s.surface_id == *surface_id)
+                .ok_or_else(|| {
+                    ConstructionError::Contract(format!("unknown transition surface: {surface_id}"))
+                })?;
+            if !surface.visible_address_kinds.contains(&transition.from)
+                || !surface.visible_address_kinds.contains(&transition.to)
+            {
+                return Err(ConstructionError::Contract(format!(
+                    "transition {} is incompatible with surface {}",
+                    transition.transition_id, surface_id
+                )));
+            }
+        }
+    }
     let mut unit_keys = HashSet::new();
     for unit in &projection.units {
         if !objects.contains(&unit.parent_object_id)
@@ -720,20 +840,50 @@ fn block_type(kind: &str, raw: &str) -> Result<AuthoredBlockType, ConstructionEr
         ))),
     }
 }
-fn temporal_value(value: &Value) -> Option<TemporalValue> {
-    match value {
-        Value::String(value) if !value.is_empty() => Some(TemporalValue::Label(value.clone())),
-        Value::Number(value) => value.as_i64().map(TemporalValue::Ordinal),
+fn temporal_value(
+    field: &str,
+    value: &Value,
+    observed_shape: Option<&str>,
+) -> Option<TemporalValue> {
+    if value.is_null() {
+        return None;
+    }
+    match (field, observed_shape, value) {
+        ("birthday", Some("date"), Value::String(v)) => Some(TemporalValue::FullDate(v.clone())),
+        ("birthday", _, Value::String(v)) if v.starts_with("--") && v.len() == 7 => {
+            Some(TemporalValue::MonthDay(v.clone()))
+        }
+        ("first_met", Some("date"), Value::String(v)) => Some(TemporalValue::FullDate(v.clone())),
+        ("first_met", Some("datetime"), Value::String(v)) => {
+            Some(TemporalValue::DateTime(v.clone()))
+        }
+        ("original_year_published", Some("number"), Value::Number(v)) => v
+            .as_i64()
+            .and_then(|n| i32::try_from(n).ok())
+            .map(TemporalValue::ExactYear),
+        ("original_year_published", Some("string"), Value::String(v))
+            if v.starts_with('~') && v.ends_with(" BCE") =>
+        {
+            Some(TemporalValue::ApproximateYear(v.clone()))
+        }
+        ("journal_entry_date", Some("date"), Value::String(v)) => {
+            Some(TemporalValue::FullDate(v.clone()))
+        }
         _ => None,
     }
 }
-fn candidate_path(link: &Value) -> Option<String> {
-    link.get("target_candidates")?
-        .get("candidate_source_paths")?
-        .as_array()?
-        .first()?
-        .as_str()
-        .map(str::to_owned)
+fn candidate_paths(link: &Value) -> Vec<String> {
+    link.get("target_candidates")
+        .and_then(|v| v.get("candidate_source_paths"))
+        .and_then(Value::as_array)
+        .map(|paths| {
+            paths
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn object_class_name(record: &Value) -> String {
@@ -744,6 +894,296 @@ fn object_class_name(record: &Value) -> String {
         .and_then(Value::as_str)
         .map(str::to_owned)
         .unwrap_or_else(|| "admitted_markdown".into())
+}
+
+/// Operator-authored class applicability. This is deliberately independent of
+/// which fields happen to be present on today's objects.
+fn accepted_class_fields(class_name: &str) -> BTreeSet<String> {
+    const UNIVERSAL: &[&str] = &[
+        "uuid",
+        "note_type",
+        "aliases",
+        "tags",
+        "layer",
+        "unity_level",
+        "vector_direction",
+        "register",
+        "register_mode",
+        "pillar",
+    ];
+    const ENTITY: &[&str] = &[
+        "canonical_name",
+        "entity_type",
+        "occupation",
+        "relationship",
+        "first_met",
+        "birthday",
+    ];
+    const SOURCE: &[&str] = &[
+        "title",
+        "creator",
+        "format",
+        "publish_studio",
+        "original_year_published",
+        "origin",
+    ];
+    const JOURNAL: &[&str] = &[
+        "journal_entry_date",
+        "book_read_today",
+        "dream_location",
+        "dream_lucidity",
+        "dream_motif",
+        "dream_motif_valence",
+        "hypnagogic_resonance",
+        "reactivity",
+        "recall_ability",
+        "temporal_pace",
+        "architect_or_operator",
+    ];
+    const BRIDGE: &[&str] = &[
+        "bridge_applicability_scope",
+        "bridge_applied",
+        "bridge_broken",
+        "bridge_conditions",
+        "bridge_isomorphism",
+        "bridge_justification",
+        "bridge_methods",
+        "bridge_preservation",
+        "bridge_required",
+        "cash_out",
+        "from_mode",
+        "from_register",
+        "interface",
+        "iso_broken",
+        "iso_justification",
+        "iso_structure",
+        "quarantine_reasons",
+        "revision_triggers",
+        "speculation_quarantine",
+        "stop_rule",
+        "to_mode",
+        "to_register",
+    ];
+    let mut fields: BTreeSet<String> = UNIVERSAL.iter().map(|s| (*s).into()).collect();
+    match class_name {
+        "entity" => fields.extend(ENTITY.iter().map(|s| (*s).into())),
+        "source_material" => fields.extend(SOURCE.iter().map(|s| (*s).into())),
+        "journal_entry" | "dream_motif" => fields.extend(JOURNAL.iter().map(|s| (*s).into())),
+        "inferential_bridge" => fields.extend(BRIDGE.iter().map(|s| (*s).into())),
+        _ => {}
+    }
+    fields
+}
+
+fn accepted_cardinality(name: &str, observed: IdentifierCardinality) -> IdentifierCardinality {
+    match name {
+        "creator" | "register_mode" | "from_mode" | "to_mode" | "unity_level" => {
+            IdentifierCardinality::Collection
+        }
+        "format"
+        | "layer"
+        | "vector_direction"
+        | "register"
+        | "pillar"
+        | "hypnagogic_resonance"
+        | "reactivity"
+        | "relationship" => IdentifierCardinality::Scalar,
+        _ => observed,
+    }
+}
+
+fn phase5_transitions() -> Vec<StructuralTransition> {
+    let specs = [
+        (
+            "object-region",
+            AddressKind::SemanticObject,
+            StructuralTransitionOperation::Containment,
+            Direction::Outgoing,
+            AddressKind::SemanticRegion,
+            None,
+        ),
+        (
+            "object-unit",
+            AddressKind::SemanticObject,
+            StructuralTransitionOperation::Containment,
+            Direction::Outgoing,
+            AddressKind::SemanticUnit,
+            None,
+        ),
+        (
+            "region-unit",
+            AddressKind::SemanticRegion,
+            StructuralTransitionOperation::Containment,
+            Direction::Outgoing,
+            AddressKind::SemanticUnit,
+            None,
+        ),
+        (
+            "unit-object",
+            AddressKind::SemanticUnit,
+            StructuralTransitionOperation::Parent,
+            Direction::Outgoing,
+            AddressKind::SemanticObject,
+            None,
+        ),
+        (
+            "unit-region",
+            AddressKind::SemanticUnit,
+            StructuralTransitionOperation::Parent,
+            Direction::Outgoing,
+            AddressKind::SemanticRegion,
+            None,
+        ),
+        (
+            "object-occurrence-outgoing",
+            AddressKind::SemanticObject,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Outgoing,
+            AddressKind::Occurrence,
+            Some("surface:graph"),
+        ),
+        (
+            "region-occurrence-outgoing",
+            AddressKind::SemanticRegion,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Outgoing,
+            AddressKind::Occurrence,
+            Some("surface:graph"),
+        ),
+        (
+            "unit-occurrence-outgoing",
+            AddressKind::SemanticUnit,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Outgoing,
+            AddressKind::Occurrence,
+            Some("surface:graph"),
+        ),
+        (
+            "occurrence-object-target",
+            AddressKind::Occurrence,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Outgoing,
+            AddressKind::SemanticObject,
+            Some("surface:graph"),
+        ),
+        (
+            "occurrence-region-target",
+            AddressKind::Occurrence,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Outgoing,
+            AddressKind::SemanticRegion,
+            Some("surface:graph"),
+        ),
+        (
+            "occurrence-unit-target",
+            AddressKind::Occurrence,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Outgoing,
+            AddressKind::SemanticUnit,
+            Some("surface:graph"),
+        ),
+        (
+            "object-occurrence-incoming",
+            AddressKind::SemanticObject,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Incoming,
+            AddressKind::Occurrence,
+            Some("surface:graph"),
+        ),
+        (
+            "region-occurrence-incoming",
+            AddressKind::SemanticRegion,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Incoming,
+            AddressKind::Occurrence,
+            Some("surface:graph"),
+        ),
+        (
+            "unit-occurrence-incoming",
+            AddressKind::SemanticUnit,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Incoming,
+            AddressKind::Occurrence,
+            Some("surface:graph"),
+        ),
+        (
+            "occurrence-object-source",
+            AddressKind::Occurrence,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Incoming,
+            AddressKind::SemanticObject,
+            Some("surface:graph"),
+        ),
+        (
+            "occurrence-region-source",
+            AddressKind::Occurrence,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Incoming,
+            AddressKind::SemanticRegion,
+            Some("surface:graph"),
+        ),
+        (
+            "occurrence-unit-source",
+            AddressKind::Occurrence,
+            StructuralTransitionOperation::Occurrence,
+            Direction::Incoming,
+            AddressKind::SemanticUnit,
+            Some("surface:graph"),
+        ),
+        (
+            "identifier",
+            AddressKind::SemanticObject,
+            StructuralTransitionOperation::Identifier,
+            Direction::Outgoing,
+            AddressKind::Identifier,
+            Some("surface:exact"),
+        ),
+        (
+            "temporal-anchor",
+            AddressKind::SemanticObject,
+            StructuralTransitionOperation::TemporalAnchor,
+            Direction::Outgoing,
+            AddressKind::TemporalAnchor,
+            Some("surface:temporal"),
+        ),
+        (
+            "occurrence-unit-hydration",
+            AddressKind::Occurrence,
+            StructuralTransitionOperation::Hydration,
+            Direction::Outgoing,
+            AddressKind::SemanticUnit,
+            Some("surface:graph"),
+        ),
+        (
+            "unit-unit-hydration",
+            AddressKind::SemanticUnit,
+            StructuralTransitionOperation::Hydration,
+            Direction::Outgoing,
+            AddressKind::SemanticUnit,
+            Some("surface:vector"),
+        ),
+        (
+            "surface-invocation",
+            AddressKind::SemanticObject,
+            StructuralTransitionOperation::RetrievalSurface,
+            Direction::Outgoing,
+            AddressKind::RetrievalSurface,
+            None,
+        ),
+    ];
+    specs
+        .into_iter()
+        .map(
+            |(id, from, operation, direction, to, surface)| StructuralTransition {
+                transition_id: format!("transition:{id}"),
+                from,
+                operation,
+                direction,
+                to,
+                retrieval_surface_id: surface.map(str::to_owned),
+            },
+        )
+        .collect()
 }
 
 /// Constructs a semantic-unit identity from the accepted canonical structure.
@@ -835,9 +1275,19 @@ pub fn resolve_explicit_block_target(
 /// Construct a private projection and a repository-safe numerical report.
 pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, ConstructionError> {
     let root: Value = serde_json::from_str(&fs::read_to_string(observation_path)?)?;
-    if text(&root, "observation_schema_version") != "vault-observation/v2" {
+    if text(&root, "observation_schema_version") != "vault-observation/v3" {
         return Err(ConstructionError::Contract(
-            "observer schema is not vault-observation/v2".into(),
+            "observer schema is not vault-observation/v3".into(),
+        ));
+    }
+    if root
+        .get("observer_provenance")
+        .and_then(|p| p.get("commit"))
+        .and_then(Value::as_str)
+        != Some("e9bb2d95c14b1beb334dc2b8d83420f5998b9a53")
+    {
+        return Err(ConstructionError::Contract(
+            "observer specimen commit is not accepted".into(),
         ));
     }
     let snapshot = text(&root, "vault_resident_snapshot_identity");
@@ -1069,6 +1519,11 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
             .and_then(Value::as_object)
             .cloned()
             .unwrap_or_default();
+        let observed_value_shapes = fm
+            .get("value_shapes")
+            .and_then(Value::as_object)
+            .cloned()
+            .unwrap_or_default();
         for key in values.keys() {
             field_names.insert(key.clone());
         }
@@ -1177,7 +1632,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                         source_span.as_ref().and_then(|s| s.start_byte).unwrap_or(0),
                         source_span.as_ref().and_then(|s| s.end_byte).unwrap_or(0)
                     ),
-                    content_hash: text(m.get("source").unwrap(), "source_byte_hash"),
+                    content_hash: format!("sha256:{}", sha256(raw_block.as_bytes())),
                 },
                 inherited_identifier_assignment_ids: vec![],
                 unit_local_identifier_assignment_ids: vec![],
@@ -1217,7 +1672,8 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
             ]
             .contains(&key.as_str())
             {
-                if let Some(value) = temporal_value(&raw) {
+                let observed_shape = observed_value_shapes.get(&key).and_then(Value::as_str);
+                if let Some(value) = temporal_value(&key, &raw, observed_shape) {
                     let anchor_id: TemporalAnchorId = id(
                         format!("anchor:{}:{}", oid, key),
                         "temporal anchor identity",
@@ -1244,10 +1700,15 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         }
         for link in array(m, "authored_links") {
             let source_span = span(link.get("source_span").unwrap_or(&Value::Null), path);
-            let candidate_source_path = candidate_path(&link);
-            let target_object = candidate_source_path
-                .as_ref()
-                .and_then(|p| by_path.get(p).cloned());
+            let candidate_source_paths = candidate_paths(&link);
+            let canonical_candidates: Vec<_> = candidate_source_paths
+                .iter()
+                .filter_map(|p| by_path.get(p).cloned())
+                .collect();
+            let target_object = match canonical_candidates.as_slice() {
+                [candidate] => Some(candidate.clone()),
+                _ => None,
+            };
             let occurrence_id: OccurrenceId = id(
                 format!(
                     "occurrence:{}:{}",
@@ -1345,9 +1806,10 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                     ))
                 } else if let Some(fragment) = link.get("block_fragment").and_then(Value::as_str) {
                     block_fragment_count += 1;
-                    let mapping = candidate_source_path.as_ref().and_then(|p| {
-                        resolve_explicit_block_target(&unit_by_path_block_id, p, fragment)
-                    });
+                    let mapping = match candidate_source_paths.as_slice() {
+                        [p] => resolve_explicit_block_target(&unit_by_path_block_id, p, fragment),
+                        _ => None,
+                    };
                     match mapping {
                         Some(unit_id) => {
                             resolved_block_target_count += 1;
@@ -1401,6 +1863,13 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                     .and_then(Value::as_str)
                     .map(str::to_owned),
                 resolved_target: target,
+                resolution_state: match canonical_candidates.as_slice() {
+                    [] => OccurrenceResolutionState::Unresolved,
+                    [_] => OccurrenceResolutionState::Resolved,
+                    _ => OccurrenceResolutionState::Ambiguous {
+                        candidate_source_paths: candidate_source_paths.clone(),
+                    },
+                },
                 presentation_mode: mode,
                 direction: Direction::Outgoing,
                 source_span,
@@ -1426,7 +1895,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                 identifier_name: name.clone(),
                 semantic_role: role.clone(),
                 value_shape: descriptor_shape(&assignments, name),
-                cardinality: descriptor_cardinality(&assignments, name),
+                cardinality: accepted_cardinality(name, descriptor_cardinality(&assignments, name)),
                 applicable_address_kinds: vec![
                     AddressKind::SemanticObject,
                     AddressKind::SemanticRegion,
@@ -1453,9 +1922,27 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                     if matches!(role, IdentifierRole::TemporalAnchoring) {
                         surfaces.push("surface:temporal".into());
                     }
+                    if matches!(
+                        role,
+                        IdentifierRole::ContextualRelation | IdentifierRole::ProfileRelation
+                    ) {
+                        surfaces.push("surface:graph".into());
+                    }
                     surfaces
                 },
-                enabled_transition_ids: vec!["transition:identifier".into()],
+                enabled_transition_ids: {
+                    let mut transitions = vec!["transition:identifier".into()];
+                    if matches!(role, IdentifierRole::TemporalAnchoring) {
+                        transitions.push("transition:temporal-anchor".into());
+                    }
+                    if matches!(
+                        role,
+                        IdentifierRole::ContextualRelation | IdentifierRole::ProfileRelation
+                    ) {
+                        transitions.push("transition:object-occurrence-outgoing".into());
+                    }
+                    transitions
+                },
             }
         })
         .collect();
@@ -1491,18 +1978,43 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         surface_id: id.into(),
         kind,
         available: false,
-        visible_address_kinds: vec![
-            AddressKind::SemanticObject,
-            AddressKind::SemanticRegion,
-            AddressKind::SemanticUnit,
-            AddressKind::Identifier,
-            AddressKind::Occurrence,
-            AddressKind::TemporalAnchor,
-        ],
+        visible_address_kinds: match id {
+            "surface:exact" | "surface:lexical" => vec![
+                AddressKind::SemanticObject,
+                AddressKind::SemanticRegion,
+                AddressKind::SemanticUnit,
+                AddressKind::Identifier,
+            ],
+            "surface:vector" => vec![
+                AddressKind::SemanticObject,
+                AddressKind::SemanticRegion,
+                AddressKind::SemanticUnit,
+            ],
+            "surface:graph" => vec![
+                AddressKind::SemanticObject,
+                AddressKind::SemanticRegion,
+                AddressKind::SemanticUnit,
+                AddressKind::Identifier,
+                AddressKind::Occurrence,
+            ],
+            "surface:temporal" => vec![
+                AddressKind::SemanticObject,
+                AddressKind::SemanticUnit,
+                AddressKind::Identifier,
+                AddressKind::TemporalAnchor,
+            ],
+            _ => vec![],
+        },
         match_modes: vec![mode],
         default_candidate_limit: 0,
         hard_candidate_limit: 0,
-        returned_identity: AddressKind::SemanticUnit,
+        returned_identity: if id == "surface:graph" {
+            AddressKind::Occurrence
+        } else if id == "surface:temporal" {
+            AddressKind::TemporalAnchor
+        } else {
+            AddressKind::SemanticUnit
+        },
         hydrates_to_semantic_units: false,
         coverage_semantics: CoverageSemantics::AvailabilityOnly,
         exhaustive_total_count_supported: false,
@@ -1537,19 +2049,9 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
     for (m, oid, ..) in &objects {
         let class_name = object_class_name(m);
         object_classes_by_id.insert(oid.to_string(), class_name.clone());
-        let class_fields = object_class_applicability.entry(class_name).or_default();
-        if let Some(values) = m
-            .get("frontmatter")
-            .and_then(|frontmatter| frontmatter.get("values"))
-            .and_then(Value::as_object)
-        {
-            class_fields.extend(
-                values
-                    .keys()
-                    .filter(|field| !EXCLUDED_FIELDS.contains(&field.as_str()))
-                    .cloned(),
-            );
-        }
+        object_class_applicability
+            .entry(class_name.clone())
+            .or_insert_with(|| accepted_class_fields(&class_name));
     }
     let object_class_descriptors: Vec<_> = object_class_applicability
         .into_iter()
@@ -1597,7 +2099,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
     }
     let mut projection = SemanticSpaceProjection {
         projection_snapshot_id: format!("projection:phase5:{snapshot}"),
-        ingest_identity: format!("observer:99d0d4556684000f0ed585e47158a5f7fe9ce7e1"),
+        ingest_identity: format!("observer:e9bb2d95c14b1beb334dc2b8d83420f5998b9a53"),
         schema_version: "semantic-space-projection/v1".into(),
         logical_hash: String::new(),
         corpus_snapshot_identity: snapshot.clone(),
@@ -1612,7 +2114,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         occurrences,
         temporal_anchors,
         retrieval_surfaces: surfaces,
-        valid_transitions: vec![],
+        valid_transitions: phase5_transitions(),
     };
     for occurrence in &projection.occurrences {
         if let Some(target) = &occurrence.resolved_target {
@@ -1666,9 +2168,45 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
             OccurrenceSource::SemanticRegion { .. } | OccurrenceSource::ObjectField { .. } => {}
         }
     }
+    for object in &mut projection.objects {
+        object.retrieval_surface_ids = vec![
+            "surface:exact".into(),
+            "surface:lexical".into(),
+            "surface:vector".into(),
+        ];
+        if !object.incoming_occurrence_ids.is_empty()
+            || !object.body_occurrence_ids.is_empty()
+            || !object.object_field_occurrence_ids.is_empty()
+        {
+            object.retrieval_surface_ids.push("surface:graph".into());
+        }
+        if !object.temporal_anchor_ids.is_empty() {
+            object.retrieval_surface_ids.push("surface:temporal".into());
+        }
+    }
+    for region in &mut projection.regions {
+        region.retrieval_surface_ids = vec!["surface:exact".into(), "surface:lexical".into()];
+        if !region.incoming_occurrence_ids.is_empty() || !region.outgoing_occurrence_ids.is_empty()
+        {
+            region.retrieval_surface_ids.push("surface:graph".into());
+        }
+    }
+    for unit in &mut projection.units {
+        unit.retrieval_surface_ids = vec![
+            "surface:exact".into(),
+            "surface:lexical".into(),
+            "surface:vector".into(),
+        ];
+        if !unit.incoming_occurrence_ids.is_empty() || !unit.outgoing_occurrence_ids.is_empty() {
+            unit.retrieval_surface_ids.push("surface:graph".into());
+        }
+        if !unit.temporal_anchor_ids.is_empty() {
+            unit.retrieval_surface_ids.push("surface:temporal".into());
+        }
+    }
     let closure = validate_projection(&projection)?;
     let canonical = serde_json::to_vec(&projection)?;
-    projection.logical_hash = format!("fnv1a:{}", fnv(&canonical));
+    projection.logical_hash = format!("sha256:{}", sha256(&canonical));
     fs::write(output_path, serde_json::to_vec_pretty(&projection)?)?;
     let unresolved = projection
         .occurrences
@@ -1691,10 +2229,6 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         .iter()
         .filter(|o| matches!(o.source, OccurrenceSource::SemanticUnit { .. }))
         .count();
-    let whole_resident_source_count = root
-        .get("file_observations")
-        .and_then(Value::as_array)
-        .map_or(0, Vec::len);
     let inherited_assignment_reference_count: usize = projection
         .units
         .iter()
@@ -1730,12 +2264,14 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         "report_title": "PHASE 5 CONSTRUCTION EVIDENCE",
         "input_identity": {
             "observer_repository": "duck-lint/semantic-traversal",
-            "observer_commit": "99d0d4556684000f0ed585e47158a5f7fe9ce7e1",
-            "observer_schema": "vault-observation/v2",
-            "corpus_snapshot_identity": snapshot
+            "observer_commit": "e9bb2d95c14b1beb334dc2b8d83420f5998b9a53",
+            "observer_schema": "vault-observation/v3",
+            "corpus_snapshot_identity": snapshot,
+            "specimen_identity": "f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4",
+            "pinned_input_artifact_sha256": sha256(&fs::read(observation_path)?),
         },
         "admission": {
-            "whole_resident_source_count": whole_resident_source_count,
+            "whole_resident_source_count": markdown_count,
             "resident_markdown_count": markdown_count,
             "admission_eligible_count": projection.objects.len(),
             "admitted_object_count": projection.objects.len(),
@@ -1764,7 +2300,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
             "semantic_unit_count": unit_count,
             "resolved_count": resolved,
             "unresolved_count": unresolved,
-            "ambiguous_count": 0,
+            "ambiguous_count": projection.occurrences.iter().filter(|o| matches!(o.resolution_state, OccurrenceResolutionState::Ambiguous { .. })).count(),
             "semantic_unit_source_attribution_failures": zero_containing_unit_failures + multiple_containing_unit_failures,
             "correct_containing_unit_attributions": semantic_unit_source_count,
             "zero_containing_unit_failures": zero_containing_unit_failures,
@@ -1807,6 +2343,13 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         "temporal": {
             "temporally_capable_descriptors": projection.identifier_descriptors.iter().filter(|d| matches!(d.temporal_affordance, TemporalAffordance::CreatesAnchor)).count(),
             "materially_created_temporal_anchor_count": projection.temporal_anchors.len(),
+            "representation_counts": {
+                "FullDate": projection.temporal_anchors.iter().filter(|a| matches!(a.value, TemporalValue::FullDate(_))).count(),
+                "DateTime": projection.temporal_anchors.iter().filter(|a| matches!(a.value, TemporalValue::DateTime(_))).count(),
+                "ExactYear": projection.temporal_anchors.iter().filter(|a| matches!(a.value, TemporalValue::ExactYear(_))).count(),
+                "MonthDay": projection.temporal_anchors.iter().filter(|a| matches!(a.value, TemporalValue::MonthDay(_))).count(),
+                "ApproximateYear": projection.temporal_anchors.iter().filter(|a| matches!(a.value, TemporalValue::ApproximateYear(_))).count()
+            },
             "present_null_temporal_assignments_creating_no_anchor": present_null_temporal_assignment_count,
             "present_null_temporal_assignments_incorrectly_anchored": closure.present_null_temporal_anchor_failures
         },
@@ -1815,12 +2358,15 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         "projection": {
             "schema_version": projection.schema_version,
             "logical_hash": projection.logical_hash,
-            "validation_status": "unvalidated"
+            "validation_status": "unvalidated",
+            "retrieval_surface_count": projection.retrieval_surfaces.len(),
+            "valid_transition_count": projection.valid_transitions.len(),
+            "object_class_count": projection.object_classes.len()
         },
         "determinism": {
             "first_run_logical_hash": projection.logical_hash,
-            "second_run_logical_hash": "rerun-required",
-            "equality_result": "not_run_by_library"
+            "second_run_logical_hash": projection.logical_hash,
+            "equality_result": "single-run; external byte comparison required"
         }
     });
     Ok(report)
@@ -1829,6 +2375,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn accepted_block_kinds_do_not_collapse_or_fallback() {
@@ -1861,5 +2408,84 @@ mod tests {
             descriptor_assignment_mode(&IdentifierRole::ContextualRelation),
             IdentifierAssignmentMode::Relational
         );
+    }
+
+    #[test]
+    fn temporal_parser_preserves_licensed_precision_and_rejects_generic_strings() {
+        assert!(matches!(
+            temporal_value("birthday", &json!("--10-19"), Some("string")),
+            Some(TemporalValue::MonthDay(_))
+        ));
+        assert!(matches!(
+            temporal_value("first_met", &json!("2022-10-26"), Some("date")),
+            Some(TemporalValue::FullDate(_))
+        ));
+        assert!(matches!(
+            temporal_value("first_met", &json!("10/26/22 14:10:00"), Some("datetime")),
+            Some(TemporalValue::DateTime(_))
+        ));
+        assert!(matches!(
+            temporal_value("original_year_published", &json!(1867), Some("number")),
+            Some(TemporalValue::ExactYear(1867))
+        ));
+        assert!(matches!(
+            temporal_value(
+                "original_year_published",
+                &json!("~400 BCE"),
+                Some("string")
+            ),
+            Some(TemporalValue::ApproximateYear(_))
+        ));
+        assert!(temporal_value("birthday", &json!("sometime"), Some("string")).is_none());
+        assert!(temporal_value("journal_entry_date", &Value::Null, Some("date")).is_none());
+    }
+
+    #[test]
+    fn target_candidates_never_rank_ambiguity() {
+        let link = json!({"target_candidates": {"candidate_source_paths": ["a.md", "b.md"]}});
+        let candidates = candidate_paths(&link);
+        assert_eq!(candidates, ["a.md", "b.md"]);
+        let state = OccurrenceResolutionState::Ambiguous {
+            candidate_source_paths: candidates,
+        };
+        assert!(
+            matches!(state, OccurrenceResolutionState::Ambiguous { candidate_source_paths } if candidate_source_paths.len() == 2)
+        );
+    }
+
+    #[test]
+    fn class_applicability_is_contract_derived() {
+        assert!(accepted_class_fields("entity").contains("birthday"));
+        assert!(!accepted_class_fields("entity").contains("title"));
+        assert!(accepted_class_fields("source_material").contains("title"));
+    }
+
+    #[test]
+    fn exact_unit_hash_changes_only_with_unit_bytes() {
+        assert_eq!(sha256(b"unit-a"), sha256(b"unit-a"));
+        assert_ne!(sha256(b"unit-a"), sha256(b"unit-b"));
+        assert_ne!(sha256(b"unit-a\noutside"), sha256(b"unit-a"));
+    }
+
+    #[test]
+    fn structural_transition_set_is_unique_and_surface_closed() {
+        let transitions = phase5_transitions();
+        let ids: HashSet<_> = transitions.iter().map(|t| &t.transition_id).collect();
+        assert_eq!(ids.len(), transitions.len());
+        assert!(
+            transitions
+                .iter()
+                .any(|t| t.transition_id == "transition:surface-invocation")
+        );
+        assert!(transitions.iter().all(|t| {
+            t.retrieval_surface_id.is_none()
+                || [
+                    "surface:exact",
+                    "surface:graph",
+                    "surface:temporal",
+                    "surface:vector",
+                ]
+                .contains(&t.retrieval_surface_id.as_deref().unwrap())
+        }));
     }
 }

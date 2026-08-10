@@ -8,8 +8,8 @@ use semantic_traversal_core::{
         SourceSpan,
     },
     projection::{
-        AuthoredBlockType, OccurrencePresentation, OccurrenceRecord, OccurrenceSource,
-        SemanticRegionRecord, SemanticUnitContent, SemanticUnitRecord,
+        AuthoredBlockType, OccurrencePresentation, OccurrenceRecord, OccurrenceResolutionState,
+        OccurrenceSource, SemanticRegionRecord, SemanticUnitContent, SemanticUnitRecord,
     },
 };
 
@@ -420,6 +420,7 @@ fn downstream_contract_records_discriminate_the_selected_region() {
         authored_target_text: "#Foo".into(),
         display_alias: None,
         resolved_target: Some(SemanticAddress::Region(foo_b.clone())),
+        resolution_state: OccurrenceResolutionState::Resolved,
         presentation_mode: OccurrencePresentation::Link,
         direction: Direction::Outgoing,
         source_span: Some(heading(2, "Foo", 10).source_span.unwrap()),

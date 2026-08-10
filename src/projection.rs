@@ -527,12 +527,30 @@ pub struct OccurrenceRecord {
     /// `None` is an explicit unresolved authored state; it is not permission to
     /// infer a target from text, embeddings, or a filename heuristic.
     pub resolved_target: Option<SemanticAddress>,
+    /// Factual authored-target resolution state. `resolved_target` is retained
+    /// as the unique-target convenience field; this state prevents unresolved
+    /// and ambiguous links from collapsing into the same representation.
+    #[serde(default)]
+    pub resolution_state: OccurrenceResolutionState,
     /// Link or embed presentation mode.
     pub presentation_mode: OccurrencePresentation,
     /// Authored incidence direction.
     pub direction: Direction,
     /// Exact source span when represented.
     pub source_span: Option<SourceSpan>,
+}
+
+/// Mechanical authored-target resolution result.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]
+pub enum OccurrenceResolutionState {
+    /// No canonical candidate was observed.
+    #[default]
+    Unresolved,
+    /// Exactly one canonical candidate was observed and selected.
+    Resolved,
+    /// More than one canonical candidate was observed; no ranking occurred.
+    Ambiguous { candidate_source_paths: Vec<String> },
 }
 
 /// Authored source surface of one occurrence.
@@ -604,15 +622,15 @@ pub struct TemporalAnchorRecord {
 )]
 pub enum TemporalValue {
     /// Calendar date in ISO-like authored form.
-    Date(String),
+    FullDate(String),
     /// Date and time with an explicit offset or zone in authored form.
     DateTime(String),
-    /// Calendar year.
-    Year(i32),
-    /// Relative or source-defined ordinal.
-    Ordinal(i64),
-    /// Named temporal label when no stronger syntax is admitted.
-    Label(String),
+    /// Exact calendar year.
+    ExactYear(i32),
+    /// Month and day without a year, in canonical `--MM-DD` form.
+    MonthDay(String),
+    /// Authored approximate year, in canonical `~<year> BCE` form.
+    ApproximateYear(String),
 }
 
 /// Descriptor of one retrieval-surface capability in a frozen projection.

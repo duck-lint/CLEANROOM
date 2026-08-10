@@ -764,7 +764,7 @@ fn temporal_context_is_sourced_on_journals_and_not_directly_on_cleo() {
 
     for anchor in &projection.temporal_anchors {
         assert!(
-            matches!(&anchor.value, TemporalValue::Date(value) if value.starts_with("2026-07-"))
+            matches!(&anchor.value, TemporalValue::FullDate(value) if value.starts_with("2026-07-"))
         );
         assert!(
             matches!(&anchor.provenance, RecordProvenance::ObjectField { field_path, .. } if field_path == "journal_entry_date")
