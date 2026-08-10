@@ -192,14 +192,47 @@ A clean projection should describe at least the following roles:
 
 A field descriptor must state its role and applicability. Treating every field as an interchangeable searchable scalar would erase the Organon’s typing discipline.
 
-### 4.1 Admitted-field registry — accepted operator classifications for the accepted specimen
+### 4.1 Admitted-field registry — accepted operator classifications for the current corpus boundary
 
 The whole-corpus admitted-field registry records **accepted operator classifications**
-for the following observation:
+for the current v3 observation:
 
-- observer repository/commit: `duck-lint/semantic-traversal@99d0d4556684000f0ed585e47158a5f7fe9ce7e1`;
-- accepted authored-vault specimen: `25fb8f13dd17efb62abbb52c48f526bc0aedd887b29001c1e60f1642d322b688`;
+- observer repository/commit: `duck-lint/semantic-traversal@e9bb2d95c14b1beb334dc2b8d83420f5998b9a53`;
+- observer schema: `vault-observation/v3`;
+- accepted authored-vault specimen: `f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4`;
 - observed field universe: **60 frontmatter keys**.
+
+The current repository-safe corpus census is:
+
+```text
+resident source records: 1060
+resident Markdown: 1060
+admission-eligible Markdown: 1052
+excluded Markdown: 8
+frontmatter valid: 1057
+frontmatter absent: 3
+frontmatter malformed: 0
+parseable UUID: 1057
+UUIDv7: 1057
+duplicate UUID groups: 0
+authored links: 5008
+one-candidate authored targets: 4907
+zero-candidate authored targets: 101
+multiple-candidate authored targets: 0
+```
+
+The three frontmatter-absent Markdown records are excluded authoring
+infrastructure, not admitted semantic objects. The admission boundary remains
+`VAULT DESIGN`, attachments, Canvas files, and PDFs excluded; eligible ordinary
+Markdown elsewhere remains admitted under the existing policy.
+
+The historical v2 predecessor remains immutable evidence: observer
+`duck-lint/semantic-traversal@99d0d4556684000f0ed585e47158a5f7fe9ce7e1`, schema
+`vault-observation/v2`, specimen
+`25fb8f13dd17efb62abbb52c48f526bc0aedd887b29001c1e60f1642d322b688`. Reconciliation
+established historical fields 60, current fields 60, added 0, removed 0, and
+unchanged 60. The registry therefore carries forward unchanged: 55 admitted,
+5 excluded, and 0 unresolved. `transition_attempted` is not a registry field.
 
 The registry is exhaustive for that accepted specimen. `note_version`,
 `schema_version`, and `note_status` are not observed keys in that specimen and
@@ -245,21 +278,58 @@ sensitive evidence remain outside this repository.
 | `relationship` | admitted; relational entity-profile metadata | entity objects; inherited with source-field provenance | does not itself create a canonical link occurrence or temporal anchor |
 | `address`, `email`, `phone`, `likes`, `dislikes` | observed but excluded from canonical substrate | raw observation/provenance only; not unit-inherited semantic metadata | no canonical occurrence or temporal affordance in the admitted substrate |
 | `title`, `creator`, `format`, `origin`, `publish_studio` | admitted; source-material naming/metadata | source-material objects; inherited with source-field provenance | no canonical occurrence unless separately authored; no independent temporal anchor |
-| `original_year_published` | admitted; publication temporal metadata | source-material objects carrying the field; inherited with provenance | a materially year-valued assignment may materialize the publication temporal affordance/anchor; present-null creates no anchor; no year is invented from source chronology or other metadata |
-| `birthday` | admitted; entity temporal metadata | entity objects carrying the field; inherited with provenance | a materially date-valued assignment may materialize the corresponding temporal anchor; present-null creates no anchor; no canonical occurrence by itself |
-| `first_met` | admitted; object-carried temporal metadata recording a first-meeting relation/context | entity objects carrying the field; inherited with provenance | a materially date-valued assignment may supply temporal access/anchoring; present-null creates no anchor; it does not itself create a canonical linked occurrence |
-| `journal_entry_date` | admitted; temporally capable object-carried journal field | journal-entry objects carrying the field; inherited with provenance | when materially date-valued, it may act as the journal object's temporal identifier/anchor and supply contextual temporal provenance through an authored occurrence; present-null creates no anchor and the date does not become intrinsic to the linked target |
+| `original_year_published` | admitted; publication temporal metadata | source-material objects carrying the field; inherited with provenance | `ExactYear` or `ApproximateYear` may materialize the publication temporal affordance; present-null creates no anchor; no year is invented from source chronology or other metadata |
+| `birthday` | admitted; entity temporal metadata | entity objects carrying the field; inherited with provenance | `FullDate` or canonical `MonthDay` may materialize the corresponding temporal anchor; present-null creates no anchor; no canonical occurrence by itself |
+| `first_met` | admitted; object-carried temporal metadata recording a first-meeting relation/context | entity objects carrying the field; inherited with provenance | `FullDate` or `DateTime` may supply temporal access/anchoring; present-null creates no anchor; it does not itself create a canonical linked occurrence |
+| `journal_entry_date` | admitted; temporally capable object-carried journal field | journal-entry objects carrying the field; inherited with provenance | current authored applicability is `FullDate`; present-null creates no anchor and the date does not become intrinsic to the linked target |
 
 #### Temporal capability and assignment actuality
 
 Temporal role in the field registry describes descriptor-level capability. An
 actual temporal anchor is materialized only from an authored assignment that
-materially supplies the corresponding date/year value under the accepted
-representation. Present-null preserves the authored assignment and provenance
-distinction but creates no temporal anchor. Field absence creates neither an
-assignment nor an anchor. This rule does not assert that every non-null string
-parses successfully and does not define a date/year parser, coercion, fallback,
-or normalization algorithm.
+materially supplies an accepted temporal representation applicable to that
+field. The current accepted representation categories are `FullDate`,
+`DateTime`, `ExactYear`, `MonthDay`, and `ApproximateYear`; field-specific
+applicability is defined by the rows above. Present-null preserves the authored
+assignment and provenance distinction but creates no temporal anchor. Field
+absence creates neither an assignment nor an anchor.
+
+Observer parser-native shape is not semantic temporal representation. A native
+YAML date or datetime may correspond to `FullDate` or `DateTime` where the field
+contract permits it. The authored string `--MM-DD` is `MonthDay`, and `~N BCE`
+is `ApproximateYear`, only under the accepted authored grammar. A parser-native
+string is not automatically non-temporal, and a parser-native date/datetime is
+not automatically an anchor without field applicability. No generic string coercion, regex parser, field-name guessing, natural-language parsing, or generic label fallback is authorized.
+
+#### Canonical authored cardinalities
+
+The repaired current substrate records these authored cardinalities without
+changing field roles or null/absence semantics:
+
+- canonical list-valued fields: `creator`, `register_mode`, `from_mode`,
+  `to_mode`, `unity_level`;
+- canonical scalar-valued fields: `format`, `layer`, `vector_direction`,
+  `register`, `pillar`, `hypnagogic_resonance`, `reactivity`, `relationship`.
+
+Single semantic values remain one-item authored lists for list-valued fields;
+multiple authored list entries retain source order without automatic semantic
+ranking significance. `from_mode` and `to_mode` remain bridge constitutive
+metadata, `register_mode` remains register typing, `unity_level` remains
+Organon-position metadata, and `relationship` remains relational entity-profile
+metadata without creating a canonical graph occurrence merely by presence.
+
+#### Explicit authored-representation operator decision — 2026-08-09
+
+The 60-field registry classification carries forward from historical R001
+because exact v3 field-universe reconciliation found 60 historical fields,
+60 current fields, 0 added, 0 removed, and 60 unchanged. Separately, during
+authored-substrate repair, the operator explicitly fixed the canonical
+authored cardinalities above and the temporal representation categories and
+field applicability recorded in this section. Those authored-representation
+decisions are constitutive operator authority. The repaired v3 observation
+supplies corpus-actuality evidence that the substrate conforms to them; the
+observer did not infer or create these rules. No new decision matrix or R001
+revision is implied.
 
 #### Canonical contextual relation-bearing fields
 
