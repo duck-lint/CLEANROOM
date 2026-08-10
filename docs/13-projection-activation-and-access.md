@@ -29,8 +29,16 @@ Where:
 - \(V\) contains canonical semantic objects, units, regions, occurrences, and anchors;
 - \(E\) contains typed connections among them;
 - \(I\) contains identifier assignments and inheritance;
-- \(S\) contains retrieval-surface capabilities and telemetry contracts;
+- \(S\) contains all five canonical retrieval-surface capabilities and
+  telemetry contracts;
 - \(\sigma\) identifies the immutable snapshot used for the turn.
+
+The five canonical surfaces are structural dimensions of the complete
+projection even when executable providers or indexes are not yet present:
+
+```text
+exact, lexical, vector, graph, temporal
+```
 
 ## 3. Problem-space lens
 
@@ -99,9 +107,17 @@ A_{\mathrm{cfg}}(M_\sigma,P_t,u_t,\Lambda_t)
 
 The runtime applies configured defaults automatically.
 
-The model does not spend inference selecting routine initial depths or deciding whether ordinary enabled discovery surfaces should fire.
+The model does not spend inference selecting routine initial depths or deciding
+whether ordinary structurally represented discovery surfaces should fire for a
+particular access operation.
 
 The initial activation should retain why each node or edge became visible.
+
+Configuration acts on the already-complete \(M_\sigma\); it does not constitute
+or reshape \(M_\sigma\). Initial breadth, relation depth, candidate limits,
+continuation limits, and other budgets govern bounded exposure and traversal
+only. A runtime configuration change therefore does not by itself create a
+new semantic projection snapshot.
 
 ## 6. Activation provenance
 
@@ -135,7 +151,10 @@ It is not a relevance score.
 
 ## 7. Surface visibility across identifiers
 
-Every admitted identifier must expose every enabled retrieval surface structurally capable of operating on its representation.
+Every admitted identifier must expose every canonical retrieval surface
+represented in the projection that is structurally capable of operating on its
+representation. Runtime policy may choose which of those surfaces to invoke
+for a particular operation, but it may not remove a surface from \(M_\sigma\).
 
 No identifier may be hidden from a surface by an undocumented hardcoded omission.
 
@@ -215,6 +234,11 @@ activation provenance
 projection snapshot identity
 configuration snapshot identity
 ```
+
+The two identities are carried separately: the projection snapshot identifies
+the immutable semantic object, while the configuration snapshot identifies the
+later bounded activation policy. The latter is not part of projection
+identity.
 
 ### Semantic object view
 
@@ -394,11 +418,26 @@ Each turn binds to:
 
 ```text
 projection_snapshot_id
-ingest identity
-schema version
-logical hash
-configuration snapshot
+ingest_identity
+schema_version
+logical_hash
+corpus_snapshot_identity
+validation_status
 ```
+
+and, independently, to one runtime configuration snapshot for the bounded
+activation/access operations of that turn. This six-field projection binding
+is distinct from that runtime configuration binding.
+
+The runtime configuration binding is separate:
+
+```text
+projection snapshot identity
++ runtime configuration snapshot identity
+```
+
+The configuration governs \(A_{cfg}(M_\sigma, ... )\) as a bounded view/access
+operation over the immutable projection; it does not constitute \(M_\sigma\).
 
 Ingest changes become visible on the next turn.
 
