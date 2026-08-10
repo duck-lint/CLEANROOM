@@ -220,6 +220,7 @@ struct ExpectedRegion {
 #[derive(Clone)]
 struct ExpectedUnit {
     id: String,
+    object_id: SemanticObjectId,
     region: SemanticRegionAddress,
     heading_path: Vec<String>,
     ordinal: u32,
@@ -228,6 +229,34 @@ struct ExpectedUnit {
     path: String,
     span: Option<SourceSpan>,
     raw: String,
+}
+
+#[derive(Clone)]
+struct ExpectedOccurrence {
+    id: String,
+    source: OccurrenceSource,
+    authored_target_text: String,
+    display_alias: Option<String>,
+    resolved_target: Option<SemanticAddress>,
+    resolution_state: OccurrenceResolutionState,
+    presentation_mode: crate::projection::OccurrencePresentation,
+    direction: Direction,
+    source_span: Option<SourceSpan>,
+}
+
+fn occurrence_matches(
+    expected: &ExpectedOccurrence,
+    actual: &crate::projection::OccurrenceRecord,
+) -> bool {
+    actual.occurrence_id.to_string() == expected.id
+        && actual.source == expected.source
+        && actual.authored_target_text == expected.authored_target_text
+        && actual.display_alias == expected.display_alias
+        && actual.resolved_target == expected.resolved_target
+        && actual.resolution_state == expected.resolution_state
+        && actual.presentation_mode == expected.presentation_mode
+        && actual.direction == expected.direction
+        && actual.source_span == expected.source_span
 }
 
 fn expected_regions(
@@ -358,6 +387,7 @@ fn expected_units(
         );
         output.push(ExpectedUnit {
             id,
+            object_id: object.clone(),
             region: selected.address.clone(),
             heading_path: selected.heading_path.clone(),
             ordinal: *ordinal,
@@ -370,6 +400,214 @@ fn expected_units(
     }
     let _ = root;
     Ok(output)
+}
+
+fn expected_occurrences(admitted_notes: &[&Value]) -> Result<Vec<ExpectedOccurrence>, String> {
+    let mut object_by_path = HashMap::new();
+    let mut regions_by_path = HashMap::new();
+    let mut units_by_path = HashMap::new();
+    for note in admitted_notes {
+        let object = object_id_from_markdown(note)?;
+        let path = text(note.get("source").ok_or("source missing")?, "relative_path")
+            .ok_or("relative path missing")?;
+        let regions = expected_regions(&object, note, &path)?;
+        let units = expected_units(&object, note, &path, &regions)?;
+        object_by_path.insert(path.clone(), object);
+        regions_by_path.insert(path.clone(), regions);
+        units_by_path.insert(path, units);
+    }
+    let mut output = Vec::new();
+    for note in admitted_notes {
+        let object = object_id_from_markdown(note)?;
+        let path = text(note.get("source").ok_or("source missing")?, "relative_path")
+            .ok_or("relative path missing")?;
+        let regions = regions_by_path.get(&path).ok_or("source regions missing")?;
+        let units = units_by_path.get(&path).ok_or("source units missing")?;
+        for link in array(note, "authored_links") {
+            let id = occurrence_id(&object, &link);
+            let source_span = span(link.get("source_span").unwrap_or(&Value::Null), &path);
+            let start = source_span.as_ref().and_then(|value| value.start_byte);
+            let source = if text(&link, "source_surface").as_deref() == Some("frontmatter") {
+                OccurrenceSource::ObjectField {
+                    object_id: object.clone(),
+                    field_path: text(&link, "frontmatter_key_path").unwrap_or_default(),
+                }
+            } else if let Some(start) = start {
+                array(note, "headings")
+                    .iter()
+                    .enumerate()
+                    .find(|(_, heading)| {
+                        heading
+                            .get("source_span")
+                            .and_then(Value::as_array)
+                            .is_some_and(|span| {
+                                span.first().and_then(Value::as_u64).unwrap_or(0) <= start
+                                    && start
+                                        < span.get(1).and_then(Value::as_u64).unwrap_or(u64::MAX)
+                            })
+                    })
+                    .and_then(|(index, _)| regions.get(index + 1))
+                    .map(|region| OccurrenceSource::SemanticRegion {
+                        region_address: region.address.clone(),
+                    })
+                    .or_else(|| {
+                        units
+                            .iter()
+                            .find(|unit| {
+                                unit.span.as_ref().is_some_and(|span| {
+                                    span.start_byte.unwrap_or(0) <= start
+                                        && start < span.end_byte.unwrap_or(u64::MAX)
+                                })
+                            })
+                            .map(|unit| OccurrenceSource::SemanticUnit {
+                                unit_id: SemanticUnitId::parse(unit.id.clone())
+                                    .expect("unit identity"),
+                            })
+                    })
+                    .or_else(|| {
+                        regions
+                            .iter()
+                            .find(|region| {
+                                region.span.as_ref().is_some_and(|span| {
+                                    span.start_byte.unwrap_or(0) <= start
+                                        && start < span.end_byte.unwrap_or(u64::MAX)
+                                })
+                            })
+                            .map(|region| OccurrenceSource::SemanticRegion {
+                                region_address: region.address.clone(),
+                            })
+                    })
+                    .ok_or_else(|| format!("cannot derive occurrence source: {id}"))?
+            } else {
+                return Err(format!("occurrence source span missing: {id}"));
+            };
+            let candidates: Vec<String> = link
+                .get("target_candidates")
+                .and_then(|value| value.get("candidate_source_paths"))
+                .and_then(Value::as_array)
+                .map(|values| {
+                    values
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .filter(|path| object_by_path.contains_key(*path))
+                        .map(str::to_owned)
+                        .collect()
+                })
+                .unwrap_or_default();
+            let heading = text(&link, "heading_fragment");
+            let block = text(&link, "block_fragment");
+            let target = if let Some(fragment) = heading {
+                candidates.first().and_then(|candidate| {
+                    let target_regions = regions_by_path.get(candidate)?;
+                    let match_span = array(&link, "heading_target_matches")
+                        .first()
+                        .and_then(|matched| matched.get("source_span"))
+                        .and_then(|value| span(value, candidate));
+                    let region = target_regions
+                        .iter()
+                        .find(|region| region.span == match_span)?;
+                    let _ = fragment;
+                    Some(SemanticAddress::Region(region.address.clone()))
+                })
+            } else if let Some(fragment) = block {
+                let fragment = fragment.trim_start_matches('^');
+                candidates
+                    .first()
+                    .and_then(|candidate| units_by_path.get(candidate))
+                    .and_then(|units| {
+                        units
+                            .iter()
+                            .find(|unit| unit.explicit.as_deref() == Some(fragment))
+                            .map(|unit| {
+                                SemanticAddress::Unit(
+                                    SemanticUnitId::parse(unit.id.clone()).expect("unit identity"),
+                                )
+                            })
+                    })
+            } else {
+                candidates
+                    .first()
+                    .and_then(|candidate| object_by_path.get(candidate))
+                    .map(|object| SemanticAddress::Object(object.clone()))
+            };
+            let resolution_state = if target.is_some() {
+                OccurrenceResolutionState::Resolved
+            } else if candidates.len() > 1 {
+                OccurrenceResolutionState::Ambiguous {
+                    candidate_source_paths: candidates,
+                }
+            } else {
+                OccurrenceResolutionState::Unresolved
+            };
+            output.push(ExpectedOccurrence {
+                id,
+                source,
+                authored_target_text: text(&link, "raw_target").unwrap_or_default(),
+                display_alias: text(&link, "display_alias"),
+                resolved_target: target,
+                resolution_state,
+                presentation_mode: if link
+                    .get("embedded")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false)
+                {
+                    crate::projection::OccurrencePresentation::Embed
+                } else {
+                    crate::projection::OccurrencePresentation::Link
+                },
+                direction: Direction::Outgoing,
+                source_span,
+            });
+        }
+    }
+    Ok(output)
+}
+
+fn check_raw_assignment_provenance(
+    projection: &Value,
+    admitted_notes: &[&Value],
+    failures: &mut BTreeMap<String, usize>,
+    violations: &mut Vec<String>,
+) {
+    let mut expected = BTreeMap::new();
+    for note in admitted_notes {
+        let Ok(object_id) = object_id_from_markdown(note) else {
+            continue;
+        };
+        let Some(values) = note
+            .get("frontmatter")
+            .and_then(|frontmatter| frontmatter.get("values"))
+            .and_then(Value::as_object)
+        else {
+            continue;
+        };
+        for (name, raw) in values {
+            if !EXCLUDED_FIELDS.contains(&name.as_str()) {
+                expected.insert(format!("assignment:{object_id}:{name}"), raw.clone());
+            }
+        }
+    }
+    let actual: HashMap<_, _> = projection
+        .get("identifier_assignments")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|assignment| {
+            assignment
+                .get("assignment_id")
+                .and_then(Value::as_str)
+                .map(|id| (id.to_owned(), assignment))
+        })
+        .collect();
+    for (id, expected_raw) in expected {
+        let Some(assignment) = actual.get(&id) else {
+            continue;
+        };
+        if assignment.get("authored_raw_value") != Some(&expected_raw) {
+            *failures.entry("provenance".into()).or_default() += 1;
+            violations.push(format!("lossless authored raw-value mismatch: {id}"));
+        }
+    }
 }
 
 fn occurrence_id(object: &SemanticObjectId, link: &Value) -> String {
@@ -1815,6 +2053,422 @@ fn independent_contract_closure(
     }
 }
 
+fn field_complete_record_closure(
+    projection: &SemanticSpaceProjection,
+    admitted_notes: &[&Value],
+    failures: &mut BTreeMap<String, usize>,
+    violations: &mut Vec<String>,
+) {
+    let mut bump = |domain: &str, message: String| {
+        *failures.entry(domain.into()).or_default() += 1;
+        violations.push(message);
+    };
+    let expected_occurrences = match expected_occurrences(admitted_notes) {
+        Ok(value) => value,
+        Err(error) => {
+            bump("occurrence", error);
+            return;
+        }
+    };
+    let occurrence_by_id: HashMap<_, _> = expected_occurrences
+        .iter()
+        .map(|value| (value.id.clone(), value))
+        .collect();
+    let actual_occurrences: BTreeSet<_> = projection
+        .occurrences
+        .iter()
+        .map(|value| value.occurrence_id.to_string())
+        .collect();
+    let expected_occurrence_ids: BTreeSet<_> = occurrence_by_id.keys().cloned().collect();
+    for id in expected_occurrence_ids.difference(&actual_occurrences) {
+        bump("occurrence", format!("missing complete occurrence: {id}"));
+    }
+    for id in actual_occurrences.difference(&expected_occurrence_ids) {
+        bump("occurrence", format!("invented complete occurrence: {id}"));
+    }
+    for occurrence in &projection.occurrences {
+        let Some(expected) = occurrence_by_id.get(&occurrence.occurrence_id.to_string()) else {
+            continue;
+        };
+        if !occurrence_matches(expected, occurrence) {
+            bump(
+                "occurrence",
+                format!(
+                    "complete occurrence correspondence mismatch: {}",
+                    occurrence.occurrence_id
+                ),
+            );
+        }
+    }
+    let mut object_expectations = BTreeMap::new();
+    let mut region_expectations = BTreeMap::new();
+    let mut unit_expectations = BTreeMap::new();
+    let mut assignment_ids_by_object = BTreeMap::<String, Vec<String>>::new();
+    let mut anchor_ids_by_object = BTreeMap::<String, Vec<String>>::new();
+    for note in admitted_notes {
+        let Ok(object_id) = object_id_from_markdown(note) else {
+            continue;
+        };
+        let Some(path) = note
+            .get("source")
+            .and_then(|source| text(source, "relative_path"))
+        else {
+            continue;
+        };
+        let Ok(regions) = expected_regions(&object_id, note, &path) else {
+            continue;
+        };
+        let Ok(units) = expected_units(&object_id, note, &path, &regions) else {
+            continue;
+        };
+        for region in &regions {
+            region_expectations.insert(
+                region_key(&region.address),
+                (region.clone(), regions.clone(), units.clone()),
+            );
+        }
+        for unit in &units {
+            unit_expectations.insert(unit.id.clone(), (unit.clone(), units.clone()));
+        }
+        let values = note
+            .get("frontmatter")
+            .and_then(|frontmatter| frontmatter.get("values"))
+            .and_then(Value::as_object);
+        let mut assignment_ids = Vec::new();
+        if let Some(values) = values {
+            for (name, raw) in values {
+                if EXCLUDED_FIELDS.contains(&name.as_str()) {
+                    continue;
+                }
+                assignment_ids.push(format!("assignment:{object_id}:{name}"));
+                if [
+                    "birthday",
+                    "first_met",
+                    "original_year_published",
+                    "journal_entry_date",
+                ]
+                .contains(&name.as_str())
+                {
+                    let shape = note
+                        .get("frontmatter")
+                        .and_then(|frontmatter| frontmatter.get("value_shapes"))
+                        .and_then(|shapes| shapes.get(name))
+                        .and_then(Value::as_str);
+                    if independent_temporal_value(name, raw, shape).is_some() {
+                        anchor_ids_by_object
+                            .entry(object_id.to_string())
+                            .or_default()
+                            .push(format!("anchor:{object_id}:{name}"));
+                    }
+                }
+            }
+        }
+        assignment_ids_by_object.insert(object_id.to_string(), assignment_ids);
+        object_expectations.insert(object_id.to_string(), (note, path, regions, units));
+    }
+    for object in &projection.objects {
+        let Some((note, path, regions, units)) =
+            object_expectations.get(&object.object_id.to_string())
+        else {
+            bump(
+                "object",
+                format!(
+                    "object has no independently expected source: {}",
+                    object.object_id
+                ),
+            );
+            continue;
+        };
+        let values = note
+            .get("frontmatter")
+            .and_then(|frontmatter| frontmatter.get("values"));
+        let aliases = values
+            .and_then(|values| values.get("aliases"))
+            .and_then(Value::as_array)
+            .map(|values| {
+                values
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let title = values
+            .and_then(|values| values.get("title"))
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .unwrap_or_else(|| {
+                text(note.get("source").unwrap_or(&Value::Null), "basename").unwrap_or_default()
+            });
+        let class = values
+            .and_then(|values| values.get("note_type"))
+            .and_then(Value::as_str)
+            .unwrap_or("admitted_markdown");
+        let expected_regions: Vec<_> = regions
+            .iter()
+            .map(|region| region.address.clone())
+            .collect();
+        let expected_units: Vec<_> = units
+            .iter()
+            .map(|unit| SemanticUnitId::parse(unit.id.clone()).expect("unit identity"))
+            .collect();
+        let expected_assignments = assignment_ids_by_object
+            .get(&object.object_id.to_string())
+            .cloned()
+            .unwrap_or_default();
+        let expected_fields: Vec<_> = expected_occurrences.iter().filter(|occurrence| matches!(&occurrence.source, OccurrenceSource::ObjectField { object_id, .. } if object_id == &object.object_id)).map(|occurrence| crate::model::OccurrenceId::parse(occurrence.id.clone()).expect("occurrence identity")).collect();
+        let expected_body: Vec<_> = expected_occurrences.iter().filter(|occurrence| !matches!(&occurrence.source, OccurrenceSource::ObjectField { object_id, .. } if object_id == &object.object_id) && occurrence.id.starts_with(&format!("occurrence:{}:", object.object_id))).map(|occurrence| crate::model::OccurrenceId::parse(occurrence.id.clone()).expect("occurrence identity")).collect();
+        let expected_incoming: Vec<_> = expected_occurrences
+            .iter()
+            .filter(|occurrence| {
+                occurrence.resolved_target
+                    == Some(SemanticAddress::Object(object.object_id.clone()))
+            })
+            .map(|occurrence| {
+                crate::model::OccurrenceId::parse(occurrence.id.clone())
+                    .expect("occurrence identity")
+            })
+            .collect();
+        let mut expected_surfaces: Vec<String> = vec![
+            "surface:exact".into(),
+            "surface:lexical".into(),
+            "surface:vector".into(),
+        ];
+        if !expected_incoming.is_empty() || !expected_body.is_empty() || !expected_fields.is_empty()
+        {
+            expected_surfaces.push("surface:graph".into());
+        }
+        if !anchor_ids_by_object
+            .get(&object.object_id.to_string())
+            .cloned()
+            .unwrap_or_default()
+            .is_empty()
+        {
+            expected_surfaces.push("surface:temporal".into());
+        }
+        if object.source_identity != format!("source:{}", fnv(path.as_bytes()))
+            || object.canonical_path != *path
+            || object.filename
+                != Path::new(path)
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or_default()
+            || object.title != title
+            || object.aliases != aliases
+            || object.object_class != class
+            || object.region_addresses != expected_regions
+            || object.unit_ids != expected_units
+            || object.identifier_assignment_ids != expected_assignments
+            || object.object_field_occurrence_ids != expected_fields
+            || object.body_occurrence_ids != expected_body
+            || object.incoming_occurrence_ids != expected_incoming
+            || object
+                .temporal_anchor_ids
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                != anchor_ids_by_object
+                    .get(&object.object_id.to_string())
+                    .cloned()
+                    .unwrap_or_default()
+            || object.retrieval_surface_ids != expected_surfaces
+        {
+            bump(
+                "object",
+                format!(
+                    "field-complete object correspondence mismatch: {}",
+                    object.object_id
+                ),
+            );
+        }
+    }
+    for region in &projection.regions {
+        let Some((expected, all_regions, units)) =
+            region_expectations.get(&region_key(&region.address))
+        else {
+            bump(
+                "region",
+                format!(
+                    "region lacks complete expected record: {}",
+                    region.address.authored_structural_address
+                ),
+            );
+            continue;
+        };
+        let children: Vec<_> = all_regions
+            .iter()
+            .filter(|candidate| candidate.parent.as_ref() == Some(&region.address))
+            .map(|candidate| candidate.address.clone())
+            .collect();
+        let contained: Vec<_> = units
+            .iter()
+            .filter(|unit| unit.region == region.address)
+            .map(|unit| SemanticUnitId::parse(unit.id.clone()).expect("unit identity"))
+            .collect();
+        let mappings: Vec<_> = units
+            .iter()
+            .filter(|unit| unit.region == region.address)
+            .filter_map(|unit| {
+                unit.explicit
+                    .as_ref()
+                    .map(|id| crate::projection::BlockTargetMapping {
+                        authored_block_id: id.clone(),
+                        target_unit_id: SemanticUnitId::parse(unit.id.clone())
+                            .expect("unit identity"),
+                    })
+            })
+            .collect();
+        let incoming: Vec<_> = expected_occurrences
+            .iter()
+            .filter(|occurrence| {
+                occurrence.resolved_target == Some(SemanticAddress::Region(region.address.clone()))
+            })
+            .map(|occurrence| {
+                crate::model::OccurrenceId::parse(occurrence.id.clone())
+                    .expect("occurrence identity")
+            })
+            .collect();
+        let outgoing: Vec<_> = expected_occurrences
+            .iter()
+            .filter(|occurrence| {
+                occurrence.source
+                    == (OccurrenceSource::SemanticRegion {
+                        region_address: region.address.clone(),
+                    })
+            })
+            .map(|occurrence| {
+                crate::model::OccurrenceId::parse(occurrence.id.clone())
+                    .expect("occurrence identity")
+            })
+            .collect();
+        let mut surfaces: Vec<String> = vec!["surface:exact".into(), "surface:lexical".into()];
+        if !incoming.is_empty() || !outgoing.is_empty() {
+            surfaces.push("surface:graph".into());
+        }
+        let inherited = assignment_ids_by_object
+            .get(&region.address.object_id.to_string())
+            .cloned()
+            .unwrap_or_default();
+        let heading_identity = format!(
+            "region:{}",
+            fnv(region.address.authored_structural_address.as_bytes())
+        );
+        if region.heading_path != expected.heading_path
+            || region.heading_identity != heading_identity
+            || region.source_span != expected.span
+            || region.child_region_addresses != children
+            || region.contained_unit_ids != contained
+            || region.block_target_mappings != mappings
+            || region.incoming_occurrence_ids != incoming
+            || region.outgoing_occurrence_ids != outgoing
+            || region.inherited_identifier_assignment_ids != inherited
+            || region.retrieval_surface_ids != surfaces
+        {
+            bump(
+                "region",
+                format!(
+                    "field-complete region correspondence mismatch: {}",
+                    region.address.authored_structural_address
+                ),
+            );
+        }
+    }
+    for unit in &projection.units {
+        let Some((expected, all_units)) = unit_expectations.get(&unit.unit_id.to_string()) else {
+            bump(
+                "unit",
+                format!("unit lacks complete expected record: {}", unit.unit_id),
+            );
+            continue;
+        };
+        let outgoing: Vec<_> = expected_occurrences
+            .iter()
+            .filter(|occurrence| {
+                occurrence.source
+                    == (OccurrenceSource::SemanticUnit {
+                        unit_id: unit.unit_id.clone(),
+                    })
+            })
+            .map(|occurrence| {
+                crate::model::OccurrenceId::parse(occurrence.id.clone())
+                    .expect("occurrence identity")
+            })
+            .collect();
+        let incoming: Vec<_> = expected_occurrences
+            .iter()
+            .filter(|occurrence| {
+                occurrence.resolved_target == Some(SemanticAddress::Unit(unit.unit_id.clone()))
+            })
+            .map(|occurrence| {
+                crate::model::OccurrenceId::parse(occurrence.id.clone())
+                    .expect("occurrence identity")
+            })
+            .collect();
+        let inherited = assignment_ids_by_object
+            .get(&unit.parent_object_id.to_string())
+            .cloned()
+            .unwrap_or_default();
+        let mut surfaces: Vec<String> = vec![
+            "surface:exact".into(),
+            "surface:lexical".into(),
+            "surface:vector".into(),
+        ];
+        if !incoming.is_empty() || !outgoing.is_empty() {
+            surfaces.push("surface:graph".into());
+        }
+        let expected_content = SemanticUnitContent::HydrationAddress {
+            address: format!(
+                "source:{}#bytes:{}:{}",
+                expected.path,
+                expected
+                    .span
+                    .as_ref()
+                    .and_then(|span| span.start_byte)
+                    .unwrap_or(0),
+                expected
+                    .span
+                    .as_ref()
+                    .and_then(|span| span.end_byte)
+                    .unwrap_or(0)
+            ),
+            content_hash: format!("sha256:{}", sha256(expected.raw.as_bytes())),
+        };
+        if unit.parent_object_id != expected.object_id
+            || unit.parent_region_address != expected.region
+            || unit.authored_block_type != expected.kind
+            || unit.heading_path != expected.heading_path
+            || unit.block_ordinal != expected.ordinal
+            || unit.explicit_block_id != expected.explicit
+            || unit.content != expected_content
+            || unit.inherited_identifier_assignment_ids != inherited
+            || !unit.unit_local_identifier_assignment_ids.is_empty()
+            || unit.outgoing_occurrence_ids != outgoing
+            || unit.incoming_occurrence_ids != incoming
+            || !unit.temporal_anchor_ids.is_empty()
+            || unit.retrieval_surface_ids != surfaces
+            || !unit.transport_segments.is_empty()
+            || unit.source_provenance
+                != (RecordProvenance::SemanticUnit {
+                    unit_id: unit.unit_id.clone(),
+                    source_span: expected.span.clone(),
+                })
+            || all_units
+                .iter()
+                .filter(|candidate| candidate.region == unit.parent_region_address)
+                .count()
+                == 0
+        {
+            bump(
+                "unit",
+                format!(
+                    "field-complete unit correspondence mismatch: {}",
+                    unit.unit_id
+                ),
+            );
+        }
+    }
+}
+
 fn compare_observation(
     projection: &SemanticSpaceProjection,
     root: &Value,
@@ -2239,6 +2893,58 @@ fn compare_observation(
             })
             .count(),
     );
+    let heading_fragment_links: Vec<_> = admitted_notes
+        .iter()
+        .flat_map(|note| array(note, "authored_links"))
+        .filter(|link| {
+            link.get("heading_fragment")
+                .and_then(Value::as_str)
+                .is_some()
+        })
+        .collect();
+    counts.insert(
+        "heading_fragment_occurrences".into(),
+        heading_fragment_links.len(),
+    );
+    counts.insert(
+        "resolved_heading_targets".into(),
+        heading_fragment_links
+            .iter()
+            .filter(|link| {
+                link.get("heading_target_evaluation")
+                    .and_then(Value::as_str)
+                    == Some("observed")
+            })
+            .count(),
+    );
+    counts.insert(
+        "unresolved_heading_targets".into(),
+        heading_fragment_links
+            .iter()
+            .filter(|link| {
+                link.get("heading_target_evaluation")
+                    .and_then(Value::as_str)
+                    != Some("observed")
+                    && link
+                        .get("target_candidates")
+                        .and_then(|value| value.get("cardinality"))
+                        .and_then(Value::as_str)
+                        != Some("multiple_candidates")
+            })
+            .count(),
+    );
+    counts.insert(
+        "ambiguous_heading_targets".into(),
+        heading_fragment_links
+            .iter()
+            .filter(|link| {
+                link.get("target_candidates")
+                    .and_then(|value| value.get("cardinality"))
+                    .and_then(Value::as_str)
+                    == Some("multiple_candidates")
+            })
+            .count(),
+    );
     counts.insert(
         "object_field_occurrences".into(),
         projection
@@ -2315,6 +3021,7 @@ fn compare_observation(
             .count(),
     );
     independent_contract_closure(projection, &admitted_notes, failures, violations);
+    field_complete_record_closure(projection, &admitted_notes, failures, violations);
     counts
 }
 
@@ -2346,7 +3053,8 @@ pub fn validate(
         )));
     }
     let root: Value = serde_json::from_slice(&observation_bytes)?;
-    let projection: SemanticSpaceProjection = serde_json::from_slice(&projection_bytes)?;
+    let projection_value: Value = serde_json::from_slice(&projection_bytes)?;
+    let projection: SemanticSpaceProjection = serde_json::from_value(projection_value.clone())?;
     if text(&root, "observation_schema_version").as_deref() != Some("vault-observation/v3")
         || root
             .get("observer_provenance")
@@ -2374,6 +3082,22 @@ pub fn validate(
     let mut failures = BTreeMap::new();
     let mut violations = Vec::new();
     let counts = compare_observation(&projection, &root, &mut failures, &mut violations);
+    let admitted_notes: Vec<_> = root
+        .get("markdown_observations")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|note| {
+            text(note.get("source").unwrap_or(&Value::Null), "relative_path")
+                .is_some_and(|path| admitted(&path))
+        })
+        .collect();
+    check_raw_assignment_provenance(
+        &projection_value,
+        &admitted_notes,
+        &mut failures,
+        &mut violations,
+    );
     check_typed_topology(&projection, &mut failures, &mut violations);
     check_reverse_incidence(&projection, &mut failures, &mut violations);
     let expected_descriptors: BTreeSet<_> =
@@ -2761,5 +3485,119 @@ mod tests {
                 .unwrap_or(&0)
                 > baseline.get("identifier").unwrap_or(&0)
         );
+    }
+
+    #[test]
+    fn correspondence_rejects_present_null_raw_provenance_loss() {
+        let object_id = "019dcf5c-ded1-70df-ab68-c25bbc4e8eb1";
+        let observation = minimal_observation(serde_json::json!({"layer": null}));
+        let notes = observation
+            .get("markdown_observations")
+            .and_then(Value::as_array)
+            .unwrap()
+            .iter()
+            .collect::<Vec<_>>();
+        let assignment_id = format!("assignment:{object_id}:layer");
+        let mut projection = serde_json::json!({"identifier_assignments": [{"assignment_id": assignment_id, "authored_raw_value": null}]});
+        let mut failures = BTreeMap::new();
+        let mut violations = Vec::new();
+        check_raw_assignment_provenance(&projection, &notes, &mut failures, &mut violations);
+        assert_eq!(failures.get("provenance").copied().unwrap_or_default(), 0);
+        projection["identifier_assignments"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("authored_raw_value");
+        failures.clear();
+        violations.clear();
+        check_raw_assignment_provenance(&projection, &notes, &mut failures, &mut violations);
+        assert_eq!(failures.get("provenance").copied(), Some(1));
+    }
+
+    #[test]
+    fn heading_fragment_target_mutation_fails_factual_correspondence() {
+        let observation = serde_json::json!({
+            "markdown_observations": [
+                {"source": {"relative_path": "source.md", "basename": "source.md"}, "uuid": {"parsed_value": "019dcf5c-ded1-70df-ab68-c25bbc4e8eb1"}, "frontmatter": {"values": {}, "value_shapes": {}}, "headings": [{"level": 1, "address_key": "source", "source_span": [0, 10]}], "block_candidates": [], "authored_links": [{"source_surface": "body", "source_span": [2, 4], "raw_target": "target#Target", "display_alias": null, "embedded": false, "heading_fragment": "Target", "block_fragment": null, "target_candidates": {"candidate_source_paths": ["target.md"]}, "heading_target_matches": [{"source_span": [10, 20]}], "block_target_evaluation": "not_applicable"}]},
+                {"source": {"relative_path": "target.md", "basename": "target.md"}, "uuid": {"parsed_value": "019dcf5c-ded1-70df-ab68-c25bbc4e8eb2"}, "frontmatter": {"values": {}, "value_shapes": {}}, "headings": [{"level": 1, "address_key": "target", "source_span": [10, 20]}, {"level": 1, "address_key": "other", "source_span": [30, 40]}], "block_candidates": [], "authored_links": []}
+            ]
+        });
+        let notes = observation
+            .get("markdown_observations")
+            .and_then(Value::as_array)
+            .unwrap()
+            .iter()
+            .collect::<Vec<_>>();
+        let expected = expected_occurrences(&notes)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+        let mut actual = crate::projection::OccurrenceRecord {
+            occurrence_id: crate::model::OccurrenceId::parse(expected.id.clone()).unwrap(),
+            source: expected.source.clone(),
+            authored_target_text: expected.authored_target_text.clone(),
+            display_alias: expected.display_alias.clone(),
+            resolved_target: expected.resolved_target.clone(),
+            resolution_state: expected.resolution_state.clone(),
+            presentation_mode: expected.presentation_mode.clone(),
+            direction: expected.direction.clone(),
+            source_span: expected.source_span.clone(),
+        };
+        assert!(occurrence_matches(&expected, &actual));
+        let target_object =
+            SemanticObjectId::parse("019dcf5c-ded1-70df-ab68-c25bbc4e8eb2").unwrap();
+        let target_regions = expected_regions(&target_object, notes[1], "target.md").unwrap();
+        actual.resolved_target = Some(SemanticAddress::Region(target_regions[2].address.clone()));
+        actual.resolution_state = OccurrenceResolutionState::Resolved;
+        assert!(!occurrence_matches(&expected, &actual));
+    }
+
+    #[test]
+    fn block_fragment_target_uses_explicit_unit_mapping() {
+        let observation = serde_json::json!({
+            "markdown_observations": [
+                {"source": {"relative_path": "source.md", "basename": "source.md"}, "uuid": {"parsed_value": "019dcf5c-ded1-70df-ab68-c25bbc4e8eb1"}, "frontmatter": {"values": {}, "value_shapes": {}}, "headings": [{"level": 1, "address_key": "source", "source_span": [0, 10]}], "block_candidates": [], "authored_links": [{"source_surface": "body", "source_span": [2, 4], "raw_target": "target#^b1", "display_alias": null, "embedded": false, "heading_fragment": null, "block_fragment": "^b1", "target_candidates": {"candidate_source_paths": ["target.md"]}, "heading_target_matches": [], "block_target_evaluation": "observed"}]},
+                {"source": {"relative_path": "target.md", "basename": "target.md"}, "uuid": {"parsed_value": "019dcf5c-ded1-70df-ab68-c25bbc4e8eb2"}, "frontmatter": {"values": {}, "value_shapes": {}}, "headings": [], "block_candidates": [{"block_kind_observation": "paragraph", "raw_markdown": "one", "source_span": [10, 20], "explicit_block_ids": ["b1"]}, {"block_kind_observation": "paragraph", "raw_markdown": "two", "source_span": [20, 30], "explicit_block_ids": ["b2"]}], "authored_links": []}
+            ]
+        });
+        let notes = observation
+            .get("markdown_observations")
+            .and_then(Value::as_array)
+            .unwrap()
+            .iter()
+            .collect::<Vec<_>>();
+        let expected = expected_occurrences(&notes)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+        let mut actual = crate::projection::OccurrenceRecord {
+            occurrence_id: crate::model::OccurrenceId::parse(expected.id.clone()).unwrap(),
+            source: expected.source.clone(),
+            authored_target_text: expected.authored_target_text.clone(),
+            display_alias: expected.display_alias.clone(),
+            resolved_target: expected.resolved_target.clone(),
+            resolution_state: expected.resolution_state.clone(),
+            presentation_mode: expected.presentation_mode.clone(),
+            direction: expected.direction.clone(),
+            source_span: expected.source_span.clone(),
+        };
+        assert!(matches!(
+            expected.resolved_target,
+            Some(SemanticAddress::Unit(_))
+        ));
+        assert!(occurrence_matches(&expected, &actual));
+        let target_object =
+            SemanticObjectId::parse("019dcf5c-ded1-70df-ab68-c25bbc4e8eb2").unwrap();
+        let regions = expected_regions(&target_object, notes[1], "target.md").unwrap();
+        let units = expected_units(&target_object, notes[1], "target.md", &regions).unwrap();
+        let other = units
+            .iter()
+            .find(|unit| unit.explicit.as_deref() == Some("b2"))
+            .unwrap();
+        actual.resolved_target = Some(SemanticAddress::Unit(
+            SemanticUnitId::parse(other.id.clone()).unwrap(),
+        ));
+        assert!(!occurrence_matches(&expected, &actual));
     }
 }

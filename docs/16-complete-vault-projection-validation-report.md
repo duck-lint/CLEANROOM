@@ -23,6 +23,27 @@ not begun. Phase 7 has not begun.
 - Phase 6 logical hash: `sha256:ae2ef75756cf4c60e65e1d73da5a20a5e38561b5f1042a50b568eb443de1bf71`
 - Phase 6 validated projection byte SHA-256: `f0f5c0b56895952aeb402b8eaea2a6f73f2124c5584d00942da928dd92b80ef1`
 
+## Validator implementation provenance
+
+The behavior-bearing validator source manifest uses UTF-8 entries sorted by
+repository-relative path. Each canonical manifest line is
+`<path>\\0sha256:<exact-file-byte-digest>\\n`; the `\\0` notation denotes one
+NUL byte and `\\n` denotes one LF byte in the hashed manifest input.
+
+```text
+src/bin/phase6_validate.rs\\0sha256:6047f7e0548c1c1dfa121b409675e1bcabff2c64b2f35d334bd6ebdacf6ff45d\\n
+src/construction.rs\\0sha256:1b6d7492ffc8e082f40cd202d780092689a7fdc5f0dc8da5f99b343ce31ba0e6\\n
+src/validation.rs\\0sha256:e1887b3d449a65a36aa5851c6a4025b20bd10c9a1855633e79ab3740ffed6f93\\n
+```
+
+Validator implementation identity:
+`sha256:b6cae70260056797fb8279e98db74b14b961278cebc576668d2777761b011ed7`
+
+`src/construction.rs` is included because Phase 6 directly reuses its
+corpus-independent byte SHA-256 implementation. Projection/model contracts
+and canonical region identity machinery are unchanged-base dependencies,
+identified by the authoritative base SHA above.
+
 Input bytes were hashed before parsing. The Phase 5 input was not overwritten.
 The Phase 6 output changes only `projection_snapshot_id`, `validation_status`,
 and `logical_hash`.
@@ -61,6 +82,10 @@ and `logical_hash`.
 | Block-fragment occurrences | 0 |
 | Resolved block targets | 0 |
 | Unresolved block targets | 0 |
+| Heading-fragment occurrences | 10 |
+| Resolved heading targets | 10 |
+| Unresolved heading targets | 0 |
+| Ambiguous heading targets | 0 |
 
 ## Independent validation domains
 
@@ -82,6 +107,12 @@ Each domain completed with zero deterministic structural violations:
 | Transport segmentation | passed | 0 |
 | Bounds | passed | 0 |
 | Deterministic identity | passed | 0 |
+
+Field-complete record correspondence also passed with zero failures for every
+contract-bearing field of semantic objects, authored regions, and semantic
+units. Complete reverse-incidence vectors passed with zero missing, extra,
+wrong, or duplicate edges. Present-null raw provenance passed for all 64
+present-null temporal assignments; raw-value failures: 0.
 
 The validator derives admitted source membership, object correspondence,
 heading-region topology, authored block units, identifier assignments,
@@ -115,6 +146,7 @@ The exact private inputs were validated twice:
 
 - The 108 unresolved authored occurrences are represented unresolved and are not structural failures. Ambiguous count is zero.
 - The current corpus's zero block-fragment state validates zero-state fidelity only; it is not positive corpus evidence of block-target resolution.
+- The corpus contains 10 heading-fragment occurrences; all 10 resolved to their independently derived canonical regions, with zero unresolved or ambiguous heading targets.
 - Synthetic falsification tests establish local validator mechanics, not corpus actuality.
 - Structural retrieval-surface descriptors and transitions were validated; executable retrieval providers and indexes were not implemented or exercised.
 - Real projection access remains Phase 7 work.
