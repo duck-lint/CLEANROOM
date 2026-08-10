@@ -134,7 +134,7 @@ fn temporal() -> ActivatedTemporalAnchorRecord {
     ActivatedTemporalAnchorRecord {
         anchor_id: anchor(),
         subject: addr(),
-        value: TemporalValue::Year(1867),
+        value: TemporalValue::ExactYear(1867),
         record_provenance: record_prov(),
         available_surface_ids: vec!["surface:temporal".into()],
         activation_provenance: prov(),
@@ -452,8 +452,8 @@ fn continuation_structural_neighbourhood_round_trip() {
 #[test]
 fn continuation_temporal_probe_round_trip() {
     let h = handle(ContinuationOrigin::TemporalProbe {
-        start: Some(TemporalValue::Year(1800)),
-        end: Some(TemporalValue::Year(1900)),
+        start: Some(TemporalValue::ExactYear(1800)),
+        end: Some(TemporalValue::ExactYear(1900)),
     });
     assert_eq!(round(&h), h);
 }

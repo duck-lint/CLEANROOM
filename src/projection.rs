@@ -351,6 +351,8 @@ pub enum IdentifierRole {
     ObjectClass,
     /// Organon or authored topological position.
     FrameworkPosition,
+    /// Analysis or constitutive orientation.
+    AnalysisOrientation,
     /// Public or indexical register typing.
     RegisterTyping,
     /// Canonical naming, title, alias, or attribution.
@@ -363,6 +365,16 @@ pub enum IdentifierRole {
     Grouping,
     /// Indexical telemetry carried by authored source material.
     IndexicalTelemetry,
+    /// Contextual journal-state classification.
+    JournalStateClassification,
+    /// Entity-profile metadata.
+    EntityMetadata,
+    /// Source-material metadata.
+    SourceMetadata,
+    /// Entity-profile relation metadata.
+    ProfileRelation,
+    /// Constitutive inferential-bridge metadata.
+    BridgeConstitutive,
     /// Named admitted role not hard-coded as corpus content.
     Declared {
         /// Stable role name.
@@ -385,6 +397,8 @@ pub enum IdentifierValueShape {
     Boolean,
     /// Canonical projected address.
     SemanticAddress,
+    /// More than one mechanically observed scalar shape.
+    Mixed(Vec<IdentifierValueShape>),
 }
 
 /// Cardinality of an identifier assignment.
@@ -397,6 +411,8 @@ pub enum IdentifierCardinality {
     Scalar,
     /// Zero or more represented values.
     Collection,
+    /// The accepted field occurs in both scalar and collection form.
+    Mixed,
 }
 
 /// Provenance and inheritance mode of an identifier assignment.
@@ -447,6 +463,11 @@ pub struct IdentifierAssignment {
     pub subject: SemanticAddress,
     /// Scalar or collection value matching the descriptor's declared shape.
     pub value: IdentifierValue,
+    /// Authored value preserved separately from its mechanically typed shape.
+    /// Real observation adapters populate this field; synthetic records may
+    /// leave it absent.
+    #[serde(default)]
+    pub authored_raw_value: Option<serde_json::Value>,
     /// Exact assignment provenance.
     pub provenance: RecordProvenance,
 }
@@ -463,6 +484,8 @@ pub struct IdentifierAssignment {
     deny_unknown_fields
 )]
 pub enum IdentifierValue {
+    /// Authored field is present with a null value.
+    Null,
     /// One string value.
     String(String),
     /// One signed integer value.
@@ -473,6 +496,12 @@ pub enum IdentifierValue {
     SemanticAddress(SemanticAddress),
     /// Collection of strings.
     Strings(Vec<String>),
+    /// Collection of signed integers.
+    Integers(Vec<i64>),
+    /// Collection of booleans.
+    Booleans(Vec<bool>),
+    /// Collection whose elements have more than one mechanical value shape.
+    Values(Vec<IdentifierValue>),
     /// Collection of canonical addresses.
     SemanticAddresses(Vec<SemanticAddress>),
 }
@@ -493,14 +522,35 @@ pub struct OccurrenceRecord {
     pub authored_target_text: String,
     /// Optional authored display alias.
     pub display_alias: Option<String>,
-    /// Canonical object, region, or unit target resolved by projection.
-    pub resolved_target: SemanticAddress,
+    /// Canonical object, region, or unit target when factual resolution exists.
+    ///
+    /// `None` is an explicit unresolved authored state; it is not permission to
+    /// infer a target from text, embeddings, or a filename heuristic.
+    pub resolved_target: Option<SemanticAddress>,
+    /// Factual authored-target resolution state. `resolved_target` is retained
+    /// as the unique-target convenience field; this state prevents unresolved
+    /// and ambiguous links from collapsing into the same representation.
+    #[serde(default)]
+    pub resolution_state: OccurrenceResolutionState,
     /// Link or embed presentation mode.
     pub presentation_mode: OccurrencePresentation,
     /// Authored incidence direction.
     pub direction: Direction,
     /// Exact source span when represented.
     pub source_span: Option<SourceSpan>,
+}
+
+/// Mechanical authored-target resolution result.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]
+pub enum OccurrenceResolutionState {
+    /// No canonical candidate was observed.
+    #[default]
+    Unresolved,
+    /// Exactly one canonical candidate was observed and selected.
+    Resolved,
+    /// More than one canonical candidate was observed; no ranking occurred.
+    Ambiguous { candidate_source_paths: Vec<String> },
 }
 
 /// Authored source surface of one occurrence.
@@ -572,15 +622,15 @@ pub struct TemporalAnchorRecord {
 )]
 pub enum TemporalValue {
     /// Calendar date in ISO-like authored form.
-    Date(String),
+    FullDate(String),
     /// Date and time with an explicit offset or zone in authored form.
     DateTime(String),
-    /// Calendar year.
-    Year(i32),
-    /// Relative or source-defined ordinal.
-    Ordinal(i64),
-    /// Named temporal label when no stronger syntax is admitted.
-    Label(String),
+    /// Exact calendar year.
+    ExactYear(i32),
+    /// Month and day without a year, in canonical `--MM-DD` form.
+    MonthDay(String),
+    /// Authored approximate year, in canonical `~<year> BCE` form.
+    ApproximateYear(String),
 }
 
 /// Descriptor of one retrieval-surface capability in a frozen projection.

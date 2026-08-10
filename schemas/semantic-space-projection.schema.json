@@ -343,6 +343,10 @@
           "description": "Snapshot-local assignment identity.",
           "type": "string"
         },
+        "authored_raw_value": {
+          "description": "Authored value preserved separately from its mechanically typed shape. Real observation adapters populate this field; synthetic records may leave it absent.",
+          "default": null
+        },
         "identifier_name": {
           "description": "Identifier descriptor name.",
           "type": "string"
@@ -422,6 +426,13 @@
           "type": "string",
           "enum": [
             "collection"
+          ]
+        },
+        {
+          "description": "The accepted field occurs in both scalar and collection form.",
+          "type": "string",
+          "enum": [
+            "mixed"
           ]
         }
       ]
@@ -571,6 +582,22 @@
           "additionalProperties": false
         },
         {
+          "description": "Analysis or constitutive orientation.",
+          "type": "object",
+          "required": [
+            "role"
+          ],
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "analysis_orientation"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
           "description": "Public or indexical register typing.",
           "type": "object",
           "required": [
@@ -667,6 +694,86 @@
           "additionalProperties": false
         },
         {
+          "description": "Contextual journal-state classification.",
+          "type": "object",
+          "required": [
+            "role"
+          ],
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "journal_state_classification"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Entity-profile metadata.",
+          "type": "object",
+          "required": [
+            "role"
+          ],
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "entity_metadata"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Source-material metadata.",
+          "type": "object",
+          "required": [
+            "role"
+          ],
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "source_metadata"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Entity-profile relation metadata.",
+          "type": "object",
+          "required": [
+            "role"
+          ],
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "profile_relation"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Constitutive inferential-bridge metadata.",
+          "type": "object",
+          "required": [
+            "role"
+          ],
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "bridge_constitutive"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
           "description": "Named admitted role not hard-coded as corpus content.",
           "type": "object",
           "required": [
@@ -692,6 +799,22 @@
     "IdentifierValue": {
       "description": "Value carried by one identifier assignment.\n\nThis is a closed structural union for exchange. It cannot be interpreted as evidence or a relation without its descriptor and provenance.",
       "oneOf": [
+        {
+          "description": "Authored field is present with a null value.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
         {
           "description": "One string value.",
           "type": "object",
@@ -797,6 +920,76 @@
           "additionalProperties": false
         },
         {
+          "description": "Collection of signed integers.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "integers"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Collection of booleans.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "booleans"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Collection whose elements have more than one mechanical value shape.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "values"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/IdentifierValue"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
           "description": "Collection of canonical addresses.",
           "type": "object",
           "required": [
@@ -851,6 +1044,22 @@
           "enum": [
             "semantic_address"
           ]
+        },
+        {
+          "description": "More than one mechanically observed scalar shape.",
+          "type": "object",
+          "required": [
+            "mixed"
+          ],
+          "properties": {
+            "mixed": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/IdentifierValueShape"
+              }
+            }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -881,7 +1090,6 @@
         "direction",
         "occurrence_id",
         "presentation_mode",
-        "resolved_target",
         "source"
       ],
       "properties": {
@@ -916,11 +1124,25 @@
             }
           ]
         },
-        "resolved_target": {
-          "description": "Canonical object, region, or unit target resolved by projection.",
+        "resolution_state": {
+          "description": "Factual authored-target resolution state. `resolved_target` is retained as the unique-target convenience field; this state prevents unresolved and ambiguous links from collapsing into the same representation.",
+          "default": {
+            "state": "unresolved"
+          },
           "allOf": [
             {
+              "$ref": "#/definitions/OccurrenceResolutionState"
+            }
+          ]
+        },
+        "resolved_target": {
+          "description": "Canonical object, region, or unit target when factual resolution exists.\n\n`None` is an explicit unresolved authored state; it is not permission to infer a target from text, embeddings, or a filename heuristic.",
+          "anyOf": [
+            {
               "$ref": "#/definitions/SemanticAddress"
+            },
+            {
+              "type": "null"
             }
           ]
         },
@@ -945,6 +1167,66 @@
         }
       },
       "additionalProperties": false
+    },
+    "OccurrenceResolutionState": {
+      "description": "Mechanical authored-target resolution result.",
+      "oneOf": [
+        {
+          "description": "No canonical candidate was observed.",
+          "type": "object",
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "unresolved"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Exactly one canonical candidate was observed and selected.",
+          "type": "object",
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "resolved"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "More than one canonical candidate was observed; no ranking occurred.",
+          "type": "object",
+          "required": [
+            "candidate_source_paths",
+            "state"
+          ],
+          "properties": {
+            "candidate_source_paths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "ambiguous"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "OccurrenceSource": {
       "description": "Authored source surface of one occurrence.\n\nIt distinguishes object-field, semantic-region marker, and semantic-unit body contexts and cannot transfer identifiers between source and target.",
@@ -2268,7 +2550,7 @@
             "precision": {
               "type": "string",
               "enum": [
-                "date"
+                "full_date"
               ]
             },
             "value": {
@@ -2298,7 +2580,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Calendar year.",
+          "description": "Exact calendar year.",
           "type": "object",
           "required": [
             "precision",
@@ -2308,7 +2590,7 @@
             "precision": {
               "type": "string",
               "enum": [
-                "year"
+                "exact_year"
               ]
             },
             "value": {
@@ -2319,7 +2601,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Relative or source-defined ordinal.",
+          "description": "Month and day without a year, in canonical `--MM-DD` form.",
           "type": "object",
           "required": [
             "precision",
@@ -2329,18 +2611,17 @@
             "precision": {
               "type": "string",
               "enum": [
-                "ordinal"
+                "month_day"
               ]
             },
             "value": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string"
             }
           },
           "additionalProperties": false
         },
         {
-          "description": "Named temporal label when no stronger syntax is admitted.",
+          "description": "Authored approximate year, in canonical `~<year> BCE` form.",
           "type": "object",
           "required": [
             "precision",
@@ -2350,7 +2631,7 @@
             "precision": {
               "type": "string",
               "enum": [
-                "label"
+                "approximate_year"
               ]
             },
             "value": {

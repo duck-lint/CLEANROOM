@@ -839,6 +839,22 @@
       "description": "Value carried by one identifier assignment.\n\nThis is a closed structural union for exchange. It cannot be interpreted as evidence or a relation without its descriptor and provenance.",
       "oneOf": [
         {
+          "description": "Authored field is present with a null value.",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
           "description": "One string value.",
           "type": "object",
           "required": [
@@ -937,6 +953,76 @@
               "type": "array",
               "items": {
                 "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Collection of signed integers.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "integers"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Collection of booleans.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "booleans"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Collection whose elements have more than one mechanical value shape.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "values"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/IdentifierValue"
               }
             }
           },
@@ -3552,7 +3638,7 @@
             "precision": {
               "type": "string",
               "enum": [
-                "date"
+                "full_date"
               ]
             },
             "value": {
@@ -3582,7 +3668,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Calendar year.",
+          "description": "Exact calendar year.",
           "type": "object",
           "required": [
             "precision",
@@ -3592,7 +3678,7 @@
             "precision": {
               "type": "string",
               "enum": [
-                "year"
+                "exact_year"
               ]
             },
             "value": {
@@ -3603,7 +3689,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Relative or source-defined ordinal.",
+          "description": "Month and day without a year, in canonical `--MM-DD` form.",
           "type": "object",
           "required": [
             "precision",
@@ -3613,18 +3699,17 @@
             "precision": {
               "type": "string",
               "enum": [
-                "ordinal"
+                "month_day"
               ]
             },
             "value": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string"
             }
           },
           "additionalProperties": false
         },
         {
-          "description": "Named temporal label when no stronger syntax is admitted.",
+          "description": "Authored approximate year, in canonical `~<year> BCE` form.",
           "type": "object",
           "required": [
             "precision",
@@ -3634,7 +3719,7 @@
             "precision": {
               "type": "string",
               "enum": [
-                "label"
+                "approximate_year"
               ]
             },
             "value": {

@@ -44,11 +44,11 @@ use semantic_traversal_core::{
         AuthoredBlockType, BlockTargetMapping, CoverageSemantics, IdentifierAssignment,
         IdentifierAssignmentMode, IdentifierCardinality, IdentifierDescriptor, IdentifierRole,
         IdentifierValue, IdentifierValueShape, OccurrencePresentation, OccurrenceRecord,
-        OccurrenceSource, ProjectionValidationStatus, RetrievalSurfaceDescriptor,
-        SemanticObjectClassDescriptor, SemanticObjectRecord, SemanticRegionRecord,
-        SemanticUnitContent, SemanticUnitRecord, SourceKind, StructuralTransition,
-        StructuralTransitionOperation, SurfaceMatchMode, TemporalAffordance, TemporalAnchorRecord,
-        TemporalValue, TransportSegmentRecord,
+        OccurrenceResolutionState, OccurrenceSource, ProjectionValidationStatus,
+        RetrievalSurfaceDescriptor, SemanticObjectClassDescriptor, SemanticObjectRecord,
+        SemanticRegionRecord, SemanticUnitContent, SemanticUnitRecord, SourceKind,
+        StructuralTransition, StructuralTransitionOperation, SurfaceMatchMode, TemporalAffordance,
+        TemporalAnchorRecord, TemporalValue, TransportSegmentRecord,
     },
     semantic_access::{
         AddressBinding, ConstraintBinding, CoverageRequirement, CoverageRequirementKind,
@@ -326,6 +326,7 @@ fn projection() -> SemanticSpaceProjection {
             identifier_name: "note_type".into(),
             subject: SemanticAddress::Object(object.clone()),
             value: IdentifierValue::String("source_material".into()),
+            authored_raw_value: None,
             provenance: RecordProvenance::ObjectField {
                 object_id: object.clone(),
                 field_path: "note_type".into(),
@@ -338,7 +339,8 @@ fn projection() -> SemanticSpaceProjection {
             },
             authored_target_text: "Marx, Karl — Capital#Chapter 2".into(),
             display_alias: Some("Chapter 2".into()),
-            resolved_target: SemanticAddress::Region(region.clone()),
+            resolved_target: Some(SemanticAddress::Region(region.clone())),
+            resolution_state: OccurrenceResolutionState::Resolved,
             presentation_mode: OccurrencePresentation::Link,
             direction: Direction::Outgoing,
             source_span: None,
@@ -346,7 +348,7 @@ fn projection() -> SemanticSpaceProjection {
         temporal_anchors: vec![TemporalAnchorRecord {
             anchor_id: anchor.clone(),
             subject: SemanticAddress::Object(object),
-            value: TemporalValue::Year(1867),
+            value: TemporalValue::ExactYear(1867),
             provenance: RecordProvenance::ObjectField {
                 object_id: object_id(),
                 field_path: "original_year_published".into(),
@@ -462,7 +464,7 @@ fn activated_projection() -> ActivatedProjection {
         activated_temporal_anchors: vec![ActivatedTemporalAnchorRecord {
             anchor_id: anchor_id(),
             subject: SemanticAddress::Object(object_id()),
-            value: TemporalValue::Year(1867),
+            value: TemporalValue::ExactYear(1867),
             record_provenance: RecordProvenance::ObjectField {
                 object_id: object_id(),
                 field_path: "year".into(),
@@ -662,7 +664,7 @@ fn retrieval_result() -> RetrievalResult {
             incoming_occurrence_ids: vec![],
             temporal_anchors: vec![RetrievedTemporalAnchor {
                 anchor_id: anchor_id(),
-                value: TemporalValue::Year(1867),
+                value: TemporalValue::ExactYear(1867),
                 provenance: RecordProvenance::ObjectField {
                     object_id: object_id(),
                     field_path: "original_year_published".into(),

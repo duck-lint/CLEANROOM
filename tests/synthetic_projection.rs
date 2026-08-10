@@ -4,7 +4,10 @@ use std::collections::HashSet;
 
 use semantic_traversal_core::{
     SemanticObjectId,
-    model::{AddressKind, Direction, RecordProvenance, RetrievalSurfaceKind, SemanticAddress},
+    construction::join_region_by_exact_span,
+    model::{
+        AddressKind, Direction, RecordProvenance, RetrievalSurfaceKind, SemanticAddress, SourceSpan,
+    },
     projection::{
         CoverageSemantics, IdentifierAssignmentMode, IdentifierRole, OccurrenceSource,
         SemanticUnitContent, StructuralTransitionOperation, SurfaceMatchMode, TemporalAffordance,
@@ -13,8 +16,8 @@ use semantic_traversal_core::{
 };
 
 use support::synthetic_projection::{
-    CLEO_OBJECT, HEADING_ONLY_OBJECT, JOURNAL_ONE_OBJECT, MARX_OBJECT, MCCARTHY_OBJECT, occurrence,
-    tiny_projection,
+    CLEO_OBJECT, HEADING_ONLY_OBJECT, JOURNAL_ONE_OBJECT, MARX_OBJECT, MCCARTHY_OBJECT, object,
+    occurrence, region, tiny_projection,
 };
 
 #[test]
@@ -459,7 +462,11 @@ fn authored_occurrences_are_listed_by_source_and_target_and_body_markdown() {
                 assert!(occurrence_end <= region_end);
             }
         }
-        match &occurrence.resolved_target {
+        match occurrence
+            .resolved_target
+            .as_ref()
+            .expect("synthetic occurrence is resolved")
+        {
             SemanticAddress::Object(id) => assert!(
                 projection
                     .objects
@@ -515,7 +522,11 @@ fn actual_occurrence_topology_has_complete_typed_transition_possibilities() {
             OccurrenceSource::SemanticRegion { .. } => AddressKind::SemanticRegion,
             OccurrenceSource::SemanticUnit { .. } => AddressKind::SemanticUnit,
         };
-        let target_kind = occurrence.resolved_target.kind();
+        let target_kind = occurrence
+            .resolved_target
+            .as_ref()
+            .expect("synthetic occurrence is resolved")
+            .kind();
         assert!(has(
             source_kind.clone(),
             Direction::Outgoing,
@@ -542,12 +553,12 @@ fn actual_occurrence_topology_has_complete_typed_transition_possibilities() {
         AddressKind::SemanticRegion,
         AddressKind::SemanticUnit,
     ] {
-        assert!(
-            projection
-                .occurrences
-                .iter()
-                .any(|record| record.resolved_target.kind() == expected)
-        );
+        assert!(projection.occurrences.iter().any(|record| {
+            record
+                .resolved_target
+                .as_ref()
+                .is_some_and(|target| target.kind() == expected)
+        }));
     }
 }
 
@@ -586,7 +597,7 @@ fn heading_region_can_source_occurrence_without_manufacturing_a_unit() {
             region_address: region.address.clone()
         }
     );
-    let SemanticAddress::Object(target_id) = &occurrence.resolved_target else {
+    let Some(SemanticAddress::Object(target_id)) = &occurrence.resolved_target else {
         panic!("dedicated region occurrence must target an object")
     };
     assert!(
@@ -633,6 +644,71 @@ fn heading_region_can_source_occurrence_without_manufacturing_a_unit() {
             && transition.direction == Direction::Incoming
             && transition.to == AddressKind::SemanticRegion
     }));
+}
+
+#[test]
+fn heading_target_join_uses_exact_span_and_fails_closed() {
+    let object_id = object(MARX_OBJECT);
+    let base = tiny_projection()
+        .regions
+        .into_iter()
+        .find(|region| region.address.object_id == object_id)
+        .expect("synthetic object has a region");
+    let mut first = base.clone();
+    first.address = region(&object_id, "duplicate-heading-first");
+    first.heading_identity = "same-rendered-heading".into();
+    first.heading_path = vec!["same-rendered-heading".into()];
+    first.source_span = Some(SourceSpan {
+        source: "synthetic.md".into(),
+        start_byte: Some(10),
+        end_byte: Some(20),
+    });
+    let mut second = base;
+    second.address = region(&object_id, "duplicate-heading-second");
+    second.heading_identity = "same-rendered-heading".into();
+    second.heading_path = vec!["same-rendered-heading".into()];
+    second.source_span = Some(SourceSpan {
+        source: "synthetic.md".into(),
+        start_byte: Some(30),
+        end_byte: Some(40),
+    });
+    let regions = vec![first.clone(), second.clone()];
+    let matched_span = second.source_span.clone().unwrap();
+
+    let selected = join_region_by_exact_span(&regions, &object_id, &matched_span).unwrap();
+    assert_eq!(selected, second.address);
+    assert_ne!(selected, first.address);
+    assert_eq!(first.heading_identity, second.heading_identity);
+    assert_eq!(first.heading_path, second.heading_path);
+
+    let zero = join_region_by_exact_span(&[], &object_id, &matched_span).unwrap_err();
+    assert!(zero.to_string().contains("zero"));
+
+    let multiple = join_region_by_exact_span(
+        &[first.clone(), {
+            let mut duplicate = second.clone();
+            duplicate.source_span = first.source_span.clone();
+            duplicate
+        }],
+        &object_id,
+        first.source_span.as_ref().unwrap(),
+    )
+    .unwrap_err();
+    assert!(multiple.to_string().contains("multiple"));
+
+    let occurrence_id = occurrence("occurrence:synthetic:exact-span");
+    let mut selected_region = regions
+        .into_iter()
+        .find(|region| region.address == selected)
+        .unwrap();
+    selected_region
+        .incoming_occurrence_ids
+        .push(occurrence_id.clone());
+    assert!(
+        selected_region
+            .incoming_occurrence_ids
+            .contains(&occurrence_id)
+    );
 }
 
 #[test]
@@ -688,7 +764,7 @@ fn temporal_context_is_sourced_on_journals_and_not_directly_on_cleo() {
 
     for anchor in &projection.temporal_anchors {
         assert!(
-            matches!(&anchor.value, TemporalValue::Date(value) if value.starts_with("2026-07-"))
+            matches!(&anchor.value, TemporalValue::FullDate(value) if value.starts_with("2026-07-"))
         );
         assert!(
             matches!(&anchor.provenance, RecordProvenance::ObjectField { field_path, .. } if field_path == "journal_entry_date")
