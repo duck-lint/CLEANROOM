@@ -1,4 +1,4 @@
-//! Phase 5 adapter from the factual `vault-observation/v2` bundle.
+//! Phase 5 adapter from the factual `vault-observation/v3` bundle.
 //!
 //! This module deliberately consumes observer JSON as facts, then applies the
 //! CLEANROOM admission boundary. It does not import the observer's ontology or
@@ -19,6 +19,72 @@ use crate::{
 };
 
 const EXCLUDED_FIELDS: [&str; 5] = ["address", "email", "phone", "likes", "dislikes"];
+const ACCEPTED_ARTIFACT_SHA256: &str =
+    "d3a340a1b203a64b2455f71a8d4f17003d5bfdba8be0583cbec1529692320bb9";
+const ACCEPTED_SPECIMEN_IDENTITY: &str =
+    "f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4";
+const ACCEPTED_FIELD_UNIVERSE: [&str; 60] = [
+    "address",
+    "aliases",
+    "architect_or_operator",
+    "birthday",
+    "book_read_today",
+    "bridge_applicability_scope",
+    "bridge_applied",
+    "bridge_broken",
+    "bridge_conditions",
+    "bridge_isomorphism",
+    "bridge_justification",
+    "bridge_methods",
+    "bridge_preservation",
+    "bridge_required",
+    "canonical_name",
+    "cash_out",
+    "creator",
+    "dislikes",
+    "dream_location",
+    "dream_lucidity",
+    "dream_motif",
+    "dream_motif_valence",
+    "email",
+    "entity_type",
+    "first_met",
+    "format",
+    "from_mode",
+    "from_register",
+    "hypnagogic_resonance",
+    "interface",
+    "iso_broken",
+    "iso_justification",
+    "iso_structure",
+    "journal_entry_date",
+    "layer",
+    "likes",
+    "note_type",
+    "occupation",
+    "origin",
+    "original_year_published",
+    "phone",
+    "pillar",
+    "publish_studio",
+    "quarantine_reasons",
+    "reactivity",
+    "recall_ability",
+    "register",
+    "register_mode",
+    "relationship",
+    "revision_triggers",
+    "speculation_quarantine",
+    "stop_rule",
+    "tags",
+    "temporal_pace",
+    "title",
+    "to_mode",
+    "to_register",
+    "unity_level",
+    "uuid",
+    "vector_direction",
+];
 
 #[derive(Debug)]
 pub enum ConstructionError {
@@ -382,6 +448,10 @@ fn descriptor_assignment_mode(role: &IdentifierRole) -> IdentifierAssignmentMode
     }
 }
 
+fn accepted_occurrence_semantics(name: &str) -> bool {
+    matches!(name, "book_read_today" | "dream_motif")
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 struct ClosureMetrics {
     semantic_unit_source_attribution_failures: usize,
@@ -403,6 +473,9 @@ struct ClosureMetrics {
     assignment_mode_failures: usize,
     retrieval_affordance_failures: usize,
     class_applicability_failures: usize,
+    authority_class_applicability_failures: usize,
+    authority_occurrence_capability_failures: usize,
+    occurrence_resolution_state_mismatches: usize,
     present_null_temporal_anchor_failures: usize,
 }
 
@@ -614,10 +687,34 @@ fn validate_projection(
             }
         }
     }
+    for class in &projection.object_classes {
+        if class
+            .applicable_identifier_names
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>()
+            != accepted_class_fields(&class.class_name)
+        {
+            metrics.authority_class_applicability_failures += 1;
+        }
+    }
     for descriptor in &projection.identifier_descriptors {
         let expected_mode = descriptor_assignment_mode(&descriptor.semantic_role);
         if descriptor.assignment_mode != expected_mode {
             metrics.assignment_mode_failures += 1;
+        }
+        let occurrence_capability = accepted_occurrence_semantics(&descriptor.identifier_name);
+        if descriptor.may_contain_canonical_links != occurrence_capability
+            || descriptor
+                .retrieval_surface_ids
+                .contains(&"surface:graph".to_owned())
+                != occurrence_capability
+            || descriptor
+                .enabled_transition_ids
+                .contains(&"transition:object-occurrence-outgoing".to_owned())
+                != occurrence_capability
+        {
+            metrics.authority_occurrence_capability_failures += 1;
         }
         for surface_id in &descriptor.retrieval_surface_ids {
             if !surface_ids.contains(surface_id.as_str())
@@ -717,6 +814,15 @@ fn validate_projection(
         }
     }
     for occurrence in &projection.occurrences {
+        let resolution_matches = match (&occurrence.resolution_state, &occurrence.resolved_target) {
+            (OccurrenceResolutionState::Resolved, Some(_)) => true,
+            (OccurrenceResolutionState::Unresolved, None)
+            | (OccurrenceResolutionState::Ambiguous { .. }, None) => true,
+            _ => false,
+        };
+        if !resolution_matches {
+            metrics.occurrence_resolution_state_mismatches += 1;
+        }
         match &occurrence.source {
             OccurrenceSource::ObjectField { object_id, .. } => {
                 if projection
@@ -806,6 +912,9 @@ fn validate_projection(
         + metrics.assignment_mode_failures
         + metrics.retrieval_affordance_failures
         + metrics.class_applicability_failures
+        + metrics.authority_class_applicability_failures
+        + metrics.authority_occurrence_capability_failures
+        + metrics.occurrence_resolution_state_mismatches
         + metrics.present_null_temporal_anchor_failures
         != 0
     {
@@ -850,7 +959,7 @@ fn temporal_value(
     }
     match (field, observed_shape, value) {
         ("birthday", Some("date"), Value::String(v)) => Some(TemporalValue::FullDate(v.clone())),
-        ("birthday", _, Value::String(v)) if v.starts_with("--") && v.len() == 7 => {
+        ("birthday", _, Value::String(v)) if valid_month_day(v) => {
             Some(TemporalValue::MonthDay(v.clone()))
         }
         ("first_met", Some("date"), Value::String(v)) => Some(TemporalValue::FullDate(v.clone())),
@@ -862,7 +971,7 @@ fn temporal_value(
             .and_then(|n| i32::try_from(n).ok())
             .map(TemporalValue::ExactYear),
         ("original_year_published", Some("string"), Value::String(v))
-            if v.starts_with('~') && v.ends_with(" BCE") =>
+            if valid_approximate_year(v) =>
         {
             Some(TemporalValue::ApproximateYear(v.clone()))
         }
@@ -871,6 +980,35 @@ fn temporal_value(
         }
         _ => None,
     }
+}
+
+fn valid_month_day(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() != 7
+        || bytes[0] != b'-'
+        || bytes[1] != b'-'
+        || bytes[4] != b'-'
+        || !bytes[2..4].iter().all(u8::is_ascii_digit)
+        || !bytes[5..7].iter().all(u8::is_ascii_digit)
+    {
+        return false;
+    }
+    let month = u32::from(value.as_bytes()[2] - b'0') * 10 + u32::from(value.as_bytes()[3] - b'0');
+    let day = u32::from(value.as_bytes()[5] - b'0') * 10 + u32::from(value.as_bytes()[6] - b'0');
+    let max_day = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        2 => 29,
+        4 | 6 | 9 | 11 => 30,
+        _ => 0,
+    };
+    max_day != 0 && day >= 1 && day <= max_day
+}
+
+fn valid_approximate_year(value: &str) -> bool {
+    let Some(year) = value.strip_prefix('~').and_then(|v| v.strip_suffix(" BCE")) else {
+        return false;
+    };
+    !year.is_empty() && year.as_bytes().iter().all(u8::is_ascii_digit)
 }
 fn candidate_paths(link: &Value) -> Vec<String> {
     link.get("target_candidates")
@@ -968,7 +1106,7 @@ fn accepted_class_fields(class_name: &str) -> BTreeSet<String> {
     match class_name {
         "entity" => fields.extend(ENTITY.iter().map(|s| (*s).into())),
         "source_material" => fields.extend(SOURCE.iter().map(|s| (*s).into())),
-        "journal_entry" | "dream_motif" => fields.extend(JOURNAL.iter().map(|s| (*s).into())),
+        "journal_entry" => fields.extend(JOURNAL.iter().map(|s| (*s).into())),
         "inferential_bridge" => fields.extend(BRIDGE.iter().map(|s| (*s).into())),
         _ => {}
     }
@@ -1272,9 +1410,58 @@ pub fn resolve_explicit_block_target(
         .cloned()
 }
 
+fn finalize_occurrence_resolution(
+    candidate_count: usize,
+    candidate_source_paths: &[String],
+    target: Option<SemanticAddress>,
+) -> Result<(Option<SemanticAddress>, OccurrenceResolutionState), ConstructionError> {
+    match (candidate_count, target) {
+        (0, None) => Ok((None, OccurrenceResolutionState::Unresolved)),
+        (0, Some(_)) => Err(ConstructionError::Contract(
+            "resolved occurrence target has no canonical candidate".into(),
+        )),
+        (1, Some(target)) => Ok((Some(target), OccurrenceResolutionState::Resolved)),
+        (1, None) => Ok((None, OccurrenceResolutionState::Unresolved)),
+        (_, None) => Ok((
+            None,
+            OccurrenceResolutionState::Ambiguous {
+                candidate_source_paths: candidate_source_paths.to_vec(),
+            },
+        )),
+        (_, Some(_)) => Err(ConstructionError::Contract(
+            "ambiguous occurrence received a resolved target".into(),
+        )),
+    }
+}
+
+fn validate_accepted_field_universe(observed: &BTreeSet<String>) -> Result<(), ConstructionError> {
+    let accepted: BTreeSet<_> = ACCEPTED_FIELD_UNIVERSE
+        .iter()
+        .map(|field| (*field).to_owned())
+        .collect();
+    let missing: Vec<_> = accepted.difference(observed).cloned().collect();
+    let unexpected: Vec<_> = observed.difference(&accepted).cloned().collect();
+    if !missing.is_empty() || !unexpected.is_empty() {
+        return Err(ConstructionError::Contract(format!(
+            "accepted field universe mismatch; missing={missing:?}; unexpected={unexpected:?}"
+        )));
+    }
+    Ok(())
+}
+
 /// Construct a private projection and a repository-safe numerical report.
 pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, ConstructionError> {
-    let root: Value = serde_json::from_str(&fs::read_to_string(observation_path)?)?;
+    let input_bytes = fs::read(observation_path)?;
+    let input_artifact_sha256 = sha256(&input_bytes);
+    if input_artifact_sha256 != ACCEPTED_ARTIFACT_SHA256 {
+        return Err(ConstructionError::Contract(format!(
+            "accepted observation artifact SHA-256 mismatch: {input_artifact_sha256}"
+        )));
+    }
+    let input_text = String::from_utf8(input_bytes).map_err(|error| {
+        ConstructionError::Contract(format!("accepted observation is not UTF-8: {error}"))
+    })?;
+    let root: Value = serde_json::from_str(&input_text)?;
     if text(&root, "observation_schema_version") != "vault-observation/v3" {
         return Err(ConstructionError::Contract(
             "observer schema is not vault-observation/v3".into(),
@@ -1291,6 +1478,11 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         ));
     }
     let snapshot = text(&root, "vault_resident_snapshot_identity");
+    if snapshot != ACCEPTED_SPECIMEN_IDENTITY {
+        return Err(ConstructionError::Contract(
+            "observer specimen identity is not accepted".into(),
+        ));
+    }
     let markdown = array(&root, "markdown_observations");
     let markdown_count = markdown.len();
     let mut admitted = Vec::new();
@@ -1854,6 +2046,11 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                     .or_default()
                     .push(occurrence_id.clone());
             }
+            let (resolved_target, resolution_state) = finalize_occurrence_resolution(
+                canonical_candidates.len(),
+                &candidate_source_paths,
+                target,
+            )?;
             occurrences.push(OccurrenceRecord {
                 occurrence_id,
                 source,
@@ -1862,14 +2059,8 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                     .get("display_alias")
                     .and_then(Value::as_str)
                     .map(str::to_owned),
-                resolved_target: target,
-                resolution_state: match canonical_candidates.as_slice() {
-                    [] => OccurrenceResolutionState::Unresolved,
-                    [_] => OccurrenceResolutionState::Resolved,
-                    _ => OccurrenceResolutionState::Ambiguous {
-                        candidate_source_paths: candidate_source_paths.clone(),
-                    },
-                },
+                resolved_target,
+                resolution_state,
                 presentation_mode: mode,
                 direction: Direction::Outgoing,
                 source_span,
@@ -1881,12 +2072,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         .filter(|k| !EXCLUDED_FIELDS.contains(&k.as_str()))
         .cloned()
         .collect();
-    if field_names.len() != 60 {
-        return Err(ConstructionError::Contract(format!(
-            "observed field universe is {}, expected 60",
-            field_names.len()
-        )));
-    }
+    validate_accepted_field_universe(&field_names)?;
     let descriptors = admitted_fields
         .iter()
         .map(|name| {
@@ -1903,8 +2089,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                 ],
                 assignment_mode: descriptor_assignment_mode(&role),
                 source_surface: format!("frontmatter.{name}"),
-                may_contain_canonical_links: ["book_read_today", "dream_motif"]
-                    .contains(&name.as_str()),
+                may_contain_canonical_links: accepted_occurrence_semantics(name),
                 temporal_affordance: if [
                     "journal_entry_date",
                     "birthday",
@@ -1922,10 +2107,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                     if matches!(role, IdentifierRole::TemporalAnchoring) {
                         surfaces.push("surface:temporal".into());
                     }
-                    if matches!(
-                        role,
-                        IdentifierRole::ContextualRelation | IdentifierRole::ProfileRelation
-                    ) {
+                    if accepted_occurrence_semantics(name) {
                         surfaces.push("surface:graph".into());
                     }
                     surfaces
@@ -1935,10 +2117,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                     if matches!(role, IdentifierRole::TemporalAnchoring) {
                         transitions.push("transition:temporal-anchor".into());
                     }
-                    if matches!(
-                        role,
-                        IdentifierRole::ContextualRelation | IdentifierRole::ProfileRelation
-                    ) {
+                    if accepted_occurrence_semantics(name) {
                         transitions.push("transition:object-occurrence-outgoing".into());
                     }
                     transitions
@@ -2267,8 +2446,12 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
             "observer_commit": "e9bb2d95c14b1beb334dc2b8d83420f5998b9a53",
             "observer_schema": "vault-observation/v3",
             "corpus_snapshot_identity": snapshot,
-            "specimen_identity": "f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4",
-            "pinned_input_artifact_sha256": sha256(&fs::read(observation_path)?),
+            "specimen_identity": snapshot,
+            "pinned_input_artifact_sha256": input_artifact_sha256,
+            "accepted_artifact_sha256_gate": true,
+            "accepted_observer_commit_gate": true,
+            "accepted_schema_gate": true,
+            "accepted_specimen_gate": true,
         },
         "admission": {
             "whole_resident_source_count": markdown_count,
@@ -2289,6 +2472,12 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
             "assignment_count": projection.identifier_assignments.len(),
             "present_null_assignment_count": projection.identifier_assignments.iter().filter(|a| matches!(a.value, IdentifierValue::Null)).count(),
             "admitted_field_coverage": projection.identifier_descriptors.len(),
+            "observed_field_universe_count": field_names.len(),
+            "accepted_field_universe_count": ACCEPTED_FIELD_UNIVERSE.len(),
+            "exact_field_universe_match": true,
+            "missing_fields": Vec::<String>::new(),
+            "unexpected_fields": Vec::<String>::new(),
+            "admitted_field_count": ACCEPTED_FIELD_UNIVERSE.len() - EXCLUDED_FIELDS.len(),
             "excluded_field_count": EXCLUDED_FIELDS.len(),
             "inherited_assignment_reference_count": inherited_assignment_reference_count,
             "region_inherited_assignment_reference_count": region_inherited_assignment_reference_count
@@ -2338,9 +2527,14 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
             "assignment_mode_failures": closure.assignment_mode_failures,
             "retrieval_affordance_failures": closure.retrieval_affordance_failures,
             "class_applicability_failures": closure.class_applicability_failures,
+            "authority_class_applicability_failures": closure.authority_class_applicability_failures,
+            "authority_occurrence_capability_failures": closure.authority_occurrence_capability_failures,
+            "occurrence_resolution_state_mismatches": closure.occurrence_resolution_state_mismatches,
             "present_null_temporal_anchor_failures": closure.present_null_temporal_anchor_failures
         },
         "temporal": {
+            "month_day_grammar_validated": true,
+            "approximate_year_grammar_validated": true,
             "temporally_capable_descriptors": projection.identifier_descriptors.iter().filter(|d| matches!(d.temporal_affordance, TemporalAffordance::CreatesAnchor)).count(),
             "materially_created_temporal_anchor_count": projection.temporal_anchors.len(),
             "representation_counts": {
@@ -2437,6 +2631,37 @@ mod tests {
             Some(TemporalValue::ApproximateYear(_))
         ));
         assert!(temporal_value("birthday", &json!("sometime"), Some("string")).is_none());
+        assert!(temporal_value("birthday", &json!("--02-29"), Some("string")).is_some());
+        assert!(temporal_value("birthday", &json!("--99-99"), Some("string")).is_none());
+        assert!(temporal_value("birthday", &json!("--13-01"), Some("string")).is_none());
+        assert!(temporal_value("birthday", &json!("--12-aa"), Some("string")).is_none());
+        assert!(
+            temporal_value(
+                "original_year_published",
+                &json!("~400 BCE"),
+                Some("string")
+            )
+            .is_some()
+        );
+        assert!(
+            temporal_value(
+                "original_year_published",
+                &json!("~banana BCE"),
+                Some("string")
+            )
+            .is_none()
+        );
+        assert!(
+            temporal_value("original_year_published", &json!("~400 BC"), Some("string")).is_none()
+        );
+        assert!(
+            temporal_value(
+                "original_year_published",
+                &json!("about 400 BCE"),
+                Some("string")
+            )
+            .is_none()
+        );
         assert!(temporal_value("journal_entry_date", &Value::Null, Some("date")).is_none());
     }
 
@@ -2458,6 +2683,52 @@ mod tests {
         assert!(accepted_class_fields("entity").contains("birthday"));
         assert!(!accepted_class_fields("entity").contains("title"));
         assert!(accepted_class_fields("source_material").contains("title"));
+        assert!(accepted_class_fields("journal_entry").contains("architect_or_operator"));
+        assert!(accepted_class_fields("journal_entry").contains("dream_motif"));
+        assert!(!accepted_class_fields("dream_motif").contains("architect_or_operator"));
+        assert!(!accepted_class_fields("dream_motif").contains("journal_entry_date"));
+        assert!(accepted_occurrence_semantics("book_read_today"));
+        assert!(accepted_occurrence_semantics("dream_motif"));
+        assert!(!accepted_occurrence_semantics("relationship"));
+    }
+
+    #[test]
+    fn exact_field_universe_rejects_substitution_and_missing_members() {
+        let accepted: BTreeSet<_> = ACCEPTED_FIELD_UNIVERSE
+            .iter()
+            .map(|field| (*field).into())
+            .collect();
+        assert!(validate_accepted_field_universe(&accepted).is_ok());
+        let mut unknown = accepted.clone();
+        unknown.remove("address");
+        unknown.insert("unknown_field".into());
+        assert!(validate_accepted_field_universe(&unknown).is_err());
+        let mut missing = accepted;
+        missing.remove("dream_motif");
+        assert!(validate_accepted_field_universe(&missing).is_err());
+    }
+
+    #[test]
+    fn final_occurrence_resolution_state_matches_final_target() {
+        let paths = vec!["one.md".into()];
+        let object =
+            SemanticAddress::Object("00000000-0000-0000-0000-000000000001".parse().unwrap());
+        assert!(matches!(
+            finalize_occurrence_resolution(0, &[], None),
+            Ok((None, OccurrenceResolutionState::Unresolved))
+        ));
+        assert!(matches!(
+            finalize_occurrence_resolution(1, &paths, Some(object.clone())),
+            Ok((
+                Some(SemanticAddress::Object(_)),
+                OccurrenceResolutionState::Resolved
+            ))
+        ));
+        assert!(matches!(
+            finalize_occurrence_resolution(2, &["one.md".into(), "two.md".into()], None),
+            Ok((None, OccurrenceResolutionState::Ambiguous { .. }))
+        ));
+        assert!(finalize_occurrence_resolution(0, &[], Some(object)).is_err());
     }
 
     #[test]
