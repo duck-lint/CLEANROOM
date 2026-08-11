@@ -108,17 +108,32 @@ or the possibility of a future intrinsic provider limitation.
 ### Affected contracts and tests
 
 Corrected in this PR: the projection requirements, implementation sequence,
-clean-room protocol, Rust assessment, semantic-access language, and
-projection-activation/access documentation. Known downstream reconciliation:
+clean-room protocol, Rust assessment, semantic-access language,
+projection-activation/access documentation, and directly contradictory
+runtime/construction-report wording. Known downstream reconciliation:
 
 - `src/projection.rs`: remove projection-owned
   `configuration_snapshot_id` and routine surface candidate-limit fields;
+  reconcile `RetrievalSurfaceDescriptor.available` when it means executable
+  provider/index availability; classify `CoverageSemantics::AvailabilityOnly`
+  rather than assuming it means provider presence; and remove or redefine
+  provider-status text in `technical_limitations` so that only structural
+  limitations remain projection state;
 - `src/construction.rs`: remove the phase-5 construction configuration
-  identity and projection-level candidate-limit initialization;
+  identity and projection-level candidate-limit initialization; reconcile
+  `available: false` provider-state initialization, the
+  `phase5:construction:no-indexes` identity, `AvailabilityOnly` initialization,
+  and provider-status `technical_limitations`;
 - `schemas/semantic-space-projection.schema.json`: remove the projection
   configuration field and routine projection-level candidate-limit fields;
+  reconcile the serialized `available`, `coverage_semantics`, and
+  `technical_limitations` representations under the same structural/provider
+  boundary;
 - `tests/support/synthetic_projection.rs`, `tests/synthetic_projection.rs`,
-  and `tests/contracts.rs`: reconcile projection fixtures and assertions;
+  and `tests/contracts.rs`: reconcile projection fixture construction,
+  assertions, and serialized expectations for `available`,
+  `AvailabilityOnly`, provider-status `technical_limitations`, and the
+  removed configuration/limit fields;
 - `tests/activation_contracts.rs`: separate runtime configuration-context
   checks from superseded projection-configuration matching;
 - `schemas/activated-projection.schema.json`, `schemas/continuation-handle.schema.json`,
@@ -136,6 +151,85 @@ projection-activation/access documentation. Known downstream reconciliation:
 These are known downstream consequences, not changes made here. PR #21 is not
 modified.
 
+#### Category A — must be reconciled after this amendment, before Phase 6
+
+The projection-layer mismatches are specifically:
+
+- `src/projection.rs`: `RetrievalSurfaceDescriptor.available`,
+  `CoverageSemantics::AvailabilityOnly`, and provider-status entries in
+  `technical_limitations`, in addition to the removed configuration and
+  routine-limit fields;
+- `src/construction.rs`: `available: false`,
+  `CoverageSemantics::AvailabilityOnly`, provider-status
+  `technical_limitations`, `phase5:construction:no-indexes`, and projection
+  candidate-limit initialization;
+- `schemas/semantic-space-projection.schema.json`: the serialized forms of
+  all of those fields and variants;
+- `tests/support/synthetic_projection.rs`, `tests/synthetic_projection.rs`,
+  and `tests/contracts.rs`: all corresponding fixture values, assertions, and
+  serialization expectations;
+- the Phase 5 serialized projection and its logical/byte identity records if
+  the corrected representation changes their shape.
+
+The following locations require explicit classification during that same
+reconciliation rather than automatic deletion:
+
+- `src/activation.rs`,
+  `schemas/activated-projection.schema.json`,
+  `schemas/activated-identifier-assignment-record.schema.json`,
+  `schemas/activated-occurrence-record.schema.json`, and their tests: the
+  `available_surface_ids` fields currently describe surfaces structurally
+  capable of inspecting a record and may remain at that layer; any use that
+  instead means provider executability must be corrected;
+- `tests/activation_contracts.rs`,
+  `schemas/projection-activation-violation.schema.json`,
+  `src/execution.rs`, `src/packet.rs`,
+  `schemas/execution-limits.schema.json`, and
+  `schemas/conformance-result.schema.json`: unavailable/provider/access
+  statuses are valid runtime facts when scoped to a concrete operation or
+  probe, but must not be interpreted as removal of a canonical surface from
+  \(M_\sigma\).
+
+#### Category B — valid later runtime/access state
+
+`src/activation.rs`, `src/semantic_access.rs`, `src/execution.rs`,
+`src/packet.rs`, the activation/access/conformance schemas, and their tests may
+continue to carry runtime configuration identity, operating limits, provider
+failure, invocation unavailability, unsupported adapter modes, failed probes,
+and unavailable continuation. These describe concrete access state, not
+projection surface existence.
+
+#### Category C — deliberately deferred Phase 7 materialization questions
+
+Only the following remain deferred: whether concrete provider/index state is
+uniquely determined by a fixed derivation contract over (M_\sigma\), or instead
+requires an independent frozen identity/handle; and what identity,
+immutability, and telemetry semantics the concrete production access machinery
+actually demonstrates. Provider-status leakage into projection is not deferred.
+
+The governing classification is:
+
+```text
+surface structural existence in M_sigma
+    = projection state
+
+record-level surface applicability
+    = projected structural fact for that record
+
+provider/index executability and invocation success
+    = later access/runtime state
+```
+
+Every complete projection structurally contains the exact, lexical, vector,
+graph, and temporal surface families. Provider absence must not be represented
+as absence of one of those families. `CoverageSemantics::AvailabilityOnly`
+requires implementation classification: it may remain only if it expresses a
+provider-independent structural coverage guarantee; if it means merely that a
+provider exists, it is stale and must be removed or replaced during the
+downstream reconciliation. Likewise, projection `technical_limitations` may
+retain a limitation constitutive of the projected affordance, but not status
+text such as “no executable index or provider.”
+
 ### Migration implications
 
 ```text
@@ -143,7 +237,7 @@ merge this authority amendment
     ↓
 bounded Rust/schema/test reconciliation
     ↓
-remove projection-level configuration identity and routine policy bounds
+remove/migrate all runtime/provider state from the projection representation
     ↓
 reconstruct Phase 5 projection if serialized shape changes
     ↓
@@ -153,11 +247,14 @@ resume Phase 6 validation against corrected authority
 ```
 
 The existing Phase 5 serialized projection was constructed under the
-superseded representation containing `configuration_snapshot_id` and routine
-projection-level candidate limits. If reconciliation changes its serialized
-shape, its logical hash, byte SHA-256, and projection snapshot output must be
-regenerated from the same accepted observation; preserving the old hashes is
-not a migration goal.
+superseded representation containing `configuration_snapshot_id`, routine
+projection-level candidate limits, `RetrievalSurfaceDescriptor.available`
+where tied to executable provider/index state,
+`CoverageSemantics::AvailabilityOnly` where tied to provider availability, and
+provider/index status encoded in projection `technical_limitations`. If
+reconciliation changes its serialized shape, its logical hash, byte SHA-256,
+and projection snapshot output must be regenerated from the same accepted
+observation; preserving the old hashes is not a migration goal.
 
 ### Unresolved decisions
 

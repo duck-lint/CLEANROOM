@@ -98,7 +98,7 @@ The second inference call uses projection tools to bind problem-space structure 
 - identifier assignments;
 - occurrences;
 - temporal anchors;
-- available retrieval surfaces.
+- runtime-usable retrieval surfaces and record-applicable surface identities.
 
 The final executable plan uses resolved projected addresses wherever canonical addresses exist.
 
@@ -422,7 +422,7 @@ It checks that:
 - every address exists;
 - every relation exists;
 - the requested direction is represented;
-- the requested surface is available;
+- the requested surface operation is available in the runtime access context;
 - each operation may consume the preceding output type;
 - requested outputs can be materialized;
 - configuration bounds are respected.

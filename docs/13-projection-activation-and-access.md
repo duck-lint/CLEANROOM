@@ -173,7 +173,11 @@ Examples:
 - canonical links and occurrences should be graph-navigable;
 - temporal identifiers and anchors should be temporally navigable.
 
-A technical limitation must be declared explicitly in the projection.
+A structural limitation of the projected surface affordance may be represented
+in the projection when it is constitutive of that affordance. A limitation
+arising from a concrete provider or index implementation belongs to the later
+access/provider boundary and must not be projected as semantic-space state
+merely because that provider is absent, constrained, or unavailable.
 
 All valid identifier-to-surface affordances must be projected rather than added through case-by-case patches.
 
@@ -234,7 +238,7 @@ activated nodes
 typed edges
 identifier assignments
 incoming and outgoing occurrence summaries
-available retrieval surfaces
+runtime-usable retrieval surfaces and record-applicable surface identities
 surface telemetry
 expansion handles
 activation provenance
@@ -259,7 +263,7 @@ An activated object should initially expose:
 - contained-region and unit counts;
 - incoming occurrence counts;
 - outgoing occurrence counts;
-- available retrieval surfaces;
+- runtime-usable retrieval surfaces and record-applicable surface identities;
 - bounded representative neighbours;
 - activation provenance.
 
@@ -275,7 +279,7 @@ An activated unit should initially expose:
 - incoming and outgoing occurrence summaries;
 - temporal-anchor summaries;
 - short text preview;
-- available retrieval surfaces;
+- runtime-usable retrieval surfaces and record-applicable surface identities;
 - activation provenance.
 
 Full semantic-unit prose is hydrated during execution.
@@ -683,13 +687,21 @@ Later seeds may be mechanically omitted when a configured seed bound is reached.
 
 ### First-seen canonical deduplication and provenance aggregation
 
-Future PR 4B output vectors use deterministic first-seen order. Available surfaces execute in `SemanticSpaceProjection.retrieval_surfaces` vector order. Surface candidates preserve each surface's deterministic returned order. Structural records preserve frozen projection vector order.
+Future PR 4B output vectors use deterministic first-seen order. Runtime-usable
+surface operations execute in `SemanticSpaceProjection.retrieval_surfaces`
+vector order. Surface candidates preserve each surface's deterministic
+returned order. Structural records preserve frozen projection vector order.
 
 Canonical object, region, unit, assignment, occurrence, anchor, and edge identities appear at most once in their respective activated vectors. When a canonical record is exposed through several paths, retain its first-seen position and append all unique activation-provenance entries in first-seen order. Do not merge records by title, alias, text, similarity, or inferred equivalence. Aliases never become duplicate canonical objects. Attention bands affect breadth and ordering but never semantic identity or truth. No numeric relevance or attention score is introduced.
 
 ### Richer bounded summaries
 
-Activated object records expose title, aliases, object class, bounded visible region addresses, bounded visible unit ids, visible identifier assignment ids, full contained counts, occurrence counts, available surfaces, and activation provenance. Aliases are discovery surfaces, not canonical identity. Object class is projected typing, not a generated ontology.
+Activated object records expose title, aliases, object class, bounded visible
+region addresses, bounded visible unit ids, visible identifier assignment ids,
+full contained counts, occurrence counts, runtime-usable surfaces and
+record-applicable surface identities, and activation provenance. Aliases are
+discovery surfaces, not canonical identity. Object class is projected typing,
+not a generated ontology.
 
 Activated region records expose heading path, heading identity, visible inherited identifier assignment ids, bounded visible unit ids, full contained count, surfaces, and activation provenance. Activated unit records expose authored block type, heading path, inherited and unit-local identifier assignment ids, typed text preview, incidence counts, temporal-anchor count, surfaces, and activation provenance.
 
@@ -887,7 +899,12 @@ Configured-default provenance does not replace the originating utterance, refere
 
 ### Atomic surface-access failure and activation failure
 
-`SurfaceAccessFailed` covers scripted access returning a failure, a declared mode unavailable from the configured activation-access implementation, malformed deterministic surface output, and failure to inspect one required configured available surface.
+`SurfaceAccessFailed` covers scripted access returning a failure, a declared
+mode unavailable from the configured activation-access implementation,
+malformed deterministic surface output, and failure to inspect one required
+surface operation that the runtime context declares usable. This is a runtime
+access fact; it does not say that the canonical surface is absent from
+\(M_\sigma\).
 
 It does not mean no corpus result exists, the probe is irrelevant, the source expression was wrong, or the problem-space interpretation failed.
 

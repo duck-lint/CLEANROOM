@@ -183,8 +183,10 @@ temporal
 ```
 
 Each surface is therefore a represented structural affordance of \(M_\sigma\),
-not necessarily an executable provider or index at this projection stage. Keep
-these facts distinct:
+not necessarily an executable provider or index at this projection stage. A
+provider or index that is absent, constrained, or not yet implemented does not
+make the represented surface absent from \(M_\sigma\). Keep these facts
+distinct:
 
 ```text
 surface is represented in Mσ
@@ -411,9 +413,11 @@ disable a canonical surface in \(M_\sigma\).
 
 Routine default and hard candidate bounds are runtime operating policy, not
 projection capability or constitutive metadata. If a future concrete provider
-has an intrinsic hard technical limitation, that fact may be represented as
-provider or capability metadata when the provider exists; it must not be
-confused with a runtime default or access budget.
+has an intrinsic hard technical limitation, that fact belongs to the later
+provider/capability boundary unless it is also a limitation constitutive of the
+projected affordance. It must not be projected as semantic-space state merely
+because the provider is absent, constrained, or not yet implemented, and it
+must not be confused with a runtime default or access budget.
 
 No identifier may be omitted from a capable surface through an undocumented case-specific rule.
 
@@ -543,7 +547,7 @@ Activated records must expose:
 - canonical identity;
 - relevant identifiers;
 - incoming and outgoing summaries;
-- available surfaces;
+- runtime-usable retrieval surfaces and record-applicable surface identities;
 - bounded previews;
 - candidate counts;
 - continuation handles;

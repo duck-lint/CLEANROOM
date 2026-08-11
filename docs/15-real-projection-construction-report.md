@@ -100,10 +100,12 @@ unit-content hash.
 
 ## Capability topology
 
-The five represented surfaces remain unavailable because Phase 5 creates no
-provider or executable index. Their structural visibility is nevertheless
-typed: vector has no Identifier visibility, graph returns occurrence/incidence
-identity, and temporal exposes only licensed temporal subjects/anchors.
+Phase 5 creates no executable provider or index, but that implementation fact
+does not make the five represented surface families unavailable in the
+projection. Their structural visibility is nevertheless typed: vector has no
+Identifier visibility, graph returns occurrence/incidence identity, and
+temporal exposes only licensed temporal subjects/anchors. Provider executability
+remains a later access-boundary fact.
 Descriptor surface references, transition references, surface IDs, and
 from/to visibility are closed.
 
