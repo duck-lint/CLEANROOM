@@ -120,7 +120,7 @@ It may reject:
 
 - absent identifiers;
 - impossible identifier/object combinations;
-- unavailable retrieval surfaces;
+- unavailable runtime retrieval-surface operations;
 - missing canonical targets;
 - invalid directions;
 - absent relations;

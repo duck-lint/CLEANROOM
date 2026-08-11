@@ -182,7 +182,7 @@ A valid exhaustive plan requires:
 Zero matches after completed execution is different from:
 
 - invalid plan;
-- unavailable surface;
+- unavailable runtime surface operation;
 - incomplete execution;
 - a problem-space gap;
 - failure to activate a region.

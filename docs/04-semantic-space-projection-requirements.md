@@ -31,9 +31,31 @@ ingest_identity
 schema_version
 logical_hash
 corpus_snapshot_identity
-configuration_snapshot_id
 validation_status
 ```
+
+These fields identify the projection object itself and its authoritative
+construction lineage:
+
+- `projection_snapshot_id` is the identity or handle for this immutable
+  projection instance;
+- `ingest_identity` identifies the accepted factual-ingest and observation
+  lineage from which it was projected;
+- `schema_version` identifies the representation contract under which the
+  projection was instantiated;
+- `logical_hash` is a deterministic identity of the complete logical
+  projection contents, produced by a deterministic serialization or hashing
+  procedure satisfying the accepted projection-identity invariants;
+- `corpus_snapshot_identity` identifies the exact authoritative corpus state
+  represented by the projection; and
+- `validation_status` records whether the instantiated projection has passed
+  the required validation gate.
+
+Runtime configuration is not constitutive of this identity. A later activation,
+semantic-access, conformance, or execution operation may bind a
+`configuration_snapshot_id` alongside `projection_snapshot_id`, but changing
+that runtime policy does not by itself create or invalidate a semantic
+projection snapshot.
 
 The snapshot may not change between:
 
@@ -47,6 +69,43 @@ boundary inference
 ```
 
 Corpus changes become visible on a later turn through a new snapshot.
+
+### 3.1 Deterministic projection instantiation
+
+Projection construction is deterministic materialization, not runtime
+configuration. The constructor receives:
+
+```text
+accepted factual observation
++ accepted admission rules
++ accepted semantic-object/unit/region/identifier/occurrence/temporal rules
++ accepted structural retrieval-surface affordances
+```
+
+and instantiates the complete semantic projection \(M_\sigma\). It does not
+use activation breadth, relation depth, candidate budgets, continuation
+limits, packet limits, or execution budgets to decide which valid semantic
+structure exists. It does not disable a canonical retrieval surface because a
+later runtime operation may not invoke it, and it does not repair malformed
+authored corpus structure through heuristic runtime behavior.
+
+If projection construction or validation exposes a deterministic projection
+failure, first classify the authority domain actually at fault. The possible
+domains include an authored-substrate defect, an observation defect, a missing
+constitutive rule, an accepted-contract defect, or a constructor defect. Correct
+only the boundary shown to be wrong, then construct a new projection
+deterministically. Runtime configuration is not a mechanism for concealing any
+of these failures or making an invalid projection appear valid.
+
+The resulting distinction is:
+
+```text
+Mσ
+    = complete represented semantic space
+
+runtime configuration
+    = later deterministic policy governing bounded access to Mσ
+```
 
 ## 4. Two simultaneous responsibilities
 
@@ -64,7 +123,9 @@ The projection must contain both schema-level possibility and instance-level act
 - valid transitions;
 - retrieval-surface capabilities;
 - temporal and graph affordances;
-- structural and configuration bounds.
+- structural coverage, match, identity, hydration, continuation, and
+  exhaustive-enumeration capabilities;
+- intrinsic technical limitations where materially true.
 
 ### 4.2 Instance-level actuality
 
@@ -109,6 +170,33 @@ W_t \subseteq M_\sigma
 Absence from \(W_t\) does not establish absence from \(M_\sigma\).
 
 ### 5.1 Multiplex projection, not one graph surface
+
+The complete multiplex projection is not a configured or partial semantic
+reality. It represents all five canonical structural retrieval surfaces:
+
+```text
+exact
+lexical
+vector
+graph
+temporal
+```
+
+Each surface is therefore a represented structural affordance of \(M_\sigma\),
+not necessarily an executable provider or index at this projection stage. A
+provider or index that is absent, constrained, or not yet implemented does not
+make the represented surface absent from \(M_\sigma\). Keep these facts
+distinct:
+
+```text
+surface is represented in Mσ
+surface is structurally capable of inspecting a record kind
+an executable provider/index presently exists
+a later runtime operation chooses to invoke the surface
+```
+
+Runtime policy may select or omit an invocation for a particular operation,
+but it may not remove a canonical surface from \(M_\sigma\).
 
 The semantic projection is not identical to any one graph, embedding space, index, or retrieval surface.
 
@@ -289,9 +377,13 @@ No semantic judge is needed. The assignments and paths either exist or do not.
 
 ## 11. Retrieval-surface affordances across identifiers
 
-Every admitted identifier must expose every enabled retrieval surface structurally capable of operating on its representation.
+Every admitted identifier must expose every canonical retrieval surface
+represented in the projection that is structurally capable of operating on its
+representation. Runtime policy may choose which of those surfaces to invoke
+for a particular operation, but it may not remove a surface from \(M_\sigma\).
 
-Possible surfaces include:
+Every complete Semantic Traversal projection contains the structural
+affordances of these five canonical surface families:
 
 - exact;
 - lexical;
@@ -301,16 +393,31 @@ Possible surfaces include:
 
 A surface descriptor must state:
 
-- whether the surface is available;
+- canonical surface identity;
 - which object, region, unit, identifier, occurrence, or anchor records it can inspect;
 - accepted query or match modes;
-- default and hard candidate bounds;
 - identity returned by the surface;
 - whether results hydrate to canonical semantic units;
 - coverage semantics;
 - whether exhaustive total count is possible;
 - whether graph or temporal continuation is possible;
 - explicit technical limitations.
+
+The five-family structural existence claim is distinct from record-level
+applicability, corpus relevance, executable provider/index existence, and
+runtime invocation. An individual record may expose no applicable surface
+operation; a surface or operation may legitimately return zero results; and a
+provider or index need not exist during projection construction. Match modes
+may vary by surface. Runtime configuration cannot create, delete, enable, or
+disable a canonical surface in \(M_\sigma\).
+
+Routine default and hard candidate bounds are runtime operating policy, not
+projection capability or constitutive metadata. If a future concrete provider
+has an intrinsic hard technical limitation, that fact belongs to the later
+provider/capability boundary unless it is also a limitation constitutive of the
+projected affordance. It must not be projected as semantic-space state merely
+because the provider is absent, constrained, or not yet implemented, and it
+must not be confused with a runtime default or access budget.
 
 No identifier may be omitted from a capable surface through an undocumented case-specific rule.
 
@@ -416,6 +523,19 @@ A contextual date remains available through its canonical occurrence path rather
 
 ## 15. Activated working projection support
 
+The complete multiplex projection and bounded runtime access policy remain
+distinct:
+
+```text
+complete Mσ
+    ≠ bounded runtime access policy
+```
+
+Activation is a later access operation over an already-instantiated
+projection. Its configuration governs how much of \(M_\sigma\) is exposed or
+traversed; it does not constitute \(M_\sigma\), alter its semantic-space
+topology, or create a new projection snapshot merely because a bound changes.
+
 The full projection must support deterministic construction of a positive activated view:
 
 \[
@@ -427,7 +547,7 @@ Activated records must expose:
 - canonical identity;
 - relevant identifiers;
 - incoming and outgoing summaries;
-- available surfaces;
+- runtime-usable retrieval surfaces and record-applicable surface identities;
 - bounded previews;
 - candidate counts;
 - continuation handles;
@@ -512,7 +632,11 @@ A valid projection must prove:
 12. every block target resolves to a unit deterministically;
 13. every temporal anchor identifies its source object or unit;
 14. transport segments retain one parent unit identity;
-15. every retrieval surface reports visible components and bounds;
+15. every canonical retrieval surface reports its structural components,
+    applicable record/address kinds, declared match modes, coverage semantics,
+    and any genuinely intrinsic technical limitation represented by the
+    projection; routine candidate, depth, continuation, packet, and expansion
+    budgets are not projection acceptance facts;
 16. every valid transition is represented;
 17. activation provenance is available;
 18. no mandatory semantic structure is discarded by prompt-size constraints;

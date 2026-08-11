@@ -98,7 +98,7 @@ The second inference call uses projection tools to bind problem-space structure 
 - identifier assignments;
 - occurrences;
 - temporal anchors;
-- available retrieval surfaces.
+- runtime-usable retrieval surfaces and record-applicable surface identities.
 
 The final executable plan uses resolved projected addresses wherever canonical addresses exist.
 
@@ -254,9 +254,10 @@ Resolution remains a synthesis or later boundary-inference outcome.
 
 ## 11. Configured execution bounds
 
-Configuration defines:
+Runtime configuration governs later bounded use of the already-complete
+projection. It may define:
 
-- enabled surfaces;
+- which structurally represented surfaces to invoke for this access operation;
 - default activation depth;
 - default candidate bounds;
 - hard maximum depth;
@@ -271,7 +272,12 @@ The runtime applies configured defaults.
 
 The model may request targeted continuation within the configured hard maxima when projection telemetry shows a need.
 
-The accepted configuration snapshot is attached to the plan.
+The accepted runtime configuration snapshot is attached to the plan as the
+identity of the later access policy. It is separate from
+`projection_snapshot_id` and does not define which canonical retrieval
+surfaces exist in \(M_\sigma\). All five canonical surfaces remain structural
+dimensions of the complete projection even when a particular plan does not
+invoke one of them.
 
 ## 12. Required and optional operations
 
@@ -372,6 +378,18 @@ SemanticAccessPlan
     coverage_requirements[]
 ```
 
+The two snapshot identities have separate authority:
+
+```text
+projection_snapshot_id
+    = immutable complete semantic projection bound for the plan
+
+configuration_snapshot_id
+    = later runtime access/execution policy bound for the plan
+```
+
+A configuration change does not by itself create a new semantic projection.
+
 ```text
 TraversalPath
     path_id
@@ -404,7 +422,7 @@ It checks that:
 - every address exists;
 - every relation exists;
 - the requested direction is represented;
-- the requested surface is available;
+- the requested surface operation is available in the runtime access context;
 - each operation may consume the preceding output type;
 - requested outputs can be materialized;
 - configuration bounds are respected.

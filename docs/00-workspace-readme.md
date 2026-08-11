@@ -116,6 +116,10 @@ private_artifact_hashes_or_locations
 attestation_timestamp
 ```
 
+`materialization_or_index_identity` records historical recovery evidence where available. It is not a
+future CLEANROOM runtime identity requirement; unknown historical values remain
+`unknown`, and no future materialization identity is inferred or fabricated.
+
 Unknown or unavailable identities are represented as `unknown`. They are not inferred, reconstructed, or fabricated.
 
 ## Pre-admission substrate observation
