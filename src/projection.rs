@@ -33,8 +33,6 @@ pub struct SemanticSpaceProjection {
     pub logical_hash: String,
     /// Identity of the admitted corpus snapshot.
     pub corpus_snapshot_identity: String,
-    /// Configuration snapshot governing represented bounds and capabilities.
-    pub configuration_snapshot_id: String,
     /// Declared validation state of the frozen representation.
     pub validation_status: ProjectionValidationStatus,
     /// Schema-level classes of semantic object represented in the snapshot.
@@ -635,9 +633,9 @@ pub enum TemporalValue {
 
 /// Descriptor of one retrieval-surface capability in a frozen projection.
 ///
-/// It declares availability, visible address kinds, modes, bounds, returned
-/// identity, hydration, coverage semantics, continuation, and limitations. It
-/// does not execute a query or judge semantic adequacy.
+/// It declares visible address kinds, modes, returned identity, hydration,
+/// coverage semantics, continuation, and structural limitations. It does not
+/// execute a query or judge semantic adequacy.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RetrievalSurfaceDescriptor {
@@ -645,16 +643,10 @@ pub struct RetrievalSurfaceDescriptor {
     pub surface_id: String,
     /// Stable surface family.
     pub kind: RetrievalSurfaceKind,
-    /// Whether the concrete surface is available in this configuration.
-    pub available: bool,
     /// Address kinds the surface may structurally inspect.
     pub visible_address_kinds: Vec<AddressKind>,
     /// Query or match modes accepted by the surface.
     pub match_modes: Vec<SurfaceMatchMode>,
-    /// Configured default candidate bound.
-    pub default_candidate_limit: u32,
-    /// Configured hard candidate bound.
-    pub hard_candidate_limit: u32,
     /// Canonical or projected identity returned directly by the surface.
     pub returned_identity: AddressKind,
     /// Whether results deterministically hydrate to canonical semantic units.
@@ -703,8 +695,6 @@ pub enum CoverageSemantics {
     Exhaustive,
     /// Results are deterministically bounded and may be incomplete.
     Bounded,
-    /// Surface reports availability but no stronger coverage guarantee.
-    AvailabilityOnly,
 }
 
 /// Valid structural transition represented by a projection snapshot.

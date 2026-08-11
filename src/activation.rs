@@ -30,11 +30,11 @@ pub struct ActivationUtterance {
     pub text: String,
 }
 
-/// Activation bounds and surface limits paired with one projection configuration.
+/// Activation bounds and surface limits paired with one projection snapshot.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectionActivationConfig {
-    /// Configuration snapshot paired with the projection.
+    /// Runtime configuration snapshot governing this activation.
     pub configuration_snapshot_id: String,
     /// Bounds for newest-utterance, whole-space-constraint, and configured-default seeds.
     pub unbanded: ProjectionActivationBandConfig,
@@ -640,9 +640,9 @@ pub enum ProjectionActivationViolation {
     ProjectionNotValidated {
         status: ProjectionValidationStatus,
     },
-    ConfigurationSnapshotMismatch {
-        projection_configuration_snapshot_id: String,
-        activation_configuration_snapshot_id: String,
+    RuntimeConfigurationSnapshotMismatch {
+        expected_configuration_snapshot_id: String,
+        actual_configuration_snapshot_id: String,
     },
     MissingAvailableSurfaceConfiguration {
         surface_id: String,
