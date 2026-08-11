@@ -40,6 +40,13 @@ projection even when executable providers or indexes are not yet present:
 exact, lexical, vector, graph, temporal
 ```
 
+Surface-family existence is distinct from record-level applicability, corpus
+relevance, executable provider/index existence, and runtime invocation. An
+individual object, region, unit, identifier, occurrence, or anchor may expose
+only the structurally applicable subset; a surface or operation may return
+zero results; and configuration cannot create, delete, enable, or disable a
+canonical surface in \(M_\sigma\).
+
 ## 3. Problem-space lens
 
 The problem space is:
@@ -639,9 +646,18 @@ The activation input includes an explicit `ActivationUtterance` containing `utte
 
 ### Layered configuration and surface capability
 
-`ProjectionActivationConfig` is separate from the activated view. It has five configuration groups: unbanded, primary, secondary, tertiary, and background. Unbanded covers newest-utterance, whole-space-constraint, and configured-default seeds. Each group has textual-seed, structural-neighbour, visible-unit, and preview-text bounds. Per-surface limits are declared for every available projected surface and every activation band.
+`ProjectionActivationConfig` is separate from the activated view. It has five configuration groups: unbanded, primary, secondary, tertiary, and background. Unbanded covers newest-utterance, whole-space-constraint, and configured-default seeds. Each group has textual-seed, structural-neighbour, visible-unit, and preview-text bounds. Per-surface limits may be declared for each canonical surface and activation band that the operation invokes.
 
-Future PR 4B validation must enforce that configuration and projection snapshot configuration identities match; exactly one surface configuration exists for each available projection surface; unavailable, unknown, and duplicate surface configurations are invalid; each configured candidate limit is within the corresponding hard surface limit; and all available structurally capable configured surfaces participate automatically. No identifier-to-surface affordance may be omitted by hardcoded exception.
+Future PR 4B validation must enforce that the runtime configuration identity used by
+the operation matches the configuration identity carried by its activation,
+plan, or continuation context. It must reject unknown or duplicate surface
+configuration names and reject missing runtime configuration only when the
+accepted operation requires configuration for that canonical surface. A
+configured candidate limit must remain within a hard maximum owned by the
+runtime configuration, if one is defined; no routine projection hard surface
+limit is consulted. A concrete provider/access failure is a runtime access
+failure, not removal of the structural surface from \(M_\sigma\). No
+identifier-to-surface affordance may be omitted by hardcoded exception.
 
 Zero total bounds, zero band bounds, and zero surface candidate limits are valid mechanical bounds. A zero candidate limit yields no candidates for that surface and band but makes no negative corpus claim. `maximum_initial_relation_depth == 0` permits no structural expansion beyond directly exposed records. `continuation_page_limit == 0` suppresses continuation handles. No configuration value is a relevance score.
 
@@ -681,7 +697,7 @@ Previews are planning material, not retrieved evidence. Full authored prose rema
 
 ### Self-describing continuation handles
 
-A continuation handle is serializable and restart-safe. It requires no hidden runtime registry, contains no evidence, and performs no expansion. Its offset has meaning only with the named frozen projection snapshot, activation configuration snapshot, problem-space thread, problem-space version, newest utterance, access mechanism, filters, and ordering. The projection snapshot, activation configuration snapshot, problem-space thread, problem-space version, and newest utterance identity must match the active continuation context exactly. A stale, cross-thread, cross-version, cross-utterance, cross-projection, or cross-configuration handle is a future typed violation.
+A continuation handle is serializable and restart-safe. It requires no hidden runtime registry, contains no evidence, and performs no expansion. Its offset has meaning only with the named frozen projection snapshot, activation configuration snapshot, problem-space thread, problem-space version, newest utterance, access mechanism, filters, and ordering. The projection snapshot and runtime configuration snapshot are separate identities and must each match the active continuation context exactly. A stale, cross-thread, cross-version, cross-utterance, cross-projection, or cross-configuration handle is a future typed violation. No provider/index materialization identity is added until Phase 7 concrete access implementation supplies evidence that one is required.
 
 Continuation origin is typed as a text probe, structural neighbourhood, or temporal probe. Continuation access is typed separately: direct projection-structure continuation follows frozen represented topology without inventing a retrieval surface, while retrieval-surface continuation resumes one concrete projected surface. Text and temporal probes require `ContinuationAccess::RetrievalSurface`. Structural neighbourhoods may continue through `ContinuationAccess::ProjectionStructure` or through a declared retrieval surface; the latter is valid only when the frozen projection declares that concrete surface and structural transition relationship. PR 4A records these combinations only and does not validate them.
 
@@ -691,7 +707,7 @@ Filters are typed as transition, source path prefix, object class, identifier, o
 
 ### Typed activation violations
 
-`ProjectionActivationViolation` is the closed Phase 4B error vocabulary. It covers empty required identities, projection validation status, configuration snapshot mismatch, missing/unknown/unavailable/duplicate surface configuration, invalid configuration values, candidate limits exceeding hard limits, atomic surface-access failure, duplicate activated identities, invalid activated references, invalid activation provenance, invalid continuation handles, invalid telemetry, activated-view bound overflow, and count overflow. PR 4A defines the vocabulary only; it does not implement validation behavior, `Display`, or `Error`.
+`ProjectionActivationViolation` is the closed Phase 4B error vocabulary. It covers empty required identities, projection validation status, runtime configuration-context mismatch, missing/unknown/duplicate required surface configuration, invalid configuration values, candidate limits exceeding an applicable runtime maximum, concrete surface-access failure, duplicate activated identities, invalid activated references, invalid activation provenance, invalid continuation handles, invalid telemetry, activated-view bound overflow, and count overflow. A required surface-access failure means that the concrete runtime probe could not execute; it does not imply that the canonical surface is absent from \(M_\sigma\). PR 4A defines the vocabulary only; it does not implement validation behavior, `Display`, or `Error`.
 
 ### Exact PR boundary
 
@@ -771,7 +787,6 @@ Future deterministic probe IDs use first-seen invocation order:
 activation-probe:0
 activation-probe:1
 activation-probe:2
-...
 ```
 
 Telemetry IDs similarly use:

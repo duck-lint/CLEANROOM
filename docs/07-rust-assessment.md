@@ -55,6 +55,11 @@ private_artifact_hashes_or_locations
 attestation_timestamp
 ```
 
+`materialization_or_index_identity` is a historical recovery-manifest field
+where available. It does not establish a future CLEANROOM runtime identity;
+unknown values remain `unknown`, and no provider/index identity is inferred or
+fabricated before Phase 7 supplies concrete implementation evidence.
+
 Unknown or unavailable identities are `unknown`, never inferred or fabricated.
 
 ## What Rust helps with
@@ -101,7 +106,12 @@ validated SemanticSpaceProjection
 → mechanically computed ProjectionActivationProbeResult
 ```
 
-It supports every actual available combination of exact, lexical, vector, graph, temporal, and declared match modes, where present. Results are computed from actual corpus-derived surfaces and indexes. They are not hand-authored expected candidates.
+Phase 7 is not complete until real read-only access exists for the exact,
+lexical, vector, graph, and temporal surface families over the validated
+projection. Each surface retains its own structurally applicable record kinds
+and declared match modes. A corpus may legitimately yield zero results for a
+surface or operation. Results are computed from actual corpus-derived surfaces
+and indexes. They are not hand-authored expected candidates.
 
 The concrete implementation is not selected by this documentation correction. Future choices may include Rust read-only indexes, a bounded Python process or protocol, deterministic exported query indexes, or another explicit versioned read-only boundary.
 

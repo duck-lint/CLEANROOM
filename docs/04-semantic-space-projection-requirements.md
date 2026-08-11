@@ -43,8 +43,9 @@ construction lineage:
   lineage from which it was projected;
 - `schema_version` identifies the representation contract under which the
   projection was instantiated;
-- `logical_hash` is the deterministic identity of the complete logical
-  projection contents under the accepted canonical procedure;
+- `logical_hash` is a deterministic identity of the complete logical
+  projection contents, produced by a deterministic serialization or hashing
+  procedure satisfying the accepted projection-identity invariants;
 - `corpus_snapshot_identity` identifies the exact authoritative corpus state
   represented by the projection; and
 - `validation_status` records whether the instantiated projection has passed
@@ -88,11 +89,13 @@ structure exists. It does not disable a canonical retrieval surface because a
 later runtime operation may not invoke it, and it does not repair malformed
 authored corpus structure through heuristic runtime behavior.
 
-If the authoritative corpus, observation, or accepted constitutive contract
-violates a deterministic projection rule, correction belongs at that upstream
-authority boundary. A new projection is then constructed deterministically;
-runtime configuration is not a mechanism for making an invalid corpus project
-successfully.
+If projection construction or validation exposes a deterministic projection
+failure, first classify the authority domain actually at fault. The possible
+domains include an authored-substrate defect, an observation defect, a missing
+constitutive rule, an accepted-contract defect, or a constructor defect. Correct
+only the boundary shown to be wrong, then construct a new projection
+deterministically. Runtime configuration is not a mechanism for concealing any
+of these failures or making an invalid projection appear valid.
 
 The resulting distinction is:
 
@@ -377,7 +380,8 @@ represented in the projection that is structurally capable of operating on its
 representation. Runtime policy may choose which of those surfaces to invoke
 for a particular operation, but it may not remove a surface from \(M_\sigma\).
 
-Possible surfaces include:
+Every complete Semantic Traversal projection contains the structural
+affordances of these five canonical surface families:
 
 - exact;
 - lexical;
@@ -387,8 +391,7 @@ Possible surfaces include:
 
 A surface descriptor must state:
 
-- canonical surface identity and whether its structural affordance is
-  represented;
+- canonical surface identity;
 - which object, region, unit, identifier, occurrence, or anchor records it can inspect;
 - accepted query or match modes;
 - identity returned by the surface;
@@ -397,6 +400,14 @@ A surface descriptor must state:
 - whether exhaustive total count is possible;
 - whether graph or temporal continuation is possible;
 - explicit technical limitations.
+
+The five-family structural existence claim is distinct from record-level
+applicability, corpus relevance, executable provider/index existence, and
+runtime invocation. An individual record may expose no applicable surface
+operation; a surface or operation may legitimately return zero results; and a
+provider or index need not exist during projection construction. Match modes
+may vary by surface. Runtime configuration cannot create, delete, enable, or
+disable a canonical surface in \(M_\sigma\).
 
 Routine default and hard candidate bounds are runtime operating policy, not
 projection capability or constitutive metadata. If a future concrete provider
@@ -617,7 +628,11 @@ A valid projection must prove:
 12. every block target resolves to a unit deterministically;
 13. every temporal anchor identifies its source object or unit;
 14. transport segments retain one parent unit identity;
-15. every retrieval surface reports visible components and bounds;
+15. every canonical retrieval surface reports its structural components,
+    applicable record/address kinds, declared match modes, coverage semantics,
+    and any genuinely intrinsic technical limitation represented by the
+    projection; routine candidate, depth, continuation, packet, and expansion
+    budgets are not projection acceptance facts;
 16. every valid transition is represented;
 17. activation provenance is available;
 18. no mandatory semantic structure is discarded by prompt-size constraints;
