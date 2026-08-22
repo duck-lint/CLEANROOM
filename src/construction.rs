@@ -158,7 +158,11 @@ fn fnv(bytes: &[u8]) -> String {
 // SHA-256 keeps hydration integrity independent from the containing note.
 // This small implementation avoids introducing a provider or external tool
 // into the Phase 5 constructor's deterministic boundary.
-fn sha256(bytes: &[u8]) -> String {
+/// Deterministic SHA-256 primitive shared by artifact-boundary tooling.
+///
+/// This function is deliberately limited to byte hashing. It carries no
+/// corpus mapping or construction authority.
+pub fn sha256(bytes: &[u8]) -> String {
     const K: [u32; 64] = [
         0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
         0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
@@ -1346,6 +1350,8 @@ pub fn canonical_unit_id(
     ))
 }
 
+type RegionBoundsByObject = BTreeMap<String, Vec<(SemanticRegionAddress, u64, u64, Vec<String>)>>;
+
 /// Join accepted heading-match provenance to an existing materialized region.
 pub fn join_region_by_exact_span(
     regions: &[SemanticRegionRecord],
@@ -1543,8 +1549,6 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
     let mut object_temporal: BTreeMap<String, Vec<TemporalAnchorId>> = BTreeMap::new();
     let mut region_by_object_span: BTreeMap<(String, u64, u64), Vec<usize>> = BTreeMap::new();
     let mut region_index_by_object_address: BTreeMap<(String, String), usize> = BTreeMap::new();
-    type RegionBoundsByObject =
-        BTreeMap<String, Vec<(SemanticRegionAddress, u64, u64, Vec<String>)>>;
     let mut region_bounds_by_object: RegionBoundsByObject = BTreeMap::new();
     let mut region_heading_spans_by_object: BTreeMap<
         String,
