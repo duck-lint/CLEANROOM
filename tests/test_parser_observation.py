@@ -134,6 +134,53 @@ class ParserObservationTests(unittest.TestCase):
             self.assertEqual(heading_link["heading_target_evaluation"], "observed")
             self.assertEqual(block_link["block_target_evaluation"], "observed")
 
+    def test_link_spans_are_exact_or_explicitly_unavailable(self) -> None:
+        source = (
+            "---\n"
+            "uuid: 018f3e7e-7b6a-7c3b-8d0e-123456789abd\n"
+            "one: \"[[Target]]\"\n"
+            "two: \"[[Target]]\"\n"
+            "aliased: \"[[Target|Target]]\"\n"
+            "---\n"
+            "A [[Target]] and [[Target]] and [[Target|Target]].\n"
+            "`[[Target]]` [[Target]]\n\n"
+            "| [[Target]] | [[Target]] |\n"
+            "| --- | --- |\n"
+        )
+        record = parse_markdown_text(source, authored_path="Source.md")
+        links = record.authored_links
+
+        repeated_frontmatter = [link for link in links if link.source_surface == "frontmatter" and link.raw == "[[Target]]"]
+        self.assertEqual(len(repeated_frontmatter), 2)
+        self.assertEqual([link.source_span for link in repeated_frontmatter], [None, None])
+        aliased_frontmatter = next(link for link in links if link.source_surface == "frontmatter" and link.raw == "[[Target|Target]]")
+        self.assertIsNotNone(aliased_frontmatter.source_span)
+        self.assertTrue(aliased_frontmatter.display_alias_present)
+        self.assertEqual(aliased_frontmatter.label, "Target")
+
+        body_links = [link for link in links if link.source_surface == "body"]
+        self.assertEqual([link.display_alias_present for link in body_links[:3]], [False, False, True])
+        for link in body_links[:3]:
+            self.assertIsNotNone(link.source_span)
+            start, end = link.source_span
+            self.assertEqual(source[start:end], link.raw)
+        inline_code_and_real_link = [link for link in body_links if link.raw == "[[Target]]"][2]
+        self.assertIsNotNone(inline_code_and_real_link.source_span)
+        start, end = inline_code_and_real_link.source_span
+        self.assertEqual(source[start:end], inline_code_and_real_link.raw)
+        table_links = [link for link in body_links if link.source_span and source[link.source_span[0] : link.source_span[1]] == link.raw]
+        self.assertLess(len(table_links), len(body_links))
+
+    def test_callout_uses_authored_block_category_and_retains_parser_token(self) -> None:
+        record = parse_markdown_text(
+            "---\nuuid: 018f3e7e-7b6a-7c3b-8d0e-123456789abd\n---\n> [!note]\n> callout body\n",
+            authored_path="Callout.md",
+        )
+
+        self.assertEqual(len(record.blocks), 1)
+        self.assertEqual(record.blocks[0].block_kind, "blockquote_or_callout")
+        self.assertIn(record.blocks[0].parser_token_type, {"callout_open", "alert_open"})
+
     def test_artifacts_are_json_and_written_only_to_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "vault"

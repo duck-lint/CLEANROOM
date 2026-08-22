@@ -60,6 +60,7 @@ class AuthoredLink:
     label: str
     target_region_fragment: str | None
     embedded: bool
+    display_alias_present: bool
     source_surface: str
     frontmatter_key_path: str | None
     source_span: tuple[int, int] | None
@@ -191,9 +192,9 @@ def _wikilink_rule(state: Any, silent: bool) -> bool:
         if silent:
             return True
         token = state.push("embed", "", 0)
-        target, fragment, label = _link_parts(match.group("body"))
+        target, fragment, label, alias_present = _link_parts(match.group("body"))
         token.content = label
-        token.attrs = {"target": target, "target_region_fragment": fragment, "label": label, "raw": match.group(0)}
+        token.attrs = {"target": target, "target_region_fragment": fragment, "label": label, "display_alias_present": alias_present, "source_position": (state.pos, match.end()), "raw": match.group(0)}
         state.pos = match.end()
         return True
     if match is None or (state.pos > 0 and state.src[state.pos - 1] == "\\"):
@@ -201,14 +202,14 @@ def _wikilink_rule(state: Any, silent: bool) -> bool:
     if silent:
         return True
     token = state.push("wikilink", "", 0)
-    target, fragment, label = _link_parts(match.group("body"))
+    target, fragment, label, alias_present = _link_parts(match.group("body"))
     token.content = label
-    token.attrs = {"target": target, "label": label, "target_region_fragment": fragment, "raw": match.group(0)}
+    token.attrs = {"target": target, "label": label, "target_region_fragment": fragment, "display_alias_present": alias_present, "source_position": (state.pos, match.end()), "raw": match.group(0)}
     state.pos = match.end()
     return True
 
 
-def _link_parts(body: str) -> tuple[str, str | None, str]:
+def _link_parts(body: str) -> tuple[str, str | None, str, bool]:
     separator = re.search(r"\\?\|", body)
     target_with_fragment = body[: separator.start()] if separator else body
     label = body[separator.end() :] if separator else None
@@ -216,7 +217,7 @@ def _link_parts(body: str) -> tuple[str, str | None, str]:
         target, fragment = target_with_fragment.split("#", 1)
     else:
         target, fragment = target_with_fragment, None
-    return target, fragment, label or target
+    return target, fragment, label or target, separator is not None
 
 
 def _markdown_parser() -> MarkdownIt:
@@ -243,6 +244,8 @@ def _block_kind(token_type: str) -> str:
         "table_open": "table",
         "blockquote_open": "blockquote_or_callout",
         "paragraph_open": "paragraph",
+        "callout_open": "blockquote_or_callout",
+        "alert_open": "blockquote_or_callout",
     }.get(token_type, token_type)
 
 
@@ -271,26 +274,52 @@ def _root_block_spans(tokens: list[Any], body_lines: list[str]) -> list[tuple[in
 
 
 def _link_from_attrs(attrs: dict[str, Any], *, embedded: bool, surface: str, key_path: str | None, source_span: tuple[int, int] | None) -> AuthoredLink:
-    return AuthoredLink(attrs["raw"], attrs["target"], attrs["label"], attrs["target_region_fragment"], embedded, surface, key_path, source_span)
+    return AuthoredLink(attrs["raw"], attrs["target"], attrs["label"], attrs["target_region_fragment"], embedded, attrs["display_alias_present"], surface, key_path, source_span)
 
 
-def _parsed_text_and_links(parser: MarkdownIt, raw: str, *, source_offset: int, source_surface: str = "body", frontmatter_key_path: str | None = None, callout: bool = False) -> tuple[str, tuple[AuthoredLink, ...], tuple[AuthoredLink, ...]]:
+def _unique_occurrence(source: str, value: str) -> int | None:
+    """Return a position only when the authored representation is unique."""
+
+    if not value:
+        return None
+    positions: list[int] = []
+    cursor = 0
+    while True:
+        position = source.find(value, cursor)
+        if position < 0:
+            break
+        positions.append(position)
+        cursor = position + 1
+    return positions[0] if len(positions) == 1 else None
+
+
+def _inline_source_start(raw: str, token: Any) -> int | None:
+    """Map one inline token to raw block source only if its slice is unique."""
+
+    if token.map is None or not token.content:
+        return None
+    lines = raw.splitlines(keepends=True)
+    line_start = sum(len(line) for line in lines[: token.map[0]])
+    line_end = sum(len(line) for line in lines[: token.map[1]])
+    relative = _unique_occurrence(raw[line_start:line_end], token.content)
+    return None if relative is None else line_start + relative
+
+
+def _parsed_text_and_links(parser: MarkdownIt, raw: str, *, source_offset: int | None, source_surface: str = "body", frontmatter_key_path: str | None = None, callout: bool = False) -> tuple[str, tuple[AuthoredLink, ...], tuple[AuthoredLink, ...]]:
     tokens = parser.parse(raw)
     text_parts: list[str] = []
     links: list[AuthoredLink] = []
     embeds: list[AuthoredLink] = []
-    search_offset = 0
     for token in tokens:
         if token.type == "inline" and token.children:
             inline_parts: list[str] = []
             for child in token.children:
                 if child.type in {"wikilink", "embed"}:
                     attrs = child.attrs or {}
-                    raw_link = attrs["raw"]
-                    local_start = raw.find(raw_link, search_offset)
-                    span = None if local_start < 0 else (source_offset + local_start, source_offset + local_start + len(raw_link))
-                    if local_start >= 0:
-                        search_offset = local_start + len(raw_link)
+                    inline_start = _inline_source_start(raw, token)
+                    source_position = attrs.get("source_position")
+                    local_start = None if inline_start is None or source_position is None else inline_start + source_position[0]
+                    span = None if source_offset is None or local_start is None else (source_offset + local_start, source_offset + local_start + len(attrs["raw"]))
                     link = _link_from_attrs(attrs, embedded=child.type == "embed", surface=source_surface, key_path=frontmatter_key_path, source_span=span)
                     (embeds if child.type == "embed" else links).append(link)
                     if child.type == "wikilink":
@@ -349,8 +378,8 @@ def _frontmatter_links(frontmatter: FrontmatterRecord) -> tuple[AuthoredLink, ..
         for item in values:
             if not isinstance(item, str):
                 continue
-            item_offset = frontmatter.raw_text.find(item)
-            source_offset = frontmatter.content_span[0] + max(item_offset, 0)
+            item_offset = _unique_occurrence(frontmatter.raw_text, item)
+            source_offset = None if item_offset is None else frontmatter.content_span[0] + item_offset
             _, item_links, item_embeds = _parsed_text_and_links(parser, item, source_offset=source_offset, source_surface="frontmatter", frontmatter_key_path=str(key))
             links.extend(item_links)
             links.extend(item_embeds)
