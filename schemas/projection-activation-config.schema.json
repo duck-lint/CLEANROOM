@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "ProjectionActivationConfig",
-  "description": "Activation bounds and surface limits paired with one projection configuration.",
+  "description": "Activation bounds and surface limits paired with one projection snapshot.",
   "type": "object",
   "required": [
     "background",
@@ -35,7 +35,7 @@
       ]
     },
     "configuration_snapshot_id": {
-      "description": "Configuration snapshot paired with the projection.",
+      "description": "Runtime configuration snapshot governing this activation.",
       "type": "string"
     },
     "continuation_page_limit": {

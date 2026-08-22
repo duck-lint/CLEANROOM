@@ -228,7 +228,6 @@ fn projection() -> SemanticSpaceProjection {
         schema_version: "v0.1.0".into(),
         logical_hash: "sha256:projection".into(),
         corpus_snapshot_identity: "corpus:1".into(),
-        configuration_snapshot_id: "configuration:1".into(),
         validation_status: ProjectionValidationStatus::Validated,
         object_classes: vec![SemanticObjectClassDescriptor {
             class_name: "source_material".into(),
@@ -357,11 +356,8 @@ fn projection() -> SemanticSpaceProjection {
         retrieval_surfaces: vec![RetrievalSurfaceDescriptor {
             surface_id: "surface:exact".into(),
             kind: RetrievalSurfaceKind::Exact,
-            available: true,
             visible_address_kinds: vec![AddressKind::SemanticObject, AddressKind::SemanticUnit],
             match_modes: vec![SurfaceMatchMode::Literal],
-            default_candidate_limit: 25,
-            hard_candidate_limit: 100,
             returned_identity: AddressKind::SemanticUnit,
             hydrates_to_semantic_units: true,
             coverage_semantics: CoverageSemantics::Exhaustive,

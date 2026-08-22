@@ -33,3 +33,18 @@ When stopping for a decision, return:
 3. available options;
 4. consequences;
 5. recommendation only if evidence licenses one.
+
+Each PR update should contain the minimum sections (can include more, this is just minimum).
+```text
+## Implemented
+what is now true
+
+## Validation
+commands/tests/results
+
+## Authority
+docs/decisions this implementation realizes
+
+## Operator decisions required
+none
+```

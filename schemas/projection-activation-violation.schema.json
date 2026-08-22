@@ -44,21 +44,21 @@
     {
       "type": "object",
       "required": [
-        "activation_configuration_snapshot_id",
-        "projection_configuration_snapshot_id",
+        "actual_configuration_snapshot_id",
+        "expected_configuration_snapshot_id",
         "violation"
       ],
       "properties": {
-        "activation_configuration_snapshot_id": {
+        "actual_configuration_snapshot_id": {
           "type": "string"
         },
-        "projection_configuration_snapshot_id": {
+        "expected_configuration_snapshot_id": {
           "type": "string"
         },
         "violation": {
           "type": "string",
           "enum": [
-            "configuration_snapshot_mismatch"
+            "runtime_configuration_snapshot_mismatch"
           ]
         }
       },

@@ -588,9 +588,9 @@ fn activation_violation_categories_round_trip() {
         ProjectionActivationViolation::ProjectionNotValidated {
             status: ProjectionValidationStatus::Unvalidated,
         },
-        ProjectionActivationViolation::ConfigurationSnapshotMismatch {
-            projection_configuration_snapshot_id: "a".into(),
-            activation_configuration_snapshot_id: "b".into(),
+        ProjectionActivationViolation::RuntimeConfigurationSnapshotMismatch {
+            expected_configuration_snapshot_id: "a".into(),
+            actual_configuration_snapshot_id: "b".into(),
         },
         ProjectionActivationViolation::MissingAvailableSurfaceConfiguration {
             surface_id: "s".into(),

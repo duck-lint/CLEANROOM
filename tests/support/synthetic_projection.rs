@@ -563,11 +563,8 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
             |(id, kind, visible, modes, returned, coverage)| RetrievalSurfaceDescriptor {
                 surface_id: id.into(),
                 kind,
-                available: true,
                 visible_address_kinds: visible,
                 match_modes: modes,
-                default_candidate_limit: 8,
-                hard_candidate_limit: 32,
                 returned_identity: returned,
                 hydrates_to_semantic_units: true,
                 coverage_semantics: coverage,
@@ -1185,10 +1182,9 @@ pub fn tiny_projection() -> SemanticSpaceProjection {
     SemanticSpaceProjection {
         projection_snapshot_id: "projection:tiny-synthetic:v2".into(),
         ingest_identity: "ingest:tiny-synthetic:v2".into(),
-        schema_version: "v0.1.0".into(),
+        schema_version: "semantic-space-projection/v2".into(),
         logical_hash: "sha256:tiny-synthetic-projection-v2".into(),
         corpus_snapshot_identity: "corpus:tiny-synthetic:v2".into(),
-        configuration_snapshot_id: "configuration:tiny-synthetic:v1".into(),
         validation_status: ProjectionValidationStatus::Validated,
         object_classes: classes(),
         objects,
