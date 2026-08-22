@@ -32,7 +32,11 @@ use crate::{
 };
 
 const OBSERVATION_SHA256: &str = "d3a340a1b203a64b2455f71a8d4f17003d5bfdba8be0583cbec1529692320bb9";
-const PROJECTION_SHA256: &str = "4870244e512f996aff1280e7d2690a9053bcbb4c4be4df7b8b9f33eab58eea5a";
+// This is the byte identity recorded by the original pre-archive PR #23 v2
+// construction. The current recovery does not possess or reconstruct that
+// private artifact; this pin lets a later private validation run fail closed
+// unless it supplies the exact corrected representation.
+const PROJECTION_SHA256: &str = "f7423f494d905799e44b2c98f470429ae960ae682b43158f90d8b8f6fa9e39d2";
 const CORPUS: &str = "f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4";
 const OBSERVER_COMMIT: &str = "e9bb2d95c14b1beb334dc2b8d83420f5998b9a53";
 const EXCLUDED_FIELDS: [&str; 5] = ["address", "email", "phone", "likes", "dislikes"];
@@ -981,7 +985,6 @@ fn independent_surfaces() -> Vec<RetrievalSurfaceDescriptor> {
     .map(|(surface_id, kind, mode)| RetrievalSurfaceDescriptor {
         surface_id: surface_id.into(),
         kind,
-        available: false,
         visible_address_kinds: match surface_id {
             "surface:exact" | "surface:lexical" => vec![
                 AddressKind::SemanticObject,
@@ -1010,8 +1013,6 @@ fn independent_surfaces() -> Vec<RetrievalSurfaceDescriptor> {
             _ => vec![],
         },
         match_modes: vec![mode],
-        default_candidate_limit: 0,
-        hard_candidate_limit: 0,
         returned_identity: if surface_id == "surface:graph" {
             AddressKind::Occurrence
         } else if surface_id == "surface:temporal" {
@@ -1020,12 +1021,10 @@ fn independent_surfaces() -> Vec<RetrievalSurfaceDescriptor> {
             AddressKind::SemanticUnit
         },
         hydrates_to_semantic_units: false,
-        coverage_semantics: CoverageSemantics::AvailabilityOnly,
+        coverage_semantics: CoverageSemantics::Bounded,
         exhaustive_total_count_supported: false,
         continuation_supported: false,
-        technical_limitations: vec![
-            "Phase 5 representation only; no executable index or provider.".into(),
-        ],
+        technical_limitations: vec![],
     })
     .collect()
 }
@@ -1601,13 +1600,8 @@ fn check_typed_topology(
         }
     }
     for surface in &projection.retrieval_surfaces {
-        if surface.default_candidate_limit > surface.hard_candidate_limit
-            || surface.surface_id.is_empty()
-        {
-            bump(
-                "bounds",
-                format!("invalid surface bounds: {}", surface.surface_id),
-            );
+        if surface.surface_id.is_empty() {
+            bump("surface", "surface identity is empty".into());
         }
     }
     for transition in &projection.valid_transitions {
@@ -3072,8 +3066,9 @@ pub fn validate(
             "Phase 5 projection is not Unvalidated".into(),
         ));
     }
-    if projection.corpus_snapshot_identity != CORPUS
-        || projection.projection_snapshot_id != format!("projection:phase5:{CORPUS}")
+    if projection.schema_version != "semantic-space-projection/v2"
+        || projection.corpus_snapshot_identity != CORPUS
+        || projection.projection_snapshot_id != format!("projection:phase5:v2:{CORPUS}")
     {
         return Err(ValidationError::Input(
             "pinned Phase 5 projection identity mismatch".into(),
@@ -3128,7 +3123,7 @@ pub fn validate(
         observation_sha256: observation_hash,
         phase5_projection_sha256: projection_hash,
         phase5_logical_hash,
-        phase5_snapshot_id: format!("projection:phase5:{CORPUS}"),
+        phase5_snapshot_id: format!("projection:phase5:v2:{CORPUS}"),
         phase6_snapshot_id: promoted.projection_snapshot_id.clone(),
         phase6_logical_hash: promoted.logical_hash.clone(),
         phase6_projection_sha256: sha256(&output_bytes),
@@ -3258,10 +3253,9 @@ mod tests {
         SemanticSpaceProjection {
             projection_snapshot_id: "projection:test".into(),
             ingest_identity: "ingest:test".into(),
-            schema_version: "projection/v1".into(),
+            schema_version: "semantic-space-projection/v2".into(),
             logical_hash: "sha256:test".into(),
             corpus_snapshot_identity: "corpus:test".into(),
-            configuration_snapshot_id: "config:test".into(),
             validation_status: crate::projection::ProjectionValidationStatus::Unvalidated,
             object_classes: vec![],
             objects: vec![object],
@@ -3315,6 +3309,32 @@ mod tests {
         p.objects.push(p.objects[0].clone());
         assert!(detects(&p, "deterministic_identity"));
     }
+
+    #[test]
+    fn independent_surface_contract_is_v2_structural_only() {
+        let surfaces = independent_surfaces();
+        assert_eq!(surfaces.len(), 5);
+        for kind in [
+            RetrievalSurfaceKind::Exact,
+            RetrievalSurfaceKind::Lexical,
+            RetrievalSurfaceKind::Vector,
+            RetrievalSurfaceKind::Graph,
+            RetrievalSurfaceKind::Temporal,
+        ] {
+            assert_eq!(
+                surfaces
+                    .iter()
+                    .filter(|surface| surface.kind == kind)
+                    .count(),
+                1
+            );
+        }
+        assert!(surfaces.iter().all(|surface| {
+            surface.coverage_semantics == CoverageSemantics::Bounded
+                && surface.technical_limitations.is_empty()
+        }));
+    }
+
     #[test]
     fn detects_invalid_region_and_unit_parent() {
         let mut p = base_projection();
@@ -3364,11 +3384,8 @@ mod tests {
         p.retrieval_surfaces.push(RetrievalSurfaceDescriptor {
             surface_id: "surface:test".into(),
             kind: crate::model::RetrievalSurfaceKind::Exact,
-            available: false,
             visible_address_kinds: vec![AddressKind::SemanticObject],
             match_modes: vec![],
-            default_candidate_limit: 10,
-            hard_candidate_limit: 1,
             returned_identity: AddressKind::SemanticObject,
             hydrates_to_semantic_units: false,
             coverage_semantics: CoverageSemantics::Bounded,

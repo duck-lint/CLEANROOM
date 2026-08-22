@@ -1,156 +1,93 @@
 # Phase 6 Complete-Vault Projection Validation Report
 
-Status: **Validated**
+Status: **validator reconciled; private Phase 6 validation pending**.
 
-This report records independent Phase 6 correspondence and closure validation
-of the frozen Phase 5 projection. Phase 5 construction evidence remains in
-`docs/15-real-projection-construction-report.md`; that report remains the
-historical record that the projection was `Unvalidated` and that Phase 6 had
-not begun. Phase 7 has not begun.
+This report records the mechanical reconciliation of the existing Phase 6
+validator and evidence contract after merged PR #23. It does not claim current
+whole-corpus validation. Phase 7 has not begun.
 
-## Exact evidence identities
+## Corrected Phase 5 input contract
 
-- CLEANROOM authoritative base: `eda0f76d14c1385cee112a3298ed66c0a1411dc4`
-- Observer repository: `duck-lint/semantic-traversal`
-- Observer commit: `e9bb2d95c14b1beb334dc2b8d83420f5998b9a53`
-- Observer schema: `vault-observation/v3`
-- Specimen / corpus snapshot: `f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4`
-- Observation artifact SHA-256: `d3a340a1b203a64b2455f71a8d4f17003d5bfdba8be0583cbec1529692320bb9`
-- Phase 5 input projection byte SHA-256: `4870244e512f996aff1280e7d2690a9053bcbb4c4be4df7b8b9f33eab58eea5a`
-- Phase 5 input logical hash: `sha256:b21a96fdf2951dd8777c72a3acff3ac0ffa16ffb04d697aa6e7ee6855993c7a8`
-- Phase 5 input snapshot: `projection:phase5:f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4`
-- Phase 6 validated snapshot: `projection:phase6:f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4`
-- Phase 6 logical hash: `sha256:ae2ef75756cf4c60e65e1d73da5a20a5e38561b5f1042a50b568eb443de1bf71`
-- Phase 6 validated projection byte SHA-256: `f0f5c0b56895952aeb402b8eaea2a6f73f2124c5584d00942da928dd92b80ef1`
+The validator now requires the corrected projection representation:
 
-## Validator implementation provenance
+- CLEANROOM base: `0179bf75d34c97f7d1adefbaeee869f57e361b0e` (merged PR #23)
+- projection schema: `semantic-space-projection/v2`
+- projection snapshot: `projection:phase5:v2:<corpus-snapshot>`
+- historical corrected Phase 5 projection byte SHA-256:
+  `f7423f494d905799e44b2c98f470429ae960ae682b43158f90d8b8f6fa9e39d2`
+- projection validation status required before promotion: `Unvalidated`
 
-The behavior-bearing validator source manifest uses UTF-8 entries sorted by
-repository-relative path. Each canonical manifest line is
-`<path>\\0sha256:<exact-file-byte-digest>\\n`; the `\\0` notation denotes one
-NUL byte and `\\n` denotes one LF byte in the hashed manifest input.
+The validator no longer constructs or validates projection-owned
+`configuration_snapshot_id`, `available`, routine candidate limits,
+`AvailabilityOnly`, or provider/index status text. Its independently derived
+surface descriptors use the five structural families and structural
+`Bounded` coverage. Runtime configuration and access state remain outside the
+projection contract.
 
-```text
-src/bin/phase6_validate.rs\\0sha256:6047f7e0548c1c1dfa121b409675e1bcabff2c64b2f35d334bd6ebdacf6ff45d\\n
-src/construction.rs\\0sha256:1b6d7492ffc8e082f40cd202d780092689a7fdc5f0dc8da5f99b343ce31ba0e6\\n
-src/validation.rs\\0sha256:e1887b3d449a65a36aa5851c6a4025b20bd10c9a1855633e79ab3740ffed6f93\\n
-```
+The historical byte hash above is retained evidence from the original
+pre-archive PR #23 construction. The 2026-08-22 recovery did not possess or
+reconstruct that private artifact.
 
-Validator implementation identity:
-`sha256:b6cae70260056797fb8279e98db74b14b961278cebc576668d2777761b011ed7`
+## Public and synthetic reconciliation
 
-`src/construction.rs` is included because Phase 6 directly reuses its
-corpus-independent byte SHA-256 implementation. Projection/model contracts
-and canonical region identity machinery are unchanged-base dependencies,
-identified by the authoritative base SHA above.
+The following are now checked against the v2 source/schema contracts:
 
-Input bytes were hashed before parsing. The Phase 5 input was not overwritten.
-The Phase 6 output changes only `projection_snapshot_id`, `validation_status`,
-and `logical_hash`.
+- validator surface descriptors use only v2 fields;
+- Phase 5 identity checks require the v2 schema and version-qualified snapshot;
+- synthetic validator fixtures construct v2 projections without removed
+  projection/runtime fields;
+- v1 Phase 6 input assumptions are absent from the validator implementation;
+- the existing independent correspondence, topology, incidence, provenance,
+  temporal, transport, and deterministic-promotion checks remain in place.
 
-## Validated corpus totals
+The validator remains independent from the Phase 5 constructor and does not
+use the constructor's high-level closure result as an oracle.
 
-| Measure | Count |
-| --- | ---: |
-| Resident source records | 1060 |
-| Resident Markdown | 1060 |
-| Admitted sources | 1052 |
-| Excluded Markdown | 8 |
-| Object classes | 14 |
-| Objects | 1052 |
-| Regions | 4356 |
-| Semantic units | 17118 |
-| Identifier descriptors | 55 |
-| Identifier assignments | 12351 |
-| Occurrences | 5003 |
-| Object-field occurrences | 501 |
-| Semantic-region occurrences | 184 |
-| Semantic-unit occurrences | 4318 |
-| Resolved occurrences | 4895 |
-| Unresolved occurrences | 108 |
-| Ambiguous occurrences | 0 |
-| FullDate anchors | 532 |
-| DateTime anchors | 1 |
-| ExactYear anchors | 7 |
-| MonthDay anchors | 3 |
-| ApproximateYear anchors | 5 |
-| Non-null temporal anchors | 548 |
-| Present-null temporal assignments | 64 |
-| Retrieval surfaces | 5 |
-| Structural transitions | 22 |
-| Transport segments | 0 |
-| Block-fragment occurrences | 0 |
-| Resolved block targets | 0 |
-| Unresolved block targets | 0 |
-| Heading-fragment occurrences | 10 |
-| Resolved heading targets | 10 |
-| Unresolved heading targets | 0 |
-| Ambiguous heading targets | 0 |
+## Historical pre-archive PR #21 evidence
 
-## Independent validation domains
+The former PR #21 evidence described a different input and is retained only as
+historical audit context:
 
-Each domain completed with zero deterministic structural violations:
+- old base: `eda0f76d14c1385cee112a3298ed66c0a1411dc4`
+- old schema/input representation: `semantic-space-projection/v1`
+- old Phase 5 projection byte SHA-256:
+  `4870244e512f996aff1280e7d2690a9053bcbb4c4be4df7b8b9f33eab58eea5a`
+- old Phase 5 logical hash:
+  `sha256:b21a96fdf2951dd8777c72a3acff3ac0ffa16ffb04d697aa6e7ee6855993c7a8`
+- old Phase 6 output byte SHA-256:
+  `f0f5c0b56895952aeb402b8eaea2a6f73f2124c5584d00942da928dd92b80ef1`
+- old Phase 6 logical hash:
+  `sha256:ae2ef75756cf4c60e65e1d73da5a20a5e38561b5f1042a50b568eb443de1bf71`
 
-| Domain | Status | Failures |
-| --- | --- | ---: |
-| Admission | passed | 0 |
-| Object | passed | 0 |
-| Region | passed | 0 |
-| Unit | passed | 0 |
-| Identifier | passed | 0 |
-| Occurrence | passed | 0 |
-| Target | passed | 0 |
-| Reverse incidence | passed | 0 |
-| Temporal | passed | 0 |
-| Surface | passed | 0 |
-| Provenance | passed | 0 |
-| Transport segmentation | passed | 0 |
-| Bounds | passed | 0 |
-| Deterministic identity | passed | 0 |
+Those values are not evidence that the corrected v2 projection has passed
+Phase 6. No current corpus counts, validation status, or promoted output are
+asserted here.
 
-Field-complete record correspondence also passed with zero failures for every
-contract-bearing field of semantic objects, authored regions, and semantic
-units. Complete reverse-incidence vectors passed with zero missing, extra,
-wrong, or duplicate edges. Present-null raw provenance passed for all 64
-present-null temporal assignments; raw-value failures: 0.
+## Current validator provenance
 
-The validator derives admitted source membership, object correspondence,
-heading-region topology, authored block units, identifier assignments,
-authored occurrence identities, exact occurrence source/target correspondence,
-and field-specific temporal anchors directly from the exact v3 observation.
-Expected and projected region, unit, assignment, descriptor, class, surface,
-transition, and anchor sets are checked in both directions. Typed checks then
-close canonical references, forward/reverse incidence, capabilities, bounds,
-provenance, and subordinate transport records. It does not call the Phase 5
-constructor or Phase 5 high-level closure helper as an oracle.
+The reconciled public implementation is composed of:
 
-The completeness correction added correspondence-path falsification coverage
-for invented regions and units and canonical assignment-value corruption, in
-addition to the existing identity, parent, exclusion, target, incidence,
-surface-bound, transition-reference, and deterministic-promotion cases. The
-production byte-hash pinning remains at the file boundary; synthetic tests use
-the same pure correspondence machinery after parsing.
+- `src/bin/phase6_validate.rs`
+- `src/construction.rs` for the byte-level SHA-256 primitive
+- `src/validation.rs`
 
-## Determinism
+The current branch is based on merged PR #23. Exact file-byte hashes and the
+commit containing this reconciliation are established by Git and public local
+validation; they do not establish private corpus validation.
 
-The exact private inputs were validated twice:
+## Completion boundary
 
-- Run 1 logical hash: `sha256:ae2ef75756cf4c60e65e1d73da5a20a5e38561b5f1042a50b568eb443de1bf71`
-- Run 2 logical hash: `sha256:ae2ef75756cf4c60e65e1d73da5a20a5e38561b5f1042a50b568eb443de1bf71`
-- Run 1 output bytes SHA-256: `f0f5c0b56895952aeb402b8eaea2a6f73f2124c5584d00942da928dd92b80ef1`
-- Run 2 output bytes SHA-256: `f0f5c0b56895952aeb402b8eaea2a6f73f2124c5584d00942da928dd92b80ef1`
-- Logical hashes identical: yes
-- Output bytes identical: yes
+Actual Phase 6 completion still requires all of the following private evidence:
 
-## Evidence limitations and boundaries
+1. the exact pinned `vault-observation/v3` artifact;
+2. the exact corrected v2 Phase 5 projection bytes;
+3. two independent validator runs with zero deterministic violations;
+4. byte-identical promoted outputs and corresponding hashes.
 
-- The 108 unresolved authored occurrences are represented unresolved and are not structural failures. Ambiguous count is zero.
-- The current corpus's zero block-fragment state validates zero-state fidelity only; it is not positive corpus evidence of block-target resolution.
-- The corpus contains 10 heading-fragment occurrences; all 10 resolved to their independently derived canonical regions, with zero unresolved or ambiguous heading targets.
-- Synthetic falsification tests establish local validator mechanics, not corpus actuality.
-- Structural retrieval-surface descriptors and transitions were validated; executable retrieval providers and indexes were not implemented or exercised.
-- Real projection access remains Phase 7 work.
-- Candidate activation remains provisional Phase 8 work.
-- PR #9 was not modified.
-- No live vault was accessed and the observation was not regenerated.
-- No private observation or projection artifact is part of this repository change.
+That evidence is unavailable in this recovery environment. The validator is
+therefore reconciled and publicly/synthetically testable, but Phase 6 remains
+incomplete. No artifact, hash, corpus count, or validation result has been
+fabricated.
+
+Real projection access remains Phase 7 work. PR #9 remains untouched and
+provisional.

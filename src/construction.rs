@@ -1549,8 +1549,6 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
     let mut object_temporal: BTreeMap<String, Vec<TemporalAnchorId>> = BTreeMap::new();
     let mut region_by_object_span: BTreeMap<(String, u64, u64), Vec<usize>> = BTreeMap::new();
     let mut region_index_by_object_address: BTreeMap<(String, String), usize> = BTreeMap::new();
-    type RegionBoundsByObject =
-        BTreeMap<String, Vec<(SemanticRegionAddress, u64, u64, Vec<String>)>>;
     let mut region_bounds_by_object: RegionBoundsByObject = BTreeMap::new();
     let mut region_heading_spans_by_object: BTreeMap<
         String,
