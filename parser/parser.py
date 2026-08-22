@@ -319,7 +319,9 @@ def _parsed_text_and_links(parser: MarkdownIt, raw: str, *, source_offset: int |
                     inline_start = _inline_source_start(raw, token)
                     source_position = attrs.get("source_position")
                     local_start = None if inline_start is None or source_position is None else inline_start + source_position[0]
-                    span = None if source_offset is None or local_start is None else (source_offset + local_start, source_offset + local_start + len(attrs["raw"]))
+                    raw_link = attrs["raw"]
+                    exact = local_start is not None and raw[local_start : local_start + len(raw_link)] == raw_link
+                    span = None if source_offset is None or not exact else (source_offset + local_start, source_offset + local_start + len(raw_link))
                     link = _link_from_attrs(attrs, embedded=child.type == "embed", surface=source_surface, key_path=frontmatter_key_path, source_span=span)
                     (embeds if child.type == "embed" else links).append(link)
                     if child.type == "wikilink":
