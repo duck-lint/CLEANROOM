@@ -305,7 +305,7 @@ def _inline_source_start(raw: str, token: Any) -> int | None:
     return None if relative is None else line_start + relative
 
 
-def _parsed_text_and_links(parser: MarkdownIt, raw: str, *, source_offset: int | None, source_surface: str = "body", frontmatter_key_path: str | None = None, callout: bool = False) -> tuple[str, tuple[AuthoredLink, ...], tuple[AuthoredLink, ...]]:
+def _parsed_text_and_links(parser: MarkdownIt, raw: str, *, source_offset: int | None, source_text: str | None = None, source_surface: str = "body", frontmatter_key_path: str | None = None, callout: bool = False) -> tuple[str, tuple[AuthoredLink, ...], tuple[AuthoredLink, ...]]:
     tokens = parser.parse(raw)
     text_parts: list[str] = []
     links: list[AuthoredLink] = []
@@ -321,7 +321,15 @@ def _parsed_text_and_links(parser: MarkdownIt, raw: str, *, source_offset: int |
                     local_start = None if inline_start is None or source_position is None else inline_start + source_position[0]
                     raw_link = attrs["raw"]
                     exact = local_start is not None and raw[local_start : local_start + len(raw_link)] == raw_link
-                    span = None if source_offset is None or not exact else (source_offset + local_start, source_offset + local_start + len(raw_link))
+                    absolute_start = None if source_offset is None or local_start is None else source_offset + local_start
+                    absolute_end = None if absolute_start is None else absolute_start + len(raw_link)
+                    absolute_exact = source_text is None or (
+                        absolute_start is not None
+                        and absolute_end is not None
+                        and 0 <= absolute_start <= absolute_end <= len(source_text)
+                        and source_text[absolute_start:absolute_end] == raw_link
+                    )
+                    span = None if not exact or not absolute_exact or absolute_start is None or absolute_end is None else (absolute_start, absolute_end)
                     link = _link_from_attrs(attrs, embedded=child.type == "embed", surface=source_surface, key_path=frontmatter_key_path, source_span=span)
                     (embeds if child.type == "embed" else links).append(link)
                     if child.type == "wikilink":
@@ -370,7 +378,7 @@ def _explicit_block_ids(raw: str) -> tuple[str, ...]:
     return tuple(re.findall(r"\^([A-Za-z0-9_-]+)\s*$", raw, flags=re.MULTILINE))
 
 
-def _frontmatter_links(frontmatter: FrontmatterRecord) -> tuple[AuthoredLink, ...]:
+def _frontmatter_links(frontmatter: FrontmatterRecord, *, source_text: str) -> tuple[AuthoredLink, ...]:
     if frontmatter.status != "valid" or frontmatter.raw_text is None or frontmatter.content_span is None:
         return ()
     parser = _markdown_parser()
@@ -382,7 +390,7 @@ def _frontmatter_links(frontmatter: FrontmatterRecord) -> tuple[AuthoredLink, ..
                 continue
             item_offset = _unique_occurrence(frontmatter.raw_text, item)
             source_offset = None if item_offset is None else frontmatter.content_span[0] + item_offset
-            _, item_links, item_embeds = _parsed_text_and_links(parser, item, source_offset=source_offset, source_surface="frontmatter", frontmatter_key_path=str(key))
+            _, item_links, item_embeds = _parsed_text_and_links(parser, item, source_offset=source_offset, source_text=source_text, source_surface="frontmatter", frontmatter_key_path=str(key))
             links.extend(item_links)
             links.extend(item_embeds)
     return tuple(links)
@@ -412,11 +420,11 @@ def parse_markdown_text(source: str, *, authored_path: str) -> MarkdownParseReco
         raw = "".join(body_lines[start:end])
         source_start = frontmatter.body_span[0] + sum(len(line) for line in body_lines[:start])
         source_end = frontmatter.body_span[0] + sum(len(line) for line in body_lines[:end])
-        parsed_text, links, embeds = _parsed_text_and_links(parser, raw, source_offset=source_start, callout=token.type == "callout_open")
+        parsed_text, links, embeds = _parsed_text_and_links(parser, raw, source_offset=source_start, source_text=source, callout=token.type == "callout_open")
         level = int(token.tag[1:]) if token.type == "heading_open" else None
         blocks.append(MarkdownBlock(_block_kind(token.type), token.type, raw, (source_start, source_end), start + 1, end, parsed_text, links, embeds, _explicit_block_ids(raw), level, _heading_raw_text(raw) if level is not None else None, _heading_address_text(parser, raw) if level is not None else None))
 
-    frontmatter_links = _frontmatter_links(frontmatter)
+    frontmatter_links = _frontmatter_links(frontmatter, source_text=source)
     all_links = frontmatter_links + tuple(link for block in blocks for link in (*block.authored_links, *block.embeds))
     issues = (frontmatter.parse_issue,) if frontmatter.parse_issue else ()
     uuid_value = frontmatter.values.get("uuid") if frontmatter.status == "valid" else None
