@@ -31,16 +31,15 @@ use crate::{
     region_identity::{AuthoredRegionHeading, canonical_region_identities},
 };
 
-const OBSERVATION_SHA256: &str = "d3a340a1b203a64b2455f71a8d4f17003d5bfdba8be0583cbec1529692320bb9";
-// This is the byte identity recorded by the original pre-archive PR #23 v2
-// construction. The current recovery does not possess or reconstruct that
-// private artifact; this pin lets a later private validation run fail closed
-// unless it supplies the exact corrected representation.
-const PROJECTION_SHA256: &str = "f7423f494d905799e44b2c98f470429ae960ae682b43158f90d8b8f6fa9e39d2";
-const CORPUS: &str = "f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4";
-const OBSERVER_COMMIT: &str = "e9bb2d95c14b1beb334dc2b8d83420f5998b9a53";
+const OBSERVATION_SHA256: &str = "4e3b3fd00caaf591afe92e7fa892b66da3f35a3e98fd719447f1649ab4a18849";
+// This is the byte identity of the current private Phase 5 v2 construction.
+// The validator remains fail-closed against any other projection bytes.
+const PROJECTION_SHA256: &str = "b8fe327284263f9a3c944c62a8b853260f22c9146aef580574dc3608aa8364e3";
+const CORPUS: &str = "eb9447aa14e07995b86beb2c92d3c97c725fbdb23f1c210650b029fecd1d2d3d";
+const OBSERVER_COMMIT: &str = "502bc8d83a3681a21f4ab2f2cafb9598074aa24c";
 const EXCLUDED_FIELDS: [&str; 5] = ["address", "email", "phone", "likes", "dislikes"];
 const IDENTIFIER_FIELDS: [&str; 55] = [
+    "analysis_orientation",
     "aliases",
     "architect_or_operator",
     "birthday",
@@ -89,13 +88,12 @@ const IDENTIFIER_FIELDS: [&str; 55] = [
     "speculation_quarantine",
     "stop_rule",
     "tags",
-    "temporal_pace",
+    "headspace",
     "title",
     "to_mode",
     "to_register",
     "unity_level",
     "uuid",
-    "vector_direction",
 ];
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -728,7 +726,7 @@ fn independent_role(name: &str) -> IdentifierRole {
         "note_type" | "entity_type" | "format" => IdentifierRole::ObjectClass,
         "layer" | "pillar" | "unity_level" => IdentifierRole::FrameworkPosition,
         "register" | "register_mode" => IdentifierRole::RegisterTyping,
-        "vector_direction" => IdentifierRole::AnalysisOrientation,
+        "analysis_orientation" => IdentifierRole::AnalysisOrientation,
         "title" | "canonical_name" | "creator" | "aliases" => IdentifierRole::CanonicalNaming,
         "journal_entry_date" | "birthday" | "first_met" | "original_year_published" => {
             IdentifierRole::TemporalAnchoring
@@ -741,7 +739,7 @@ fn independent_role(name: &str) -> IdentifierRole {
         | "hypnagogic_resonance"
         | "reactivity"
         | "recall_ability"
-        | "temporal_pace" => IdentifierRole::IndexicalTelemetry,
+        | "headspace" => IdentifierRole::IndexicalTelemetry,
         "architect_or_operator" => IdentifierRole::JournalStateClassification,
         "occupation" => IdentifierRole::EntityMetadata,
         "origin" | "publish_studio" => IdentifierRole::SourceMetadata,
@@ -820,7 +818,7 @@ fn independent_descriptor(
         }
         "format"
         | "layer"
-        | "vector_direction"
+        | "analysis_orientation"
         | "register"
         | "pillar"
         | "hypnagogic_resonance"
@@ -885,7 +883,7 @@ fn independent_class_fields(class_name: &str) -> BTreeSet<String> {
         "tags",
         "layer",
         "unity_level",
-        "vector_direction",
+        "analysis_orientation",
         "register",
         "register_mode",
         "pillar",
@@ -920,7 +918,7 @@ fn independent_class_fields(class_name: &str) -> BTreeSet<String> {
             "hypnagogic_resonance",
             "reactivity",
             "recall_ability",
-            "temporal_pace",
+            "headspace",
             "architect_or_operator",
         ],
         "inferential_bridge" => &[

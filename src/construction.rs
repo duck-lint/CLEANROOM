@@ -20,11 +20,12 @@ use crate::{
 
 const EXCLUDED_FIELDS: [&str; 5] = ["address", "email", "phone", "likes", "dislikes"];
 const ACCEPTED_ARTIFACT_SHA256: &str =
-    "d3a340a1b203a64b2455f71a8d4f17003d5bfdba8be0583cbec1529692320bb9";
+    "4e3b3fd00caaf591afe92e7fa892b66da3f35a3e98fd719447f1649ab4a18849";
 const ACCEPTED_SPECIMEN_IDENTITY: &str =
-    "f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4";
+    "eb9447aa14e07995b86beb2c92d3c97c725fbdb23f1c210650b029fecd1d2d3d";
 const ACCEPTED_FIELD_UNIVERSE: [&str; 60] = [
     "address",
+    "analysis_orientation",
     "aliases",
     "architect_or_operator",
     "birthday",
@@ -77,13 +78,12 @@ const ACCEPTED_FIELD_UNIVERSE: [&str; 60] = [
     "speculation_quarantine",
     "stop_rule",
     "tags",
-    "temporal_pace",
+    "headspace",
     "title",
     "to_mode",
     "to_register",
     "unity_level",
     "uuid",
-    "vector_direction",
 ];
 
 #[derive(Debug)]
@@ -418,7 +418,7 @@ fn descriptor_role(name: &str) -> IdentifierRole {
         "note_type" | "entity_type" | "format" => IdentifierRole::ObjectClass,
         "layer" | "pillar" | "unity_level" => IdentifierRole::FrameworkPosition,
         "register" | "register_mode" => IdentifierRole::RegisterTyping,
-        "vector_direction" => IdentifierRole::AnalysisOrientation,
+        "analysis_orientation" => IdentifierRole::AnalysisOrientation,
         "title" | "canonical_name" | "creator" | "aliases" => IdentifierRole::CanonicalNaming,
         "journal_entry_date" | "birthday" | "first_met" | "original_year_published" => {
             IdentifierRole::TemporalAnchoring
@@ -431,7 +431,7 @@ fn descriptor_role(name: &str) -> IdentifierRole {
         | "hypnagogic_resonance"
         | "reactivity"
         | "recall_ability"
-        | "temporal_pace" => IdentifierRole::IndexicalTelemetry,
+        | "headspace" => IdentifierRole::IndexicalTelemetry,
         "architect_or_operator" => IdentifierRole::JournalStateClassification,
         "occupation" => IdentifierRole::EntityMetadata,
         "origin" | "publish_studio" => IdentifierRole::SourceMetadata,
@@ -1046,7 +1046,7 @@ fn accepted_class_fields(class_name: &str) -> BTreeSet<String> {
         "tags",
         "layer",
         "unity_level",
-        "vector_direction",
+        "analysis_orientation",
         "register",
         "register_mode",
         "pillar",
@@ -1077,7 +1077,7 @@ fn accepted_class_fields(class_name: &str) -> BTreeSet<String> {
         "hypnagogic_resonance",
         "reactivity",
         "recall_ability",
-        "temporal_pace",
+        "headspace",
         "architect_or_operator",
     ];
     const BRIDGE: &[&str] = &[
@@ -1122,7 +1122,7 @@ fn accepted_cardinality(name: &str, observed: IdentifierCardinality) -> Identifi
         }
         "format"
         | "layer"
-        | "vector_direction"
+        | "analysis_orientation"
         | "register"
         | "pillar"
         | "hypnagogic_resonance"
@@ -1475,7 +1475,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         .get("observer_provenance")
         .and_then(|p| p.get("commit"))
         .and_then(Value::as_str)
-        != Some("e9bb2d95c14b1beb334dc2b8d83420f5998b9a53")
+        != Some("502bc8d83a3681a21f4ab2f2cafb9598074aa24c")
     {
         return Err(ConstructionError::Contract(
             "observer specimen commit is not accepted".into(),
@@ -2273,7 +2273,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
     }
     let mut projection = SemanticSpaceProjection {
         projection_snapshot_id: format!("projection:phase5:v2:{snapshot}"),
-        ingest_identity: "observer:e9bb2d95c14b1beb334dc2b8d83420f5998b9a53".to_string(),
+        ingest_identity: "observer:502bc8d83a3681a21f4ab2f2cafb9598074aa24c".to_string(),
         schema_version: "semantic-space-projection/v2".into(),
         logical_hash: String::new(),
         corpus_snapshot_identity: snapshot.clone(),
@@ -2437,7 +2437,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         "report_title": "PHASE 5 CONSTRUCTION EVIDENCE",
         "input_identity": {
             "observer_repository": "duck-lint/semantic-traversal",
-            "observer_commit": "e9bb2d95c14b1beb334dc2b8d83420f5998b9a53",
+            "observer_commit": "502bc8d83a3681a21f4ab2f2cafb9598074aa24c",
             "observer_schema": "vault-observation/v3",
             "corpus_snapshot_identity": snapshot,
             "specimen_identity": snapshot,
