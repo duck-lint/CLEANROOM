@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 from parser.observation import observe
+from parser.parser import parse_markdown_text
 
 
 class ParserObservationTests(unittest.TestCase):
@@ -57,6 +58,81 @@ class ParserObservationTests(unittest.TestCase):
             root.mkdir()
             with self.assertRaises(ValueError):
                 observe(root, root / ".observation")
+
+    def test_salvaged_parser_owns_all_markdown_structure_and_link_syntax(self) -> None:
+        source = (
+            "---\n"
+            "uuid: 018f3e7e-7b6a-7c3b-8d0e-123456789abd\n"
+            "when: 2026-08-22\n"
+            "related: \"[[Target#Heading|display]]\"\n"
+            "aliases:\n"
+            "  - Alias\n"
+            "  - \"[[Target]]\"\n"
+            "embed: \"![[Target#^block|embed]]\"\n"
+            "---\n"
+            "# [[Target|Heading]]\n\n"
+            "A [[Target#Heading|display]] and ![[Target#^block|embed]].\n\n"
+            "`[[Target]]` \\[[Target]]\n\n"
+            "    [[Target]]\n\n"
+            "~~~md\n[[Target]]\n~~~\n\n"
+            "- list [[Target]]\n  - nested [[Target]]\n\n"
+            "| left | right |\n| --- | --- |\n| [[Target]] | value |\n\n"
+            "body ^block\n"
+        )
+        record = parse_markdown_text(source, authored_path="Source.md")
+
+        self.assertEqual(record.frontmatter.value_shapes["when"], "date")
+        self.assertEqual(record.frontmatter.values["aliases"][0], "Alias")
+        self.assertEqual(
+            [block.block_kind for block in record.blocks],
+            ["heading", "paragraph", "paragraph", "indented_code", "code_fence", "list", "table", "paragraph"],
+        )
+        self.assertEqual(record.blocks[0].heading_raw_text, "[[Target|Heading]]")
+        self.assertEqual(record.blocks[1].parsed_text, "A display and .")
+        self.assertEqual(record.blocks[4].authored_links, ())
+        self.assertEqual(record.blocks[3].authored_links, ())
+        self.assertEqual(record.blocks[5].parsed_text.count("Target"), 2)
+        self.assertEqual(record.blocks[6].parsed_text.count("Target"), 1)
+        self.assertEqual(len(record.authored_links), 9)
+        self.assertEqual(
+            [(link.target, link.target_region_fragment, link.embedded, link.source_surface) for link in record.authored_links],
+            [
+                ("Target", "Heading", False, "frontmatter"),
+                ("Target", None, False, "frontmatter"),
+                ("Target", "^block", True, "frontmatter"),
+                ("Target", None, False, "body"),
+                ("Target", "Heading", False, "body"),
+                ("Target", "^block", True, "body"),
+                ("Target", None, False, "body"),
+                ("Target", None, False, "body"),
+                ("Target", None, False, "body"),
+            ],
+        )
+
+    def test_candidate_step_consumes_parser_links_and_fragments(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "vault"
+            output = Path(temporary) / "output"
+            root.mkdir()
+            (root / "Target.md").write_text(
+                "---\nuuid: 018f3e7e-7b6a-7c3b-8d0e-123456789abc\n---\n## Heading\n\nblock ^block\n",
+                encoding="utf-8",
+            )
+            (root / "Source.md").write_text(
+                "---\nuuid: 018f3e7e-7b6a-7c3b-8d0e-123456789abd\nrelated: \"[[Target#Heading|display]]\"\n---\n[[Target#Heading|display]]\n![[Target#^block|embed]]\n",
+                encoding="utf-8",
+            )
+
+            observation, _ = observe(root, output)
+            source = next(item for item in observation["markdown_observations"] if item["source"]["relative_path"] == "Source.md")
+            links = source["authored_links"]
+
+            self.assertEqual(len(links), 3)
+            self.assertTrue(all(link["target_candidates"]["cardinality"] == "one_candidate" for link in links))
+            heading_link = next(link for link in links if link["heading_fragment"] == "Heading")
+            block_link = next(link for link in links if link["block_fragment"] == "block")
+            self.assertEqual(heading_link["heading_target_evaluation"], "observed")
+            self.assertEqual(block_link["block_target_evaluation"], "observed")
 
     def test_artifacts_are_json_and_written_only_to_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

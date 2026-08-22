@@ -1,4 +1,4 @@
-"""Whole-vault Markdown discovery and object-level validation."""
+"""Deterministic raw Markdown discovery and factual parse collection."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from ruamel.yaml.error import YAMLError
 
-from .parser import BuildConfig, NoteParseError, ParsedNote, parse_note
+from .parser import MarkdownParseRecord, ObservationConfig, NoteParseError, parse_markdown
 
 
 @dataclass(frozen=True)
@@ -21,15 +21,15 @@ class CorpusFailure:
 
 @dataclass(frozen=True)
 class VaultParseResult:
-    """Parsed candidate notes plus aggregate validation failures."""
+    """Parsed Markdown records plus independently observed parse failures."""
 
-    notes: tuple[ParsedNote, ...]
+    records: tuple[MarkdownParseRecord, ...]
     failures: tuple[CorpusFailure, ...]
-    build_config: BuildConfig
+    config: ObservationConfig
 
     @property
     def is_valid(self) -> bool:
-        """Whether this candidate is a valid completed parsed corpus."""
+        """Whether every discovered Markdown source parsed mechanically."""
 
         return not self.failures
 
@@ -38,7 +38,7 @@ def _relative_path(path: Path, vault_root: Path) -> str:
     return path.relative_to(vault_root).as_posix()
 
 
-def _excluded(relative_path: PurePosixPath, config: BuildConfig) -> bool:
+def _excluded(relative_path: PurePosixPath, config: ObservationConfig) -> bool:
     """Apply exact path-prefix exclusion, not leaf-name or glob matching."""
 
     for excluded_folder in config.excluded_folders:
@@ -48,7 +48,7 @@ def _excluded(relative_path: PurePosixPath, config: BuildConfig) -> bool:
     return False
 
 
-def discover_markdown_notes(vault_root: str | Path, build_config: BuildConfig) -> tuple[Path, ...]:
+def discover_markdown_notes(vault_root: str | Path, config: ObservationConfig) -> tuple[Path, ...]:
     """Discover included Markdown notes in deterministic vault-relative order."""
 
     root = Path(vault_root)
@@ -60,47 +60,23 @@ def discover_markdown_notes(vault_root: str | Path, build_config: BuildConfig) -
         if not path.is_file() or path.suffix != ".md":
             continue
         relative = PurePosixPath(_relative_path(path, root))
-        if not _excluded(relative, build_config):
+        if not _excluded(relative, config):
             discovered.append((relative.as_posix(), path))
     discovered.sort(key=lambda item: item[0])
     return tuple(path for _, path in discovered)
 
 
-def parse_vault(vault_root: str | Path, build_config: BuildConfig) -> VaultParseResult:
-    """Parse all included notes and aggregate parse and UUID failures."""
+def parse_vault(vault_root: str | Path, config: ObservationConfig = ObservationConfig()) -> VaultParseResult:
+    """Parse all included Markdown sources without admission or resolution."""
 
     root = Path(vault_root)
-    notes: list[ParsedNote] = []
+    records: list[MarkdownParseRecord] = []
     failures: list[CorpusFailure] = []
-    for path in discover_markdown_notes(root, build_config):
+    for path in discover_markdown_notes(root, config):
         source_path = (_relative_path(path, root),)
         try:
-            note = parse_note(path, vault_root=root, build_config=build_config, require_uuid=False)
-            notes.append(note)
-            if note.semantic_object.uuid is None:
-                failures.append(
-                    CorpusFailure(
-                        "missing_uuid",
-                        f"frontmatter must contain one non-empty {build_config.uuid_field}",
-                        source_path,
-                    )
-                )
+            records.append(parse_markdown(path, vault_root=root))
         except (NoteParseError, OSError, UnicodeError, YAMLError) as exc:
             failures.append(CorpusFailure("parse", str(exc), source_path))
 
-    by_uuid: dict[str, list[str]] = defaultdict(list)
-    for note in notes:
-        if note.semantic_object.uuid is not None:
-            by_uuid[note.semantic_object.uuid].append(note.semantic_object.authored_path)
-    for uuid, paths in sorted(by_uuid.items()):
-        if len(paths) > 1:
-            collision_paths = tuple(sorted(paths))
-            failures.append(
-                CorpusFailure(
-                    "duplicate_uuid",
-                    f"duplicate {build_config.uuid_field} value {uuid!r}",
-                    collision_paths,
-                )
-            )
-
-    return VaultParseResult(tuple(notes), tuple(failures), build_config)
+    return VaultParseResult(tuple(records), tuple(failures), config)

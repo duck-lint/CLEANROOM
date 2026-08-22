@@ -1,12 +1,9 @@
-"""Bounded factual observation of a raw authored vault.
+"""Serialize factual records emitted by :mod:`parser.parser`.
 
-This module deliberately stops at observation.  It does not assign semantic
-object or unit identities, resolve links, materialize context, canonicalize
-records, or expose retrieval/runtime behavior.
-
-The Markdown and YAML mechanics were salvaged from semantic-traversal build
-commit ``72ef99219fd260ba71365005273f6d9f68cab939``.  The output is a
-CLEANROOM-owned ``vault-observation/v3`` artifact.
+This module owns filesystem inventory, JSON-safe transport, UUID census, and
+candidate-address enumeration. It does not parse Markdown. All Markdown
+blocks, headings, raw source, parsed text, links, embeds, fences, and code are
+consumed from the salvaged parser's ``MarkdownParseRecord``.
 """
 
 from __future__ import annotations
@@ -16,30 +13,32 @@ from datetime import date, datetime, timezone
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
-import re
+import subprocess
 import uuid as uuidlib
 from typing import Any
 
-from ruamel.yaml import YAML
-
-from .parser import BuildConfig, NoteParseError, _frontmatter, parse_note
+from .parser import AuthoredLink, MarkdownParseRecord, NoteParseError, parse_markdown
 
 
 SCHEMA_VERSION = "vault-observation/v3"
-SOURCE_COMMIT = "72ef99219fd260ba71365005273f6d9f68cab939"
+OBSERVER_IMPLEMENTATION_VERSION = "cleanroom-parser-observer/v2"
+PARSER_SALVAGE_COMMIT = "72ef99219fd260ba71365005273f6d9f68cab939"
+PARSER_SALVAGE_BLOBS = {
+    "parser/parser.py": {
+        "source_path": "src/semantic_traversal/build/parser.py",
+        "blob": "e30b2043a6282cbaa21aa0d5c2d91901ad7c3889",
+    },
+    "parser/vault.py": {
+        "source_path": "src/semantic_traversal/build/vault.py",
+        "blob": "deea2fedf0376f3d112fdfb28c0340d8d30ea09b",
+    },
+}
 MARKDOWN_EXTENSIONS = {".md"}
 APPARATUS_NAMESPACES = {
     ".git": "version_control",
     ".obsidian": "application_state",
     ".semantic-traversal": "generated_runtime_state",
 }
-HEADING_RE = re.compile(r"^(?P<marks>#{1,6})[ \t]+(?P<text>.*?)[ \t]*$")
-FENCE_RE = re.compile(r"^[ \t]*(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
-LIST_RE = re.compile(r"^[ \t]*(?:[-+*]|\d+[.)])[ \t]+")
-TABLE_SEPARATOR_RE = re.compile(
-    r"^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)+\|?[ \t]*$"
-)
-INLINE_WIKILINK_RE = re.compile(r"(?P<embed>!)?\[\[(?P<body>[^\]]+)\]\]")
 
 
 def _sha256_bytes(value: bytes) -> str:
@@ -47,9 +46,19 @@ def _sha256_bytes(value: bytes) -> str:
 
 
 def _sha256_json(value: Any) -> str:
-    return _sha256_bytes(
-        json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    )
+    return _sha256_bytes(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
+
+
+def _json_safe(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    return str(value)
 
 
 def _shape(value: Any) -> str:
@@ -72,284 +81,57 @@ def _shape(value: Any) -> str:
     return type(value).__name__
 
 
-def _json_safe(value: Any) -> Any:
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, (datetime, date)):
-        return value.isoformat()
-    if isinstance(value, list):
-        return [_json_safe(item) for item in value]
-    if isinstance(value, dict):
-        return {str(key): _json_safe(item) for key, item in value.items()}
-    return str(value)
-
-
-def _line_spans(text: str) -> list[tuple[int, int, str]]:
-    result: list[tuple[int, int, str]] = []
-    offset = 0
-    for line in text.splitlines(keepends=True):
-        end = offset + len(line)
-        result.append((offset, end, line))
-        offset = end
-    if not result or offset < len(text):
-        result.append((offset, len(text), text[offset:]))
-    return result
-
-
-def _frontmatter_observation(text: str) -> dict[str, Any]:
-    lines = _line_spans(text)
-    if not lines or lines[0][2].strip("\r\n") != "---":
-        return {
-            "status": "absent",
-            "raw_text": None,
-            "source_span": None,
-            "body_span": [0, len(text)],
-            "keys": [],
-            "values": {},
-            "value_shapes": {},
-        }
-    closing = next(
-        (index for index, (_, _, line) in enumerate(lines[1:], 1) if line.strip("\r\n") in {"---", "..."}),
-        None,
-    )
-    if closing is None:
-        raw = text[lines[0][1] :]
-        return {
-            "status": "unterminated",
-            "raw_text": raw,
-            "source_span": [lines[0][0], len(text)],
-            "body_span": [len(text), len(text)],
-            "keys": [],
-            "values": {},
-            "value_shapes": {},
-            "parse_issue": "missing_closing_delimiter",
-        }
-    raw = text[lines[0][1] : lines[closing][0]]
-    yaml = YAML(typ="safe", pure=True)
-    yaml.version = (1, 2)
+def _git_commit() -> str | None:
+    checkout = Path(__file__).resolve().parent.parent
     try:
-        parsed = yaml.load(raw) or {}
-    except Exception as exc:  # Concrete parser exceptions are outside this boundary.
-        return {
-            "status": "malformed",
-            "raw_text": raw,
-            "source_span": [lines[0][0], lines[closing][1]],
-            "body_span": [lines[closing][1], len(text)],
-            "keys": [],
-            "values": {},
-            "value_shapes": {},
-            "parse_issue": f"yaml_parse_failed:{type(exc).__name__}",
-        }
-    if not isinstance(parsed, dict):
-        return {
-            "status": "non_mapping",
-            "raw_text": raw,
-            "source_span": [lines[0][0], lines[closing][1]],
-            "body_span": [lines[closing][1], len(text)],
-            "keys": [],
-            "values": {},
-            "value_shapes": {},
-            "parse_issue": "frontmatter_not_mapping",
-        }
-    shapes = {str(key): _shape(value) for key, value in parsed.items()}
-    values = {str(key): _json_safe(value) for key, value in parsed.items()}
+        return subprocess.check_output(["git", "-C", str(checkout), "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+
+
+def _git_worktree_state() -> str:
+    checkout = Path(__file__).resolve().parent.parent
+    try:
+        status = subprocess.check_output(["git", "-C", str(checkout), "status", "--porcelain", "--", "parser"], text=True, stderr=subprocess.DEVNULL)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return "unavailable"
+    return "dirty" if status.strip() else "clean"
+
+
+def _implementation_source_fingerprint() -> str:
+    package = Path(__file__).resolve().parent
+    files = {}
+    for name in ("parser.py", "observation.py", "vault.py", "__main__.py"):
+        path = package / name
+        files[name] = _sha256_bytes(path.read_bytes())
+    return _sha256_json(files)
+
+
+def _observer_provenance() -> dict[str, Any]:
+    commit = _git_commit()
     return {
-        "status": "valid",
-        "raw_text": raw,
-        "source_span": [lines[0][0], lines[closing][1]],
-        "body_span": [lines[closing][1], len(text)],
-        "keys": sorted(values),
-        "values": values,
-        "value_shapes": {key: shapes[key] for key in sorted(shapes)},
+        "status": "resolved" if commit else "version_only",
+        "implementation_version": OBSERVER_IMPLEMENTATION_VERSION,
+        "repository": "CLEANROOM",
+        "commit": commit,
+        "working_tree_state": _git_worktree_state(),
+        "implementation_source_fingerprint": _implementation_source_fingerprint(),
+        "parser_salvage": {
+            "repository": "duck-lint/semantic-traversal",
+            "commit": PARSER_SALVAGE_COMMIT,
+            "files": PARSER_SALVAGE_BLOBS,
+        },
     }
-
-
-def _uuid_observation(frontmatter: dict[str, Any]) -> dict[str, Any]:
-    values = frontmatter.get("values", {})
-    if "uuid" not in values:
-        return {"field_present": False, "raw_value": None, "value_shape": None, "parse_status": "absent"}
-    raw = values["uuid"]
-    result: dict[str, Any] = {
-        "field_present": True,
-        "raw_value": raw,
-        "value_shape": _shape(raw),
-        "parse_status": "not_parseable",
-        "parsed_version": None,
-        "parsed_value": None,
-    }
-    if isinstance(raw, str):
-        try:
-            parsed = uuidlib.UUID(raw)
-        except (ValueError, AttributeError):
-            pass
-        else:
-            result.update(parse_status="parseable", parsed_version=parsed.version, parsed_value=str(parsed))
-    return result
-
-
-def _parse_link(match: re.Match[str], surface: str, key_path: str | None) -> dict[str, Any]:
-    body = match.group("body")
-    separator = re.search(r"\\?\|", body)
-    if separator:
-        target_with_fragments = body[: separator.start()]
-        display = body[separator.end() :]
-    else:
-        target_with_fragments = body
-        display = None
-    base = target_with_fragments
-    heading = None
-    block = None
-    if "#" in base:
-        base, fragment = base.split("#", 1)
-        if fragment.startswith("^"):
-            block = fragment[1:]
-        else:
-            heading = fragment
-    elif "^" in base:
-        base, block = base.split("^", 1)
-    return {
-        "source_surface": surface,
-        "frontmatter_key_path": key_path,
-        "raw_link_markup": match.group(0),
-        "raw_target": target_with_fragments,
-        "raw_target_without_fragment": base,
-        "display_alias": display,
-        "heading_fragment": heading,
-        "block_fragment": block,
-        "embedded": bool(match.group("embed")),
-        "source_span": [match.start(), match.end()],
-    }
-
-
-def _render_inline_wikilinks(text: str) -> str:
-    def replace(match: re.Match[str]) -> str:
-        body = match.group("body")
-        separator = re.search(r"\\?\|", body)
-        if separator:
-            return body[separator.end() :]
-        return body.split("#", 1)[0] if "#" in body else body
-
-    return INLINE_WIKILINK_RE.sub(replace, text)
-
-
-def _source_derived_inline_wikilinks(text: str) -> str:
-    def replace(match: re.Match[str]) -> str:
-        body = match.group("body")
-        separator = re.search(r"\\?\|", body)
-        if not separator:
-            return body.split("#", 1)[0] if "#" in body else body
-        target = body[: separator.start()].split("#", 1)[0]
-        display = body[separator.end() :]
-        return " ".join(part for part in (target, display) if part)
-
-    return INLINE_WIKILINK_RE.sub(replace, text)
-
-
-def _heading_address_key(text: str) -> str:
-    rendered = _render_inline_wikilinks(text).replace("\\|", "|").casefold()
-    rendered = rendered.replace(":", "").replace("|", "")
-    rendered = re.sub(r"\(\s+", "(", rendered)
-    return " ".join(rendered.split())
-
-
-def _heading_observation(raw_text: str, level: int, source_span: list[int]) -> dict[str, Any]:
-    rendered_text = _render_inline_wikilinks(raw_text)
-    source_derived_text = _source_derived_inline_wikilinks(raw_text)
-    surfaces = []
-    for surface_name, surface_text in (
-        ("raw", raw_text),
-        ("rendered", rendered_text),
-        ("source_derived", source_derived_text),
-    ):
-        surface = {"surface": surface_name, "text": surface_text, "address_key": _heading_address_key(surface_text)}
-        if not any(existing["address_key"] == surface["address_key"] for existing in surfaces):
-            surfaces.append(surface)
-    return {
-        "level": level,
-        "raw_text": raw_text,
-        "rendered_text": rendered_text,
-        "source_derived_text": source_derived_text,
-        "address_surfaces": surfaces,
-        "address_key": _heading_address_key(rendered_text),
-        "source_span": source_span,
-    }
-
-
-def _frontmatter_key_for_offset(raw_text: str, offset: int) -> str | None:
-    current: str | None = None
-    running = 0
-    for line in raw_text.splitlines(keepends=True):
-        match = re.match(r"^([A-Za-z0-9_-]+)\s*:", line)
-        if match:
-            current = match.group(1)
-        if running <= offset < running + len(line):
-            return current
-        running += len(line)
-    return current
-
-
-def _blocks(text: str, body_start: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    lines = _line_spans(text)
-    headings = [
-        _heading_observation(match.group("text"), len(match.group("marks")), [start, end])
-        for start, end, line in lines
-        if start >= body_start and (match := HEADING_RE.match(line.rstrip("\r\n")))
-    ]
-    candidates: list[dict[str, Any]] = []
-    index = 0
-    while index < len(lines):
-        start, end, line = lines[index]
-        if end <= body_start or not line.strip():
-            index += 1
-            continue
-        raw = line.rstrip("\r\n")
-        fence = FENCE_RE.match(raw)
-        if fence:
-            marker = fence.group("marker")
-            last = index
-            while last + 1 < len(lines):
-                last += 1
-                if re.match(r"^[ \t]*" + re.escape(marker[0]) + r"{" + str(len(marker)) + r",}[ \t]*$", lines[last][2].rstrip("\r\n")):
-                    break
-            kind = "code_fence"
-        else:
-            last = index
-            kind = (
-                "heading"
-                if HEADING_RE.match(raw)
-                else "list"
-                if LIST_RE.match(raw)
-                else "table"
-                if "|" in raw and index + 1 < len(lines) and TABLE_SEPARATOR_RE.match(lines[index + 1][2].rstrip("\r\n"))
-                else "blockquote_or_callout"
-                if raw.lstrip().startswith(">")
-                else "paragraph"
-            )
-            if kind == "paragraph":
-                while last + 1 < len(lines) and lines[last + 1][2].strip() and not HEADING_RE.match(lines[last + 1][2].rstrip("\r\n")) and not FENCE_RE.match(lines[last + 1][2].rstrip("\r\n")):
-                    last += 1
-        block_end = lines[last][1]
-        raw_block = text[start:block_end]
-        candidates.append({
-            "block_kind_observation": kind,
-            "raw_markdown": raw_block,
-            "source_span": [start, block_end],
-            "line_start": index + 1,
-            "line_end": last + 1,
-            "explicit_block_ids": re.findall(r"\^([A-Za-z0-9_-]+)\s*$", raw_block, flags=re.MULTILINE),
-        })
-        index = last + 1
-    return headings, candidates
-
-
-def _relative(path: Path, root: Path) -> str:
-    return path.relative_to(root).as_posix()
 
 
 def _apparatus_root(relative: str) -> tuple[str, str] | None:
     first = relative.split("/", 1)[0]
     category = APPARATUS_NAMESPACES.get(first)
     return (first, category) if category else None
+
+
+def _relative(path: Path, root: Path) -> str:
+    return path.relative_to(root).as_posix()
 
 
 def _directories(vault_root: Path) -> list[dict[str, Any]]:
@@ -368,62 +150,119 @@ def _directories(vault_root: Path) -> list[dict[str, Any]]:
     return result
 
 
-def _frontmatter_links(frontmatter: dict[str, Any]) -> list[tuple[re.Match[str], str | None]]:
-    values = frontmatter.get("values", {})
-    result: list[tuple[re.Match[str], str | None]] = []
-    for key, value in values.items():
-        authored_values = [value] if isinstance(value, str) else value if isinstance(value, list) else []
-        for item in authored_values:
-            if not isinstance(item, str):
-                continue
-            result.extend((match, str(key)) for match in INLINE_WIKILINK_RE.finditer(item))
+def _frontmatter_json(record: MarkdownParseRecord) -> dict[str, Any]:
+    frontmatter = record.frontmatter
+    return {
+        "status": frontmatter.status,
+        "raw_text": frontmatter.raw_text,
+        "source_span": list(frontmatter.source_span) if frontmatter.source_span is not None else None,
+        "body_span": list(frontmatter.body_span),
+        "keys": list(frontmatter.keys),
+        "values": {key: _json_safe(value) for key, value in frontmatter.values.items()},
+        "value_shapes": dict(frontmatter.value_shapes),
+        **({"parse_issue": frontmatter.parse_issue} if frontmatter.parse_issue else {}),
+    }
+
+
+def _uuid_observation(record: MarkdownParseRecord) -> dict[str, Any]:
+    value = record.uuid_value
+    if record.frontmatter.status != "valid" or "uuid" not in record.frontmatter.values:
+        return {"field_present": False, "raw_value": None, "value_shape": None, "parse_status": "absent"}
+    result: dict[str, Any] = {
+        "field_present": True,
+        "raw_value": _json_safe(value),
+        "value_shape": _shape(value),
+        "parse_status": "not_parseable",
+        "parsed_version": None,
+        "parsed_value": None,
+    }
+    if isinstance(value, str):
+        try:
+            parsed = uuidlib.UUID(value)
+        except (ValueError, AttributeError):
+            pass
+        else:
+            result.update(parse_status="parseable", parsed_version=parsed.version, parsed_value=str(parsed))
     return result
 
 
+def _heading_address_key(text: str) -> str:
+    normalized = text.casefold().replace(":", "").replace("|", "")
+    return " ".join(normalized.split())
+
+
+def _heading_json(block: Any) -> dict[str, Any]:
+    raw_text = block.heading_raw_text or ""
+    rendered_text = block.parsed_text
+    source_derived_text = block.heading_address_text or rendered_text
+    surfaces = []
+    for name, text in (("raw", raw_text), ("rendered", rendered_text), ("source_derived", source_derived_text)):
+        surface = {"surface": name, "text": text, "address_key": _heading_address_key(text)}
+        if not any(existing["address_key"] == surface["address_key"] for existing in surfaces):
+            surfaces.append(surface)
+    return {
+        "level": block.heading_level,
+        "raw_text": raw_text,
+        "rendered_text": rendered_text,
+        "source_derived_text": source_derived_text,
+        "address_surfaces": surfaces,
+        "address_key": _heading_address_key(rendered_text),
+        "source_span": list(block.source_span),
+    }
+
+
+def _block_json(block: Any) -> dict[str, Any]:
+    return {
+        "block_kind_observation": block.block_kind,
+        "parser_token_type": block.parser_token_type,
+        "raw_markdown": block.raw_markdown,
+        "parsed_text": block.parsed_text,
+        "source_span": list(block.source_span),
+        "line_start": block.line_start,
+        "line_end": block.line_end,
+        "explicit_block_ids": list(block.explicit_block_ids),
+    }
+
+
+def _link_json(link: AuthoredLink) -> dict[str, Any]:
+    return {
+        "source_surface": link.source_surface,
+        "frontmatter_key_path": link.frontmatter_key_path,
+        "raw_link_markup": link.raw,
+        "raw_target": link.target + (("#" + link.target_region_fragment) if link.target_region_fragment else ""),
+        "raw_target_without_fragment": link.target,
+        "display_alias": None if link.label == link.target else link.label,
+        "heading_fragment": link.target_region_fragment if link.target_region_fragment and not link.target_region_fragment.startswith("^") else None,
+        "block_fragment": link.target_region_fragment[1:] if link.target_region_fragment and link.target_region_fragment.startswith("^") else None,
+        "embedded": link.embedded,
+        "source_span": list(link.source_span) if link.source_span is not None else None,
+    }
+
+
 def _observe_markdown(path: Path, root: Path, file_record: dict[str, Any]) -> dict[str, Any]:
-    decoded = path.read_text(encoding="utf-8")
-    frontmatter = _frontmatter_observation(decoded)
-    body_start = frontmatter["body_span"][0]
-    headings, blocks = _blocks(decoded, body_start)
-    fence_spans = [block["source_span"] for block in blocks if block["block_kind_observation"] == "code_fence"]
-    links: list[dict[str, Any]] = []
-    for match in INLINE_WIKILINK_RE.finditer(decoded):
-        if any(start <= match.start() < end for start, end in fence_spans):
-            continue
-        if frontmatter["source_span"] and match.start() < frontmatter["source_span"][1]:
-            offset = match.start() - frontmatter["source_span"][0] - len("---\n")
-            surface, key_path = "frontmatter", _frontmatter_key_for_offset(frontmatter["raw_text"] or "", offset)
-        else:
-            surface, key_path = "body", None
-        links.append(_parse_link(match, surface, key_path))
-    # Parsing is retained as a mechanical parser gate; its result is not
-    # promoted into semantic objects, units, relations, or canonical records.
-    try:
-        parse_note(path, vault_root=root, build_config=BuildConfig("vault", "uuid", (), ()), require_uuid=False)
-    except (NoteParseError, OSError, UnicodeError) as exc:
-        parse_issues = [f"parser:{type(exc).__name__}:{exc}"]
-    else:
-        parse_issues = []
+    record = parse_markdown(path, vault_root=root)
+    links = [_link_json(link) for link in record.authored_links]
     return {
         "source": file_record,
-        "raw_markdown": decoded,
-        "frontmatter": frontmatter,
-        "uuid": _uuid_observation(frontmatter),
-        "headings": headings,
-        "block_candidates": blocks,
+        "raw_markdown": record.raw_markdown,
+        "frontmatter": _frontmatter_json(record),
+        "uuid": _uuid_observation(record),
+        "headings": [_heading_json(block) for block in record.headings],
+        "block_candidates": [_block_json(block) for block in record.blocks],
         "authored_links": links,
-        "parse_issues": ([frontmatter["parse_issue"]] if frontmatter.get("parse_issue") else []) + parse_issues,
+        "parse_issues": list(record.parse_issues),
     }
 
 
 def _complete_link_observations(markdown: list[dict[str, Any]], files: list[dict[str, Any]]) -> None:
+    """Enumerate address candidates from parser-emitted links only."""
+
     address_surfaces: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
 
     def add(surface: str, key: str, source: str) -> None:
         address_surfaces[surface][key].add(source)
 
-    resident_files = [item for item in files if item["observation_category"] == "vault_resident"]
-    for file_record in resident_files:
+    for file_record in (item for item in files if item["observation_category"] == "vault_resident"):
         path = PurePosixPath(file_record["relative_path"])
         source = file_record["relative_path"]
         add("exact_relative_path", source, source)
@@ -459,10 +298,7 @@ def _complete_link_observations(markdown: list[dict[str, Any]], files: list[dict
             link["target_candidates"] = {
                 "cardinality": "zero_candidates" if not candidates else "one_candidate" if len(candidates) == 1 else "multiple_candidates",
                 "candidate_source_paths": candidates,
-                "candidate_evidence": [
-                    {"source_path": source, "surfaces": sorted(surface for surface, sources in evidence.items() if source in sources)}
-                    for source in candidates
-                ],
+                "candidate_evidence": [{"source_path": source, "surfaces": sorted(surface for surface, sources in evidence.items() if source in sources)} for source in candidates],
             }
             target_record = by_source.get(candidates[0]) if len(candidates) == 1 else None
             if link["heading_fragment"] is None:
@@ -473,8 +309,7 @@ def _complete_link_observations(markdown: list[dict[str, Any]], files: list[dict
                 fragment_key = _heading_address_key(link["heading_fragment"])
                 matches = [heading for heading in target_record["headings"] if any(surface["address_key"] == fragment_key for surface in heading["address_surfaces"])]
                 if len(matches) == 1:
-                    heading = matches[0]
-                    link.update(heading_target_evaluation="observed", heading_target_match_kind="normalized", heading_target_matches=[heading])
+                    link.update(heading_target_evaluation="observed", heading_target_match_kind="normalized", heading_target_matches=matches)
                 elif matches:
                     link.update(heading_target_evaluation="ambiguous", heading_target_match_kind="ambiguous", heading_target_matches=matches)
                 else:
@@ -507,9 +342,10 @@ def observe(vault_root: str | Path, output_root: str | Path) -> tuple[dict[str, 
         if kind == "markdown":
             try:
                 decoded = data.decode("utf-8")
-                decoding = "utf8"
             except UnicodeDecodeError:
                 decoding = "decode_failed"
+            else:
+                decoding = "utf8"
         file_record = {
             "relative_path": relative,
             "parent_relative_path": "" if path.parent == root else path.parent.relative_to(root).as_posix(),
@@ -542,11 +378,8 @@ def observe(vault_root: str | Path, output_root: str | Path) -> tuple[dict[str, 
 
     resident_dirs = [item for item in directories if item["observation_category"] == "vault_resident"]
     resident_files = [item for item in files if item["observation_category"] == "vault_resident"]
-    snapshot = _sha256_json({
-        "directories": resident_dirs,
-        "files": [{key: item[key] for key in ("relative_path", "source_kind", "extension", "byte_size", "source_byte_hash", "text_decoding_status")} for item in resident_files],
-    })
-    provenance = {"status": "resolved", "commit": SOURCE_COMMIT}
+    snapshot = _sha256_json({"directories": resident_dirs, "files": [{key: item[key] for key in ("relative_path", "source_kind", "extension", "byte_size", "source_byte_hash", "text_decoding_status")} for item in resident_files]})
+    provenance = _observer_provenance()
     observation = {
         "observation_schema_version": SCHEMA_VERSION,
         "observer_provenance": provenance,
@@ -557,7 +390,7 @@ def observe(vault_root: str | Path, output_root: str | Path) -> tuple[dict[str, 
         "technical_apparatus_observations": sorted(apparatus_stats.values(), key=lambda item: item["relative_root_path"]),
         "markdown_observations": markdown,
         "measurement_limitations": [
-            "Only the listed Markdown heading, block, frontmatter, wikilink, embed, and fragment forms are mechanically interpreted.",
+            "Markdown structure, source spans, parser-native frontmatter shapes, links, embeds, and code forms are emitted by the salvaged factual parser.",
             "Unsupported Markdown is retained as raw source and is not interpreted as semantic structure.",
             "Candidate paths are address observations, not canonical identities.",
         ],
