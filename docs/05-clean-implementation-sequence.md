@@ -49,6 +49,221 @@ Implementation authority
 
 The domains are scoped. The Organon constrains system meaning; explicit operator decisions resolve open authoring or constitutive questions; the vault supplies actual authored instances; equations and invariants constrain deterministic runtime authority; contracts become representational authority only after corpus validation; implementations are authoritative only within accepted boundaries. A cross-domain conflict requires classification, retained evidence, an explicit operator or contract decision, and a bounded amendment.
 
+## Bounded amendment record — projection/runtime separation closure
+
+### Prior claim
+
+The superseded projection contract coupled runtime configuration to projection
+identity and routine projection surface bounds, while leaving the status of the
+five-surface universe insufficiently explicit.
+
+### Evidence
+
+The kernel/runtime architecture expresses activation as later configured access
+over a frozen projection. Complete-vault projection construction and validation
+treat \(M_\sigma\) as the deterministic representation of the accepted corpus.
+Red-team review exposed the remaining projection/runtime-configuration coupling.
+Recovery evidence demonstrated operation of five mechanisms but did not itself
+establish projection exhaustiveness. The explicit operator decision recorded by
+this amendment establishes exact, lexical, vector, graph, and temporal as the
+constitutive structural surface families of Semantic Traversal \(M_\sigma\).
+
+### Bridge rule
+
+```text
+corpus actuality
+    determines represented instances
+
+accepted constitutive contracts + explicit operator decisions
+    determine representation architecture
+
+runtime configuration
+    governs later bounded use
+```
+
+### Smallest correction
+
+Remove runtime configuration from projection identity and routine access
+budgets from projection constitutive metadata. Explicitly establish the five
+canonical structural surface families, preserve runtime configuration as a
+separate later binding, and do not define provider/index materialization
+identity before Phase 7 provides concrete implementation evidence.
+
+### Information preserved
+
+The correction preserves complete projection semantics; canonical
+object/region/unit/identifier/occurrence/temporal representation; the
+five-surface multiplex architecture; bounded runtime access; later runtime
+configuration identity; provider/index implementation freedom; provenance; and
+deterministic identity requirements.
+
+### Information superseded or lost
+
+It supersedes projection-owned runtime configuration identity, routine
+projection candidate default/hard bounds, runtime authority to determine
+whether a canonical surface exists, and the interpretation that the five
+surfaces exist only where present. It does not remove runtime operating bounds
+or the possibility of a future intrinsic provider limitation.
+
+### Affected contracts and tests
+
+Corrected in this PR: the projection requirements, implementation sequence,
+clean-room protocol, Rust assessment, semantic-access language,
+projection-activation/access documentation, and directly contradictory
+runtime/construction-report wording. Known downstream reconciliation:
+
+- `src/projection.rs`: remove projection-owned
+  `configuration_snapshot_id` and routine surface candidate-limit fields;
+  reconcile `RetrievalSurfaceDescriptor.available` when it means executable
+  provider/index availability; classify `CoverageSemantics::AvailabilityOnly`
+  rather than assuming it means provider presence; and remove or redefine
+  provider-status text in `technical_limitations` so that only structural
+  limitations remain projection state;
+- `src/construction.rs`: remove the phase-5 construction configuration
+  identity and projection-level candidate-limit initialization; reconcile
+  `available: false` provider-state initialization, the
+  `phase5:construction:no-indexes` identity, `AvailabilityOnly` initialization,
+  and provider-status `technical_limitations`;
+- `schemas/semantic-space-projection.schema.json`: remove the projection
+  configuration field and routine projection-level candidate-limit fields;
+  reconcile the serialized `available`, `coverage_semantics`, and
+  `technical_limitations` representations under the same structural/provider
+  boundary;
+- `tests/support/synthetic_projection.rs`, `tests/synthetic_projection.rs`,
+  and `tests/contracts.rs`: reconcile projection fixture construction,
+  assertions, and serialized expectations for `available`,
+  `AvailabilityOnly`, provider-status `technical_limitations`, and the
+  removed configuration/limit fields;
+- `tests/activation_contracts.rs`: separate runtime configuration-context
+  checks from superseded projection-configuration matching;
+- `schemas/activated-projection.schema.json`, `schemas/continuation-handle.schema.json`,
+  and activation/conformance fixtures: preserve valid runtime configuration
+  bindings while removing any projection-owned assumption;
+- `src/activation.rs`, `src/semantic_access.rs`,
+  `schemas/projection-activation-config.schema.json`,
+  `schemas/semantic-access-plan.schema.json`,
+  `schemas/synthesis-input.schema.json`, and
+  `schemas/conformance-result.schema.json`: verify that configuration remains
+  later runtime policy and that no projection-level hard bound is assumed;
+- the serialized Phase 5 projection and Phase 6 validation inputs: rebuild and
+  re-establish hashes if the corrected representation changes their shape.
+
+These are known downstream consequences, not changes made here. PR #21 is not
+modified.
+
+#### Category A — must be reconciled after this amendment, before Phase 6
+
+The projection-layer mismatches are specifically:
+
+- `src/projection.rs`: `RetrievalSurfaceDescriptor.available`,
+  `CoverageSemantics::AvailabilityOnly`, and provider-status entries in
+  `technical_limitations`, in addition to the removed configuration and
+  routine-limit fields;
+- `src/construction.rs`: `available: false`,
+  `CoverageSemantics::AvailabilityOnly`, provider-status
+  `technical_limitations`, `phase5:construction:no-indexes`, and projection
+  candidate-limit initialization;
+- `schemas/semantic-space-projection.schema.json`: the serialized forms of
+  all of those fields and variants;
+- `tests/support/synthetic_projection.rs`, `tests/synthetic_projection.rs`,
+  and `tests/contracts.rs`: all corresponding fixture values, assertions, and
+  serialization expectations;
+- the Phase 5 serialized projection and its logical/byte identity records if
+  the corrected representation changes their shape.
+
+The following locations require explicit classification during that same
+reconciliation rather than automatic deletion:
+
+- `src/activation.rs`,
+  `schemas/activated-projection.schema.json`,
+  `schemas/activated-identifier-assignment-record.schema.json`,
+  `schemas/activated-occurrence-record.schema.json`, and their tests: the
+  `available_surface_ids` fields currently describe surfaces structurally
+  capable of inspecting a record and may remain at that layer; any use that
+  instead means provider executability must be corrected;
+- `tests/activation_contracts.rs`,
+  `schemas/projection-activation-violation.schema.json`,
+  `src/execution.rs`, `src/packet.rs`,
+  `schemas/execution-limits.schema.json`, and
+  `schemas/conformance-result.schema.json`: unavailable/provider/access
+  statuses are valid runtime facts when scoped to a concrete operation or
+  probe, but must not be interpreted as removal of a canonical surface from
+  \(M_\sigma\).
+
+#### Category B — valid later runtime/access state
+
+`src/activation.rs`, `src/semantic_access.rs`, `src/execution.rs`,
+`src/packet.rs`, the activation/access/conformance schemas, and their tests may
+continue to carry runtime configuration identity, operating limits, provider
+failure, invocation unavailability, unsupported adapter modes, failed probes,
+and unavailable continuation. These describe concrete access state, not
+projection surface existence.
+
+#### Category C — deliberately deferred Phase 7 materialization questions
+
+Only the following remain deferred: whether concrete provider/index state is
+uniquely determined by a fixed derivation contract over (M_\sigma\), or instead
+requires an independent frozen identity/handle; and what identity,
+immutability, and telemetry semantics the concrete production access machinery
+actually demonstrates. Provider-status leakage into projection is not deferred.
+
+The governing classification is:
+
+```text
+surface structural existence in M_sigma
+    = projection state
+
+record-level surface applicability
+    = projected structural fact for that record
+
+provider/index executability and invocation success
+    = later access/runtime state
+```
+
+Every complete projection structurally contains the exact, lexical, vector,
+graph, and temporal surface families. Provider absence must not be represented
+as absence of one of those families. `CoverageSemantics::AvailabilityOnly`
+requires implementation classification: it may remain only if it expresses a
+provider-independent structural coverage guarantee; if it means merely that a
+provider exists, it is stale and must be removed or replaced during the
+downstream reconciliation. Likewise, projection `technical_limitations` may
+retain a limitation constitutive of the projected affordance, but not status
+text such as “no executable index or provider.”
+
+### Migration implications
+
+```text
+merge this authority amendment
+    ↓
+bounded Rust/schema/test reconciliation
+    ↓
+remove/migrate all runtime/provider state from the projection representation
+    ↓
+reconstruct Phase 5 projection if serialized shape changes
+    ↓
+re-establish Phase 5 hashes and identity
+    ↓
+resume Phase 6 validation against corrected authority
+```
+
+The existing Phase 5 serialized projection was constructed under the
+superseded representation containing `configuration_snapshot_id`, routine
+projection-level candidate limits, `RetrievalSurfaceDescriptor.available`
+where tied to executable provider/index state,
+`CoverageSemantics::AvailabilityOnly` where tied to provider availability, and
+provider/index status encoded in projection `technical_limitations`. If
+reconciliation changes its serialized shape, its logical hash, byte SHA-256,
+and projection snapshot output must be regenerated from the same accepted
+observation; preserving the old hashes is not a migration goal.
+
+### Unresolved decisions
+
+Provider/index materialization identity semantics remain deliberately
+undecided until Phase 7 creates concrete production access state whose
+behavior supplies evidence that such an identity is required. No independent
+provider/index identity is added to the projection, activation, access plan,
+continuation, conformance, or telemetry contracts by this amendment.
+
 ## Evidence taxonomy
 
 ```text
@@ -93,6 +308,11 @@ unmeasured_areas
 private_artifact_hashes_or_locations
 attestation_timestamp
 ```
+
+`materialization_or_index_identity` is a historical observed recovery-manifest
+field where available. It does not establish a required future CLEANROOM
+runtime identity; unknown historical values remain `unknown`, and no future
+materialization identity is inferred or fabricated.
 
 Unknown or unavailable identities are `unknown`; no historical identity is inferred or fabricated.
 
@@ -215,7 +435,12 @@ validated SemanticSpaceProjection
 
 The boundary is the real `ProjectionActivationAccess` implementation required before candidate activation revalidation.
 
-The boundary supports every actual available combination of exact, lexical, vector, graph, temporal, and declared match modes, where present. Results are computed from actual corpus-derived surfaces and indexes; they are not hand-authored expected candidates.
+Phase 7 is not complete until real read-only access exists for the exact,
+lexical, vector, graph, and temporal surface families over the validated
+projection. Each surface retains its own structurally applicable record kinds
+and declared match modes. A corpus may legitimately yield zero results for a
+surface or operation. Results are computed from actual corpus-derived surfaces
+and indexes; they are not hand-authored expected candidates.
 
 The concrete implementation is intentionally undecided in this documentation correction. Permitted future implementations include Rust read-only indexes, a bounded Python process or protocol, deterministic exported query indexes, or another explicit versioned read-only boundary.
 
@@ -223,7 +448,7 @@ This boundary performs probes needed by initial activation. Later semantic-acces
 
 ## Phase 8 — Revalidate candidate activation
 
-Only after Phase 7, test the candidate activation implementation against the real projection-access result, including actual counts, empty objects, heterogeneous identifiers, deep headings, duplicate titles, unresolved links, reverse incidence, hydration addresses, zero-result surfaces, bounds, and every actual surface/match-mode combination. PR #9 remains untouched and provisional.
+Only after Phase 7, test the candidate activation implementation against the real projection-access result, including actual counts, empty objects, heterogeneous identifiers, deep headings, duplicate titles, unresolved links, reverse incidence, hydration addresses, zero-result surfaces, intrinsic provider limitations if any, and every declared surface/match-mode combination. Routine runtime budgets remain activation/access policy, not projection bounds. PR #9 remains untouched and provisional.
 
 ## Phase 9 — Resume frozen semantic-access work
 

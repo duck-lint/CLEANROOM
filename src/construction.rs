@@ -1549,6 +1549,8 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
     let mut object_temporal: BTreeMap<String, Vec<TemporalAnchorId>> = BTreeMap::new();
     let mut region_by_object_span: BTreeMap<(String, u64, u64), Vec<usize>> = BTreeMap::new();
     let mut region_index_by_object_address: BTreeMap<(String, String), usize> = BTreeMap::new();
+    type RegionBoundsByObject =
+        BTreeMap<String, Vec<(SemanticRegionAddress, u64, u64, Vec<String>)>>;
     let mut region_bounds_by_object: RegionBoundsByObject = BTreeMap::new();
     let mut region_heading_spans_by_object: BTreeMap<
         String,
@@ -2156,7 +2158,6 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
     .map(|(id, kind, mode)| RetrievalSurfaceDescriptor {
         surface_id: id.into(),
         kind,
-        available: false,
         visible_address_kinds: match id {
             "surface:exact" | "surface:lexical" => vec![
                 AddressKind::SemanticObject,
@@ -2185,8 +2186,6 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
             _ => vec![],
         },
         match_modes: vec![mode],
-        default_candidate_limit: 0,
-        hard_candidate_limit: 0,
         returned_identity: if id == "surface:graph" {
             AddressKind::Occurrence
         } else if id == "surface:temporal" {
@@ -2195,12 +2194,10 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
             AddressKind::SemanticUnit
         },
         hydrates_to_semantic_units: false,
-        coverage_semantics: CoverageSemantics::AvailabilityOnly,
+        coverage_semantics: CoverageSemantics::Bounded,
         exhaustive_total_count_supported: false,
         continuation_supported: false,
-        technical_limitations: vec![
-            "Phase 5 representation only; no executable index or provider.".into(),
-        ],
+        technical_limitations: vec![],
     })
     .collect();
     for unit in &units {
@@ -2277,12 +2274,11 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         });
     }
     let mut projection = SemanticSpaceProjection {
-        projection_snapshot_id: format!("projection:phase5:{snapshot}"),
+        projection_snapshot_id: format!("projection:phase5:v2:{snapshot}"),
         ingest_identity: "observer:e9bb2d95c14b1beb334dc2b8d83420f5998b9a53".to_string(),
-        schema_version: "semantic-space-projection/v1".into(),
+        schema_version: "semantic-space-projection/v2".into(),
         logical_hash: String::new(),
         corpus_snapshot_identity: snapshot.clone(),
-        configuration_snapshot_id: "phase5:construction:no-indexes".into(),
         validation_status: ProjectionValidationStatus::Unvalidated,
         object_classes: object_class_descriptors,
         objects: object_records,

@@ -10,8 +10,8 @@ use semantic_traversal_core::{
     },
     projection::{
         CoverageSemantics, IdentifierAssignmentMode, IdentifierRole, OccurrenceSource,
-        SemanticUnitContent, StructuralTransitionOperation, SurfaceMatchMode, TemporalAffordance,
-        TemporalValue,
+        SemanticSpaceProjection, SemanticUnitContent, StructuralTransitionOperation,
+        SurfaceMatchMode, TemporalAffordance, TemporalValue,
     },
 };
 
@@ -28,7 +28,7 @@ fn fixed_projection_identity_and_exact_fixture_inventory_are_stable() {
         "projection:tiny-synthetic:v2"
     );
     assert_eq!(projection.ingest_identity, "ingest:tiny-synthetic:v2");
-    assert_eq!(projection.schema_version, "v0.1.0");
+    assert_eq!(projection.schema_version, "semantic-space-projection/v2");
     assert_eq!(
         projection.logical_hash,
         "sha256:tiny-synthetic-projection-v2"
@@ -36,10 +36,6 @@ fn fixed_projection_identity_and_exact_fixture_inventory_are_stable() {
     assert_eq!(
         projection.corpus_snapshot_identity,
         "corpus:tiny-synthetic:v2"
-    );
-    assert_eq!(
-        projection.configuration_snapshot_id,
-        "configuration:tiny-synthetic:v1"
     );
     assert_eq!(projection.objects.len(), 6);
     assert_eq!(projection.regions.len(), 5);
@@ -97,6 +93,55 @@ fn fixed_projection_identity_and_exact_fixture_inventory_are_stable() {
             IdentifierRole::CanonicalNaming | IdentifierRole::ObjectClass
         ));
     }
+}
+
+#[test]
+fn projection_representation_separates_structural_surfaces_from_runtime_state() {
+    let projection = tiny_projection();
+    let serialized = serde_json::to_value(&projection).unwrap();
+    let projection_object = serialized.as_object().unwrap();
+    assert!(!projection_object.contains_key("configuration_snapshot_id"));
+
+    let surface_ids: HashSet<_> = projection
+        .retrieval_surfaces
+        .iter()
+        .map(|surface| surface.surface_id.clone())
+        .collect();
+    assert_eq!(surface_ids.len(), 5);
+    assert_eq!(projection.retrieval_surfaces.len(), 5);
+    for kind in [
+        RetrievalSurfaceKind::Exact,
+        RetrievalSurfaceKind::Lexical,
+        RetrievalSurfaceKind::Vector,
+        RetrievalSurfaceKind::Graph,
+        RetrievalSurfaceKind::Temporal,
+    ] {
+        assert_eq!(
+            projection
+                .retrieval_surfaces
+                .iter()
+                .filter(|surface| surface.kind == kind)
+                .count(),
+            1
+        );
+    }
+    for surface in &projection.retrieval_surfaces {
+        let surface_value = serde_json::to_value(surface).unwrap();
+        let surface_object = surface_value.as_object().unwrap();
+        assert!(!surface_object.contains_key("available"));
+        assert!(!surface_object.contains_key("default_candidate_limit"));
+        assert!(!surface_object.contains_key("hard_candidate_limit"));
+    }
+}
+
+#[test]
+fn superseded_projection_shape_is_rejected() {
+    let mut serialized = serde_json::to_value(tiny_projection()).unwrap();
+    serialized.as_object_mut().unwrap().insert(
+        "configuration_snapshot_id".into(),
+        "configuration:old".into(),
+    );
+    assert!(serde_json::from_value::<SemanticSpaceProjection>(serialized).is_err());
 }
 
 #[test]
@@ -869,9 +914,6 @@ fn retrieval_coverage_is_explicitly_exhaustive_or_bounded() {
             .iter()
             .find(|surface| surface.kind == kind)
             .unwrap();
-        assert!(surface.available);
-        assert_eq!(surface.default_candidate_limit, 8);
-        assert_eq!(surface.hard_candidate_limit, 32);
         assert!(surface.continuation_supported);
         assert!(surface.hydrates_to_semantic_units);
         assert_eq!(
@@ -965,13 +1007,10 @@ fn every_retrieval_surface_declares_its_intended_fixture_capability() {
             .iter()
             .find(|surface| surface.kind == kind)
             .unwrap();
-        assert!(surface.available);
         assert_eq!(surface.match_modes, vec![mode]);
         assert_eq!(surface.returned_identity, returned);
         assert_eq!(surface.coverage_semantics, coverage);
         assert_eq!(surface.exhaustive_total_count_supported, total_count);
-        assert_eq!(surface.default_candidate_limit, 8);
-        assert_eq!(surface.hard_candidate_limit, 32);
         assert!(surface.continuation_supported);
         assert!(surface.hydrates_to_semantic_units);
         assert_eq!(
@@ -992,7 +1031,6 @@ fn every_record_surface_membership_matches_named_surface_visibility() {
                 .iter()
                 .find(|surface| &surface.surface_id == surface_id)
                 .unwrap();
-            assert!(surface.available);
             assert!(surface.visible_address_kinds.contains(&address_kind));
         }
     };

@@ -29,8 +29,23 @@ Where:
 - \(V\) contains canonical semantic objects, units, regions, occurrences, and anchors;
 - \(E\) contains typed connections among them;
 - \(I\) contains identifier assignments and inheritance;
-- \(S\) contains retrieval-surface capabilities and telemetry contracts;
+- \(S\) contains all five canonical retrieval-surface capabilities and
+  telemetry contracts;
 - \(\sigma\) identifies the immutable snapshot used for the turn.
+
+The five canonical surfaces are structural dimensions of the complete
+projection even when executable providers or indexes are not yet present:
+
+```text
+exact, lexical, vector, graph, temporal
+```
+
+Surface-family existence is distinct from record-level applicability, corpus
+relevance, executable provider/index existence, and runtime invocation. An
+individual object, region, unit, identifier, occurrence, or anchor may expose
+only the structurally applicable subset; a surface or operation may return
+zero results; and configuration cannot create, delete, enable, or disable a
+canonical surface in \(M_\sigma\).
 
 ## 3. Problem-space lens
 
@@ -99,9 +114,17 @@ A_{\mathrm{cfg}}(M_\sigma,P_t,u_t,\Lambda_t)
 
 The runtime applies configured defaults automatically.
 
-The model does not spend inference selecting routine initial depths or deciding whether ordinary enabled discovery surfaces should fire.
+The model does not spend inference selecting routine initial depths or deciding
+whether ordinary structurally represented discovery surfaces should fire for a
+particular access operation.
 
 The initial activation should retain why each node or edge became visible.
+
+Configuration acts on the already-complete \(M_\sigma\); it does not constitute
+or reshape \(M_\sigma\). Initial breadth, relation depth, candidate limits,
+continuation limits, and other budgets govern bounded exposure and traversal
+only. A runtime configuration change therefore does not by itself create a
+new semantic projection snapshot.
 
 ## 6. Activation provenance
 
@@ -135,7 +158,10 @@ It is not a relevance score.
 
 ## 7. Surface visibility across identifiers
 
-Every admitted identifier must expose every enabled retrieval surface structurally capable of operating on its representation.
+Every admitted identifier must expose every canonical retrieval surface
+represented in the projection that is structurally capable of operating on its
+representation. Runtime policy may choose which of those surfaces to invoke
+for a particular operation, but it may not remove a surface from \(M_\sigma\).
 
 No identifier may be hidden from a surface by an undocumented hardcoded omission.
 
@@ -147,7 +173,11 @@ Examples:
 - canonical links and occurrences should be graph-navigable;
 - temporal identifiers and anchors should be temporally navigable.
 
-A technical limitation must be declared explicitly in the projection.
+A structural limitation of the projected surface affordance may be represented
+in the projection when it is constitutive of that affordance. A limitation
+arising from a concrete provider or index implementation belongs to the later
+access/provider boundary and must not be projected as semantic-space state
+merely because that provider is absent, constrained, or unavailable.
 
 All valid identifier-to-surface affordances must be projected rather than added through case-by-case patches.
 
@@ -208,13 +238,18 @@ activated nodes
 typed edges
 identifier assignments
 incoming and outgoing occurrence summaries
-available retrieval surfaces
+runtime-usable retrieval surfaces and record-applicable surface identities
 surface telemetry
 expansion handles
 activation provenance
 projection snapshot identity
 configuration snapshot identity
 ```
+
+The two identities are carried separately: the projection snapshot identifies
+the immutable semantic object, while the configuration snapshot identifies the
+later bounded activation policy. The latter is not part of projection
+identity.
 
 ### Semantic object view
 
@@ -228,7 +263,7 @@ An activated object should initially expose:
 - contained-region and unit counts;
 - incoming occurrence counts;
 - outgoing occurrence counts;
-- available retrieval surfaces;
+- runtime-usable retrieval surfaces and record-applicable surface identities;
 - bounded representative neighbours;
 - activation provenance.
 
@@ -244,7 +279,7 @@ An activated unit should initially expose:
 - incoming and outgoing occurrence summaries;
 - temporal-anchor summaries;
 - short text preview;
-- available retrieval surfaces;
+- runtime-usable retrieval surfaces and record-applicable surface identities;
 - activation provenance.
 
 Full semantic-unit prose is hydrated during execution.
@@ -394,11 +429,26 @@ Each turn binds to:
 
 ```text
 projection_snapshot_id
-ingest identity
-schema version
-logical hash
-configuration snapshot
+ingest_identity
+schema_version
+logical_hash
+corpus_snapshot_identity
+validation_status
 ```
+
+and, independently, to one runtime configuration snapshot for the bounded
+activation/access operations of that turn. This six-field projection binding
+is distinct from that runtime configuration binding.
+
+The runtime configuration binding is separate:
+
+```text
+projection snapshot identity
++ runtime configuration snapshot identity
+```
+
+The configuration governs \(A_{cfg}(M_\sigma, ... )\) as a bounded view/access
+operation over the immutable projection; it does not constitute \(M_\sigma\).
 
 Ingest changes become visible on the next turn.
 
@@ -600,9 +650,18 @@ The activation input includes an explicit `ActivationUtterance` containing `utte
 
 ### Layered configuration and surface capability
 
-`ProjectionActivationConfig` is separate from the activated view. It has five configuration groups: unbanded, primary, secondary, tertiary, and background. Unbanded covers newest-utterance, whole-space-constraint, and configured-default seeds. Each group has textual-seed, structural-neighbour, visible-unit, and preview-text bounds. Per-surface limits are declared for every available projected surface and every activation band.
+`ProjectionActivationConfig` is separate from the activated view. It has five configuration groups: unbanded, primary, secondary, tertiary, and background. Unbanded covers newest-utterance, whole-space-constraint, and configured-default seeds. Each group has textual-seed, structural-neighbour, visible-unit, and preview-text bounds. Per-surface limits may be declared for each canonical surface and activation band that the operation invokes.
 
-Future PR 4B validation must enforce that configuration and projection snapshot configuration identities match; exactly one surface configuration exists for each available projection surface; unavailable, unknown, and duplicate surface configurations are invalid; each configured candidate limit is within the corresponding hard surface limit; and all available structurally capable configured surfaces participate automatically. No identifier-to-surface affordance may be omitted by hardcoded exception.
+Future PR 4B validation must enforce that the runtime configuration identity used by
+the operation matches the configuration identity carried by its activation,
+plan, or continuation context. It must reject unknown or duplicate surface
+configuration names and reject missing runtime configuration only when the
+accepted operation requires configuration for that canonical surface. A
+configured candidate limit must remain within a hard maximum owned by the
+runtime configuration, if one is defined; no routine projection hard surface
+limit is consulted. A concrete provider/access failure is a runtime access
+failure, not removal of the structural surface from \(M_\sigma\). No
+identifier-to-surface affordance may be omitted by hardcoded exception.
 
 Zero total bounds, zero band bounds, and zero surface candidate limits are valid mechanical bounds. A zero candidate limit yields no candidates for that surface and band but makes no negative corpus claim. `maximum_initial_relation_depth == 0` permits no structural expansion beyond directly exposed records. `continuation_page_limit == 0` suppresses continuation handles. No configuration value is a relevance score.
 
@@ -628,13 +687,21 @@ Later seeds may be mechanically omitted when a configured seed bound is reached.
 
 ### First-seen canonical deduplication and provenance aggregation
 
-Future PR 4B output vectors use deterministic first-seen order. Available surfaces execute in `SemanticSpaceProjection.retrieval_surfaces` vector order. Surface candidates preserve each surface's deterministic returned order. Structural records preserve frozen projection vector order.
+Future PR 4B output vectors use deterministic first-seen order. Runtime-usable
+surface operations execute in `SemanticSpaceProjection.retrieval_surfaces`
+vector order. Surface candidates preserve each surface's deterministic
+returned order. Structural records preserve frozen projection vector order.
 
 Canonical object, region, unit, assignment, occurrence, anchor, and edge identities appear at most once in their respective activated vectors. When a canonical record is exposed through several paths, retain its first-seen position and append all unique activation-provenance entries in first-seen order. Do not merge records by title, alias, text, similarity, or inferred equivalence. Aliases never become duplicate canonical objects. Attention bands affect breadth and ordering but never semantic identity or truth. No numeric relevance or attention score is introduced.
 
 ### Richer bounded summaries
 
-Activated object records expose title, aliases, object class, bounded visible region addresses, bounded visible unit ids, visible identifier assignment ids, full contained counts, occurrence counts, available surfaces, and activation provenance. Aliases are discovery surfaces, not canonical identity. Object class is projected typing, not a generated ontology.
+Activated object records expose title, aliases, object class, bounded visible
+region addresses, bounded visible unit ids, visible identifier assignment ids,
+full contained counts, occurrence counts, runtime-usable surfaces and
+record-applicable surface identities, and activation provenance. Aliases are
+discovery surfaces, not canonical identity. Object class is projected typing,
+not a generated ontology.
 
 Activated region records expose heading path, heading identity, visible inherited identifier assignment ids, bounded visible unit ids, full contained count, surfaces, and activation provenance. Activated unit records expose authored block type, heading path, inherited and unit-local identifier assignment ids, typed text preview, incidence counts, temporal-anchor count, surfaces, and activation provenance.
 
@@ -642,7 +709,7 @@ Previews are planning material, not retrieved evidence. Full authored prose rema
 
 ### Self-describing continuation handles
 
-A continuation handle is serializable and restart-safe. It requires no hidden runtime registry, contains no evidence, and performs no expansion. Its offset has meaning only with the named frozen projection snapshot, activation configuration snapshot, problem-space thread, problem-space version, newest utterance, access mechanism, filters, and ordering. The projection snapshot, activation configuration snapshot, problem-space thread, problem-space version, and newest utterance identity must match the active continuation context exactly. A stale, cross-thread, cross-version, cross-utterance, cross-projection, or cross-configuration handle is a future typed violation.
+A continuation handle is serializable and restart-safe. It requires no hidden runtime registry, contains no evidence, and performs no expansion. Its offset has meaning only with the named frozen projection snapshot, activation configuration snapshot, problem-space thread, problem-space version, newest utterance, access mechanism, filters, and ordering. The projection snapshot and runtime configuration snapshot are separate identities and must each match the active continuation context exactly. A stale, cross-thread, cross-version, cross-utterance, cross-projection, or cross-configuration handle is a future typed violation. No provider/index materialization identity is added until Phase 7 concrete access implementation supplies evidence that one is required.
 
 Continuation origin is typed as a text probe, structural neighbourhood, or temporal probe. Continuation access is typed separately: direct projection-structure continuation follows frozen represented topology without inventing a retrieval surface, while retrieval-surface continuation resumes one concrete projected surface. Text and temporal probes require `ContinuationAccess::RetrievalSurface`. Structural neighbourhoods may continue through `ContinuationAccess::ProjectionStructure` or through a declared retrieval surface; the latter is valid only when the frozen projection declares that concrete surface and structural transition relationship. PR 4A records these combinations only and does not validate them.
 
@@ -652,7 +719,7 @@ Filters are typed as transition, source path prefix, object class, identifier, o
 
 ### Typed activation violations
 
-`ProjectionActivationViolation` is the closed Phase 4B error vocabulary. It covers empty required identities, projection validation status, configuration snapshot mismatch, missing/unknown/unavailable/duplicate surface configuration, invalid configuration values, candidate limits exceeding hard limits, atomic surface-access failure, duplicate activated identities, invalid activated references, invalid activation provenance, invalid continuation handles, invalid telemetry, activated-view bound overflow, and count overflow. PR 4A defines the vocabulary only; it does not implement validation behavior, `Display`, or `Error`.
+`ProjectionActivationViolation` is the closed Phase 4B error vocabulary. It covers empty required identities, projection validation status, runtime configuration-context mismatch, missing/unknown/duplicate required surface configuration, invalid configuration values, candidate limits exceeding an applicable runtime maximum, concrete surface-access failure, duplicate activated identities, invalid activated references, invalid activation provenance, invalid continuation handles, invalid telemetry, activated-view bound overflow, and count overflow. A required surface-access failure means that the concrete runtime probe could not execute; it does not imply that the canonical surface is absent from \(M_\sigma\). PR 4A defines the vocabulary only; it does not implement validation behavior, `Display`, or `Error`.
 
 ### Exact PR boundary
 
@@ -732,7 +799,6 @@ Future deterministic probe IDs use first-seen invocation order:
 activation-probe:0
 activation-probe:1
 activation-probe:2
-...
 ```
 
 Telemetry IDs similarly use:
@@ -833,7 +899,12 @@ Configured-default provenance does not replace the originating utterance, refere
 
 ### Atomic surface-access failure and activation failure
 
-`SurfaceAccessFailed` covers scripted access returning a failure, a declared mode unavailable from the configured activation-access implementation, malformed deterministic surface output, and failure to inspect one required configured available surface.
+`SurfaceAccessFailed` covers scripted access returning a failure, a declared
+mode unavailable from the configured activation-access implementation,
+malformed deterministic surface output, and failure to inspect one required
+surface operation that the runtime context declares usable. This is a runtime
+access fact; it does not say that the canonical surface is absent from
+\(M_\sigma\).
 
 It does not mean no corpus result exists, the probe is irrelevant, the source expression was wrong, or the problem-space interpretation failed.
 

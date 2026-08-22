@@ -4,7 +4,6 @@
   "description": "Frozen projection snapshot of the admitted semantic substrate.\n\nIt contains schema-level possibility and instance-level actuality for canonical objects, regions, units, identifiers, occurrences, anchors, surfaces, and transitions. It is structural authority for a snapshot only; it may not infer, activate, query, conform, retrieve, or synthesize.",
   "type": "object",
   "required": [
-    "configuration_snapshot_id",
     "corpus_snapshot_identity",
     "identifier_assignments",
     "identifier_descriptors",
@@ -23,10 +22,6 @@
     "validation_status"
   ],
   "properties": {
-    "configuration_snapshot_id": {
-      "description": "Configuration snapshot governing represented bounds and capabilities.",
-      "type": "string"
-    },
     "corpus_snapshot_identity": {
       "description": "Identity of the admitted corpus snapshot.",
       "type": "string"
@@ -277,13 +272,6 @@
           "type": "string",
           "enum": [
             "bounded"
-          ]
-        },
-        {
-          "description": "Surface reports availability but no stronger coverage guarantee.",
-          "type": "string",
-          "enum": [
-            "availability_only"
           ]
         }
       ]
@@ -1438,15 +1426,12 @@
       "additionalProperties": false
     },
     "RetrievalSurfaceDescriptor": {
-      "description": "Descriptor of one retrieval-surface capability in a frozen projection.\n\nIt declares availability, visible address kinds, modes, bounds, returned identity, hydration, coverage semantics, continuation, and limitations. It does not execute a query or judge semantic adequacy.",
+      "description": "Descriptor of one retrieval-surface capability in a frozen projection.\n\nIt declares visible address kinds, modes, returned identity, hydration, coverage semantics, continuation, and structural limitations. It does not execute a query or judge semantic adequacy.",
       "type": "object",
       "required": [
-        "available",
         "continuation_supported",
         "coverage_semantics",
-        "default_candidate_limit",
         "exhaustive_total_count_supported",
-        "hard_candidate_limit",
         "hydrates_to_semantic_units",
         "kind",
         "match_modes",
@@ -1456,10 +1441,6 @@
         "visible_address_kinds"
       ],
       "properties": {
-        "available": {
-          "description": "Whether the concrete surface is available in this configuration.",
-          "type": "boolean"
-        },
         "continuation_supported": {
           "description": "Whether bounded continuation is structurally available.",
           "type": "boolean"
@@ -1472,21 +1453,9 @@
             }
           ]
         },
-        "default_candidate_limit": {
-          "description": "Configured default candidate bound.",
-          "type": "integer",
-          "format": "uint32",
-          "minimum": 0.0
-        },
         "exhaustive_total_count_supported": {
           "description": "Whether a complete eligible-scope total count is supported.",
           "type": "boolean"
-        },
-        "hard_candidate_limit": {
-          "description": "Configured hard candidate bound.",
-          "type": "integer",
-          "format": "uint32",
-          "minimum": 0.0
         },
         "hydrates_to_semantic_units": {
           "description": "Whether results deterministically hydrate to canonical semantic units.",
