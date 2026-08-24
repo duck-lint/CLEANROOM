@@ -279,6 +279,18 @@ def _root_block_spans(tokens: list[Any], body_lines: list[str]) -> list[tuple[in
     return [(start, end, token) for start, end, token in spans if end > start and end <= len(body_lines)]
 
 
+def _commonmark_lines(body: str) -> list[str]:
+    """Reconstruct the parser's line units without treating form-feed as a break."""
+
+    if not body:
+        return []
+    parts = body.split("\n")
+    lines = [part + "\n" for part in parts[:-1]]
+    if parts[-1]:
+        lines.append(parts[-1])
+    return lines
+
+
 def _link_from_attrs(
     attrs: dict[str, Any],
     *,
@@ -460,7 +472,7 @@ def parse_markdown_text(source: str, *, authored_path: str) -> MarkdownParseReco
     normalized_path = PurePosixPath(authored_path.replace("\\", "/")).as_posix()
     frontmatter = _frontmatter(source)
     body = source[frontmatter.body_span[0] : frontmatter.body_span[1]]
-    body_lines = body.splitlines(keepends=True)
+    body_lines = _commonmark_lines(body)
     parser = _markdown_parser()
     tokens = parser.parse(body)
     for index, token in enumerate(tokens):

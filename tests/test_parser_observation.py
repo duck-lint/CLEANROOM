@@ -194,6 +194,35 @@ class ParserObservationTests(unittest.TestCase):
         self.assertEqual([link.source_block_span for link in links], [record.blocks[0].source_span] * 2)
         self.assertEqual([link.source_span for link in links], [None, None])
 
+    def test_body_occurrences_use_parser_blocks_for_lists_quotes_callouts_and_tables(self) -> None:
+        record = parse_markdown_text(
+            "---\nuuid: 018f3e7e-7b6a-7c3b-8d0e-123456789abd\n---\n"
+            "- [[Target]]\n- [[Target]]\n\n"
+            "> [[Target]]\n\n"
+            "> [!note]\n> [[Target]]\n\n"
+            "| [[Target]] | value |\n| --- | --- |\n",
+            authored_path="Structured.md",
+        )
+
+        linked_blocks = [block for block in record.blocks if block.authored_links]
+        self.assertEqual(
+            [block.block_kind for block in linked_blocks],
+            ["list", "blockquote_or_callout", "blockquote_or_callout", "table"],
+        )
+        for block in linked_blocks:
+            self.assertTrue(all(link.source_block_span == block.source_span for link in block.authored_links))
+
+    def test_commonmark_line_reconstruction_does_not_promote_form_feed_to_a_block_boundary(self) -> None:
+        record = parse_markdown_text(
+            "---\nuuid: 018f3e7e-7b6a-7c3b-8d0e-123456789abd\n---\n"
+            "body\x0ccontinuation\n\n---\n\n## Heading\n",
+            authored_path="FormFeed.md",
+        )
+
+        self.assertEqual([block.parser_token_type for block in record.blocks], ["paragraph_open", "hr", "heading_open"])
+        self.assertEqual(record.blocks[1].raw_markdown, "---\n")
+        self.assertEqual(record.blocks[2].heading_address_text, "Heading")
+
     def test_callout_uses_authored_block_category_and_retains_parser_token(self) -> None:
         record = parse_markdown_text(
             "---\nuuid: 018f3e7e-7b6a-7c3b-8d0e-123456789abd\n---\n> [!note]\n> callout body\n",
