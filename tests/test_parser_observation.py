@@ -140,6 +140,9 @@ class ParserObservationTests(unittest.TestCase):
             "uuid: 018f3e7e-7b6a-7c3b-8d0e-123456789abd\n"
             "one: \"[[Target]]\"\n"
             "two: \"[[Target]]\"\n"
+            "related:\n"
+            "  - \"[[Target]]\"\n"
+            "  - \"[[Target]]\"\n"
             "aliased: \"[[Target|Target]]\"\n"
             "---\n"
             "A [[Target]] and [[Target]] and [[Target|Target]].\n"
@@ -150,16 +153,23 @@ class ParserObservationTests(unittest.TestCase):
         record = parse_markdown_text(source, authored_path="Source.md")
         links = record.authored_links
 
-        repeated_frontmatter = [link for link in links if link.source_surface == "frontmatter" and link.raw == "[[Target]]"]
+        repeated_frontmatter = [link for link in links if link.source_surface == "frontmatter" and link.raw == "[[Target]]" and link.frontmatter_key_path in {"one", "two"}]
         self.assertEqual(len(repeated_frontmatter), 2)
         self.assertEqual([link.source_span for link in repeated_frontmatter], [None, None])
+        self.assertEqual([link.source_block_span for link in repeated_frontmatter], [None, None])
+        self.assertEqual([link.source_occurrence_ordinal for link in repeated_frontmatter], [1, 1])
+        repeated_field = [link for link in links if link.source_surface == "frontmatter" and link.frontmatter_key_path == "related"]
+        self.assertEqual([link.source_occurrence_ordinal for link in repeated_field], [1, 2])
         aliased_frontmatter = next(link for link in links if link.source_surface == "frontmatter" and link.raw == "[[Target|Target]]")
         self.assertIsNotNone(aliased_frontmatter.source_span)
         self.assertTrue(aliased_frontmatter.display_alias_present)
         self.assertEqual(aliased_frontmatter.label, "Target")
+        self.assertEqual(aliased_frontmatter.source_occurrence_ordinal, 1)
 
         body_links = [link for link in links if link.source_surface == "body"]
         self.assertEqual([link.display_alias_present for link in body_links[:3]], [False, False, True])
+        self.assertEqual([link.source_occurrence_ordinal for link in body_links[:3]], [1, 2, 3])
+        self.assertTrue(all(link.source_block_span == record.blocks[0].source_span for link in body_links[:3]))
         for link in body_links[:3]:
             self.assertIsNotNone(link.source_span)
             start, end = link.source_span
@@ -170,6 +180,19 @@ class ParserObservationTests(unittest.TestCase):
         self.assertEqual(source[start:end], inline_code_and_real_link.raw)
         table_links = [link for link in body_links if link.source_span and source[link.source_span[0] : link.source_span[1]] == link.raw]
         self.assertLess(len(table_links), len(body_links))
+
+    def test_body_occurrence_ordinals_share_the_parser_block_and_survive_unavailable_spans(self) -> None:
+        record = parse_markdown_text(
+            "---\nuuid: 018f3e7e-7b6a-7c3b-8d0e-123456789abd\n---\n"
+            "| [[Target]] | [[Target]] |\n| --- | --- |\n",
+            authored_path="Table.md",
+        )
+
+        links = record.authored_links
+        self.assertEqual(len(links), 2)
+        self.assertEqual([link.source_occurrence_ordinal for link in links], [1, 2])
+        self.assertEqual([link.source_block_span for link in links], [record.blocks[0].source_span] * 2)
+        self.assertEqual([link.source_span for link in links], [None, None])
 
     def test_callout_uses_authored_block_category_and_retains_parser_token(self) -> None:
         record = parse_markdown_text(

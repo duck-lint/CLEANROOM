@@ -237,6 +237,8 @@ def _link_json(link: AuthoredLink) -> dict[str, Any]:
         "block_fragment": link.target_region_fragment[1:] if link.target_region_fragment and link.target_region_fragment.startswith("^") else None,
         "embedded": link.embedded,
         "source_span": list(link.source_span) if link.source_span is not None else None,
+        "source_block_span": list(link.source_block_span) if link.source_block_span is not None else None,
+        "source_occurrence_ordinal": link.source_occurrence_ordinal,
     }
 
 

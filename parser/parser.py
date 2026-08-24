@@ -64,6 +64,12 @@ class AuthoredLink:
     source_surface: str
     frontmatter_key_path: str | None
     source_span: tuple[int, int] | None
+    # The parser-owned block is the authoritative body-occurrence source.
+    # The finer inline span remains optional evidence, never the source-unit
+    # authority. Frontmatter links have no block span.
+    source_block_span: tuple[int, int] | None
+    # One-based order within the owning body block or frontmatter field.
+    source_occurrence_ordinal: int
 
 
 Wikilink = AuthoredLink
@@ -273,8 +279,29 @@ def _root_block_spans(tokens: list[Any], body_lines: list[str]) -> list[tuple[in
     return [(start, end, token) for start, end, token in spans if end > start and end <= len(body_lines)]
 
 
-def _link_from_attrs(attrs: dict[str, Any], *, embedded: bool, surface: str, key_path: str | None, source_span: tuple[int, int] | None) -> AuthoredLink:
-    return AuthoredLink(attrs["raw"], attrs["target"], attrs["label"], attrs["target_region_fragment"], embedded, attrs["display_alias_present"], surface, key_path, source_span)
+def _link_from_attrs(
+    attrs: dict[str, Any],
+    *,
+    embedded: bool,
+    surface: str,
+    key_path: str | None,
+    source_span: tuple[int, int] | None,
+    source_block_span: tuple[int, int] | None,
+    source_occurrence_ordinal: int,
+) -> AuthoredLink:
+    return AuthoredLink(
+        attrs["raw"],
+        attrs["target"],
+        attrs["label"],
+        attrs["target_region_fragment"],
+        embedded,
+        attrs["display_alias_present"],
+        surface,
+        key_path,
+        source_span,
+        source_block_span,
+        source_occurrence_ordinal,
+    )
 
 
 def _unique_occurrence(source: str, value: str) -> int | None:
@@ -305,11 +332,23 @@ def _inline_source_start(raw: str, token: Any) -> int | None:
     return None if relative is None else line_start + relative
 
 
-def _parsed_text_and_links(parser: MarkdownIt, raw: str, *, source_offset: int | None, source_text: str | None = None, source_surface: str = "body", frontmatter_key_path: str | None = None, callout: bool = False) -> tuple[str, tuple[AuthoredLink, ...], tuple[AuthoredLink, ...]]:
+def _parsed_text_and_links(
+    parser: MarkdownIt,
+    raw: str,
+    *,
+    source_offset: int | None,
+    source_text: str | None = None,
+    source_surface: str = "body",
+    frontmatter_key_path: str | None = None,
+    source_block_span: tuple[int, int] | None = None,
+    source_occurrence_ordinal_start: int = 1,
+    callout: bool = False,
+) -> tuple[str, tuple[AuthoredLink, ...], tuple[AuthoredLink, ...], int]:
     tokens = parser.parse(raw)
     text_parts: list[str] = []
     links: list[AuthoredLink] = []
     embeds: list[AuthoredLink] = []
+    occurrence_ordinal = source_occurrence_ordinal_start
     for token in tokens:
         if token.type == "inline" and token.children:
             inline_parts: list[str] = []
@@ -330,7 +369,16 @@ def _parsed_text_and_links(parser: MarkdownIt, raw: str, *, source_offset: int |
                         and source_text[absolute_start:absolute_end] == raw_link
                     )
                     span = None if not exact or not absolute_exact or absolute_start is None or absolute_end is None else (absolute_start, absolute_end)
-                    link = _link_from_attrs(attrs, embedded=child.type == "embed", surface=source_surface, key_path=frontmatter_key_path, source_span=span)
+                    link = _link_from_attrs(
+                        attrs,
+                        embedded=child.type == "embed",
+                        surface=source_surface,
+                        key_path=frontmatter_key_path,
+                        source_span=span,
+                        source_block_span=source_block_span,
+                        source_occurrence_ordinal=occurrence_ordinal,
+                    )
+                    occurrence_ordinal += 1
                     (embeds if child.type == "embed" else links).append(link)
                     if child.type == "wikilink":
                         inline_parts.append(child.content)
@@ -343,7 +391,7 @@ def _parsed_text_and_links(parser: MarkdownIt, raw: str, *, source_offset: int |
     parsed_text = "\n".join(part for part in text_parts if part)
     if callout:
         parsed_text = _CALLOUT.sub("", parsed_text, count=1)
-    return parsed_text, tuple(links), tuple(embeds)
+    return parsed_text, tuple(links), tuple(embeds), occurrence_ordinal
 
 
 def _heading_address_text(parser: MarkdownIt, raw: str) -> str:
@@ -385,12 +433,21 @@ def _frontmatter_links(frontmatter: FrontmatterRecord, *, source_text: str) -> t
     links: list[AuthoredLink] = []
     for key, value in frontmatter.values.items():
         values: Iterable[Any] = (value,) if isinstance(value, str) else value if isinstance(value, list) else ()
+        field_occurrence_ordinal = 1
         for item in values:
             if not isinstance(item, str):
                 continue
             item_offset = _unique_occurrence(frontmatter.raw_text, item)
             source_offset = None if item_offset is None else frontmatter.content_span[0] + item_offset
-            _, item_links, item_embeds = _parsed_text_and_links(parser, item, source_offset=source_offset, source_text=source_text, source_surface="frontmatter", frontmatter_key_path=str(key))
+            _, item_links, item_embeds, field_occurrence_ordinal = _parsed_text_and_links(
+                parser,
+                item,
+                source_offset=source_offset,
+                source_text=source_text,
+                source_surface="frontmatter",
+                frontmatter_key_path=str(key),
+                source_occurrence_ordinal_start=field_occurrence_ordinal,
+            )
             links.extend(item_links)
             links.extend(item_embeds)
     return tuple(links)
@@ -420,7 +477,14 @@ def parse_markdown_text(source: str, *, authored_path: str) -> MarkdownParseReco
         raw = "".join(body_lines[start:end])
         source_start = frontmatter.body_span[0] + sum(len(line) for line in body_lines[:start])
         source_end = frontmatter.body_span[0] + sum(len(line) for line in body_lines[:end])
-        parsed_text, links, embeds = _parsed_text_and_links(parser, raw, source_offset=source_start, source_text=source, callout=token.type == "callout_open")
+        parsed_text, links, embeds, _ = _parsed_text_and_links(
+            parser,
+            raw,
+            source_offset=source_start,
+            source_text=source,
+            source_block_span=(source_start, source_end),
+            callout=token.type == "callout_open",
+        )
         level = int(token.tag[1:]) if token.type == "heading_open" else None
         blocks.append(MarkdownBlock(_block_kind(token.type), token.type, raw, (source_start, source_end), start + 1, end, parsed_text, links, embeds, _explicit_block_ids(raw), level, _heading_raw_text(raw) if level is not None else None, _heading_address_text(parser, raw) if level is not None else None))
 
