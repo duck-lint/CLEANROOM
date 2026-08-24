@@ -8,7 +8,7 @@ correspondence validation only; it does not begin Phase 7.
 
 ## Current evidence tuple
 
-- CLEANROOM validator source commit: `005f75f`
+- CLEANROOM validator source commit: `005f75fecbf319d94b78382722f1e83ecff0dd52`
 - Observation schema: `vault-observation/v3`
 - Observer version: `cleanroom-parser-observer/v2`
 - Observer repository: `CLEANROOM`
