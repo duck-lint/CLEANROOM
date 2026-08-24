@@ -5,6 +5,7 @@
 //! conformance evaluation, retrieval, packet assembly, or synthesis.
 #![forbid(unsafe_code)]
 
+pub mod access;
 pub mod activation;
 pub mod conformance;
 pub mod construction;

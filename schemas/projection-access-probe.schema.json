@@ -1,0 +1,635 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ProjectionAccessProbe",
+  "type": "object",
+  "required": [
+    "match_mode",
+    "operand",
+    "page_size",
+    "probe_id",
+    "projection_snapshot_id",
+    "surface_id",
+    "surface_kind"
+  ],
+  "properties": {
+    "cursor": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "match_mode": {
+      "$ref": "#/definitions/SurfaceMatchMode"
+    },
+    "operand": {
+      "$ref": "#/definitions/AccessOperand"
+    },
+    "page_size": {
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0.0
+    },
+    "probe_id": {
+      "type": "string"
+    },
+    "projection_snapshot_id": {
+      "type": "string"
+    },
+    "surface_id": {
+      "type": "string"
+    },
+    "surface_kind": {
+      "$ref": "#/definitions/RetrievalSurfaceKind"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "AccessOperand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "exact_literal"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "lexical_terms"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "vector"
+              ]
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "graph"
+              ]
+            },
+            "value": {
+              "type": "object",
+              "required": [
+                "direction",
+                "seed",
+                "transition_ids"
+              ],
+              "properties": {
+                "direction": {
+                  "$ref": "#/definitions/Direction"
+                },
+                "seed": {
+                  "$ref": "#/definitions/SemanticAddress"
+                },
+                "transition_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "temporal"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/TemporalQuery"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Direction": {
+      "description": "Explicit direction for a represented structural connection.\n\nDirection authorizes no traversal by itself; it is valid only when the projection represents the requested incidence.",
+      "oneOf": [
+        {
+          "description": "Move from source incidence toward its represented target.",
+          "type": "string",
+          "enum": [
+            "outgoing"
+          ]
+        },
+        {
+          "description": "Move from a target toward represented incoming incidence.",
+          "type": "string",
+          "enum": [
+            "incoming"
+          ]
+        }
+      ]
+    },
+    "IdentifierAddress": {
+      "description": "Address of an identifier descriptor or assignment.\n\nIt represents a named projected surface and optional represented value. It cannot replace canonical object or unit identity.",
+      "type": "object",
+      "required": [
+        "identifier_name"
+      ],
+      "properties": {
+        "identifier_name": {
+          "description": "Identifier name represented by the projection.",
+          "type": "string"
+        },
+        "represented_value": {
+          "description": "Optional exact represented value used to address one assignment.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "RetrievalSurfaceAddress": {
+      "description": "Address of a retrieval-surface descriptor.\n\nIt names a projected capability only. It does not execute the surface or imply that the surface is available for a particular address.",
+      "type": "object",
+      "required": [
+        "surface_id"
+      ],
+      "properties": {
+        "surface_id": {
+          "description": "Snapshot-local retrieval-surface identifier.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RetrievalSurfaceKind": {
+      "description": "Retrieval-surface families admitted by the contracts.\n\nA family describes a capability class only; the projection determines whether a concrete surface exists and what it may inspect.",
+      "oneOf": [
+        {
+          "description": "Literal or exact matching.",
+          "type": "string",
+          "enum": [
+            "exact"
+          ]
+        },
+        {
+          "description": "Lexical matching.",
+          "type": "string",
+          "enum": [
+            "lexical"
+          ]
+        },
+        {
+          "description": "Vector-neighbour lookup.",
+          "type": "string",
+          "enum": [
+            "vector"
+          ]
+        },
+        {
+          "description": "Graph or incidence navigation.",
+          "type": "string",
+          "enum": [
+            "graph"
+          ]
+        },
+        {
+          "description": "Temporal lookup or ordering.",
+          "type": "string",
+          "enum": [
+            "temporal"
+          ]
+        }
+      ]
+    },
+    "SemanticAddress": {
+      "description": "Canonical or projected address used by plans and provenance records.\n\nIt can point only to represented address categories. It does not prove that the target exists in a given snapshot; structural conformance owns that later check.",
+      "oneOf": [
+        {
+          "description": "Canonical semantic object.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "object"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Canonical semantic unit.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "unit"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Authored semantic region.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "region"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/SemanticRegionAddress"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Identifier assignment or descriptor.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "identifier"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/IdentifierAddress"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Authored occurrence.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "occurrence"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Temporal anchor.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "temporal_anchor"
+              ]
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Retrieval surface.",
+          "type": "object",
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "retrieval_surface"
+              ]
+            },
+            "value": {
+              "$ref": "#/definitions/RetrievalSurfaceAddress"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SemanticRegionAddress": {
+      "description": "Address of an authored structural region inside one semantic object.\n\nThe address preserves both the canonical parent object and a non-empty authored structural address. It has no authority to select a unit, infer a heading target, or treat the region as a separate epistemic object class.",
+      "type": "object",
+      "required": [
+        "authored_structural_address",
+        "object_id"
+      ],
+      "properties": {
+        "authored_structural_address": {
+          "description": "Non-empty authored heading, block, or structural address.",
+          "type": "string"
+        },
+        "object_id": {
+          "description": "Canonical parent semantic object.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SurfaceMatchMode": {
+      "description": "Query or match modes exposed by a retrieval surface.\n\nModes constrain execution shape only and do not imply semantic relevance.",
+      "oneOf": [
+        {
+          "description": "Exact literal match.",
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "literal"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Token or term match.",
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "terms"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Nearest-neighbour candidate lookup.",
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "nearest_neighbours"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Typed edge or occurrence navigation.",
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "incidence"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Temporal range or ordering access.",
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "temporal"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Named configured mode not hard-coded as corpus meaning.",
+          "type": "object",
+          "required": [
+            "mode",
+            "name"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "declared"
+              ]
+            },
+            "name": {
+              "description": "Stable configured mode name.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TemporalPrecision": {
+      "type": "string",
+      "enum": [
+        "FullDate",
+        "DateTime",
+        "ExactYear",
+        "MonthDay",
+        "ApproximateYear"
+      ]
+    },
+    "TemporalQuery": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "operation",
+            "precision",
+            "value"
+          ],
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "exact"
+              ]
+            },
+            "precision": {
+              "$ref": "#/definitions/TemporalPrecision"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "operation",
+            "precision"
+          ],
+          "properties": {
+            "end": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "operation": {
+              "type": "string",
+              "enum": [
+                "range"
+              ]
+            },
+            "precision": {
+              "$ref": "#/definitions/TemporalPrecision"
+            },
+            "start": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "descending",
+            "operation"
+          ],
+          "properties": {
+            "descending": {
+              "type": "boolean"
+            },
+            "operation": {
+              "type": "string",
+              "enum": [
+                "ordered"
+              ]
+            },
+            "precision": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/TemporalPrecision"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}
