@@ -22,11 +22,12 @@ corpus-validated CLEANROOM contracts.
 
 | Item | Repository-safe value |
 |---|---|
-| Observer repository | `duck-lint/semantic-traversal` |
-| Observer commit | `502bc8d83a3681a21f4ab2f2cafb9598074aa24c` |
+| Observer repository | `CLEANROOM` |
+| Observer commit | `32957a3ff467ee57d7a76d4c4321753ac018d054` |
+| Parser salvage commit | `duck-lint/semantic-traversal@72ef99219fd260ba71365005273f6d9f68cab939` |
 | Observer schema identifier/version | `vault-observation/v3` |
-| Authored-vault specimen identity | `eb9447aa14e07995b86beb2c92d3c97c725fbdb23f1c210650b029fecd1d2d3d` |
-| Pinned run-1 artifact byte SHA-256 | `4e3b3fd00caaf591afe92e7fa892b66da3f35a3e98fd719447f1649ab4a18849` |
+| Authored-vault specimen identity | `8db3ab329d1890890a1fa7eeaec42d700b29420fb71ed052383dbb9ed3b0e8cc` |
+| Pinned run-1 artifact byte SHA-256 | `cc179d31f4035f84742312bab363a1504173f034e11625022a2142294c6eb000` |
 | Resident source records | `1085` |
 | Resident Markdown count | `1085` |
 | Admission-eligible Markdown count | `1077` |
@@ -37,8 +38,8 @@ corpus-validated CLEANROOM contracts.
 | Parseable UUID count | `1082` |
 | UUIDv7 count | `1082` |
 | Duplicate UUID groups | `0` |
-| Whole-resident total authored-link occurrences | `4929` |
-| Whole-resident one-candidate occurrences | `4924` |
+| Whole-resident total authored-link occurrences | `4925` |
+| Whole-resident one-candidate occurrences | `4920` |
 | Whole-resident zero-candidate occurrences | `5` |
 | Whole-resident multiple-candidate occurrences | `0` |
 | Observed frontmatter field count | `60` |
@@ -48,11 +49,14 @@ The observer repository/commit is recorded as evidence identity only. CLEANROOM
 does not import, imitate, or infer architectural authority from that
 implementation.
 
-The current v3 observation was produced once from the repaired authored vault.
+The current v3 observation was produced once from the current authored vault.
 The pinned digest above is an artifact-byte identity only, while the specimen
 identity is the observer-defined source identity. Wikilinks inside fenced code
 are retained as raw Markdown but excluded from authored-link occurrences by the
-observer correction in commit `502bc8d83a3681a21f4ab2f2cafb9598074aa24c`.
+CLEANROOM observer. CommonMark line reconstruction and block-owned occurrence
+provenance are implemented in observer commit
+`32957a3ff467ee57d7a76d4c4321753ac018d054`; parser mechanics were salvaged
+from semantic-traversal commit `72ef99219fd260ba71365005273f6d9f68cab939`.
 
 ### 1.1 Historical v2 predecessor boundary
 
@@ -97,7 +101,7 @@ observer, schema, and specimen above.
 
 The authored-vault specimen identity is the observer-defined
 `vault_resident_snapshot_identity`. At observer commit
-`502bc8d83a3681a21f4ab2f2cafb9598074aa24c`, its input is:
+`32957a3ff467ee57d7a76d4c4321753ac018d054`, its input is:
 
 ```text
 {

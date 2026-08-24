@@ -470,6 +470,34 @@ address, exact authored span, occurrence identity, authored direction, target
 identity, and reverse incidence. The projection must not manufacture a unit,
 drop the occurrence, or degrade its provenance to an object-level source.
 
+### Accepted Phase-5 block-owned occurrence amendment
+
+For the current `vault-observation/v3` contact, an ordinary body occurrence
+is canonically sourced by the exact parser-emitted Markdown block that owns
+it, and therefore by the one semantic unit materialized from that block. The
+observation carries `source_block_span` and a deterministic
+`source_occurrence_ordinal` for every body occurrence. An exact inline
+`source_span` remains finer-grained evidence when available and is explicitly
+null when unavailable; it does not select the source unit.
+
+Phase 5 maps a body source block to exactly one semantic unit, a
+heading-marker source block to exactly one canonical semantic region, and a
+frontmatter occurrence to its object field. Zero or multiple body-block
+mappings fail closed; no object or neighboring-region fallback is permitted.
+Frontmatter retains its field path and field-local occurrence ordinal, so
+repeated identical authored markup remains distinguishable.
+
+The observed parser block kind `hr` is retained as authored structural
+evidence and consumes its region-local authored block ordinal, but does not
+materialize as a semantic unit, region, retrieval target, or new
+`AuthoredBlockType`. Thus semantic-unit ordinals may contain gaps, and the
+Phase-5 report counts the non-materialized `hr` blocks explicitly.
+
+For a heading fragment with one canonical parent-object candidate but zero
+factual heading matches, the occurrence remains explicitly unresolved. The
+same applies to ambiguous heading evidence; Phase 5 does not select a
+candidate or degrade the occurrence to its parent object.
+
 ## 13. Authored-target resolution
 
 The projection must provide deterministic mappings from authored Obsidian targets to canonical addresses.

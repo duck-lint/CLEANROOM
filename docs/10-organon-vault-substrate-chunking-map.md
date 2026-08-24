@@ -544,6 +544,24 @@ Quote-plus-commentary adjacency does not create a special fused semantic unit. T
 
 The page heading defines one semantic region. Within that region, the block quote and the following commentary retain their authored Markdown block boundaries. Adjacency supplies local structural context but does not merge the quote and commentary into one canonical unit. A contiguous Markdown list remains one authored list block unless the authored structure itself establishes additional block boundaries.
 
+### 6.3.1 Block-owned occurrence provenance and thematic breaks
+
+The parser-owned Markdown block is the canonical body-occurrence source. The
+factual observation records its exact `source_block_span` and a deterministic
+`source_occurrence_ordinal`; an inline `source_span` is retained only as
+finer-grained evidence and may be explicitly unavailable. Phase 5 therefore
+requires one and only one semantic unit for an ordinary body source block,
+and one and only one canonical region for a heading-marker source block.
+Frontmatter occurrences remain sourced by their object field and retain a
+field-local occurrence ordinal. Repeated identical authored markup must not
+collapse occurrence identity.
+
+The observed `hr` block is an authored thematic separator. It consumes the
+region-local authored block ordinal but materializes as no semantic unit,
+region, retrieval target, or new `AuthoredBlockType`. The resulting semantic
+unit ordinals may contain gaps, and repository-safe Phase-5 evidence reports
+the number of observed non-materialized `hr` blocks.
+
 This preserves both requirements:
 
 ```text

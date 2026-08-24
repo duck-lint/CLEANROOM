@@ -20,9 +20,10 @@ use crate::{
 
 const EXCLUDED_FIELDS: [&str; 5] = ["address", "email", "phone", "likes", "dislikes"];
 const ACCEPTED_ARTIFACT_SHA256: &str =
-    "4e3b3fd00caaf591afe92e7fa892b66da3f35a3e98fd719447f1649ab4a18849";
+    "cc179d31f4035f84742312bab363a1504173f034e11625022a2142294c6eb000";
 const ACCEPTED_SPECIMEN_IDENTITY: &str =
-    "eb9447aa14e07995b86beb2c92d3c97c725fbdb23f1c210650b029fecd1d2d3d";
+    "8db3ab329d1890890a1fa7eeaec42d700b29420fb71ed052383dbb9ed3b0e8cc";
+const ACCEPTED_OBSERVER_COMMIT: &str = "32957a3ff467ee57d7a76d4c4321753ac018d054";
 const ACCEPTED_FIELD_UNIVERSE: [&str; 60] = [
     "address",
     "analysis_orientation",
@@ -859,6 +860,17 @@ fn validate_projection(
                                 ..
                             },
                         ) => span_contains(unit_span, occurrence_span),
+                        // The parser-owned source block is the canonical
+                        // source-unit authority. An inline span is finer
+                        // evidence and may be unavailable without weakening
+                        // the already-established block attribution.
+                        (
+                            None,
+                            RecordProvenance::SemanticUnit {
+                                source_span: Some(_),
+                                ..
+                            },
+                        ) => true,
                         _ => false,
                     };
                     span_ok
@@ -951,6 +963,13 @@ fn block_type(kind: &str, raw: &str) -> Result<AuthoredBlockType, ConstructionEr
         ))),
     }
 }
+
+fn next_region_block_ordinal(ordinals: &mut BTreeMap<String, u32>, region: &str) -> u32 {
+    let next = ordinals.entry(region.to_owned()).or_insert(0);
+    *next += 1;
+    *next
+}
+
 fn temporal_value(
     field: &str,
     value: &Value,
@@ -1473,9 +1492,14 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
     }
     if root
         .get("observer_provenance")
-        .and_then(|p| p.get("commit"))
+        .and_then(|p| p.get("repository"))
         .and_then(Value::as_str)
-        != Some("502bc8d83a3681a21f4ab2f2cafb9598074aa24c")
+        != Some("CLEANROOM")
+        || root
+            .get("observer_provenance")
+            .and_then(|p| p.get("commit"))
+            .and_then(Value::as_str)
+            != Some(ACCEPTED_OBSERVER_COMMIT)
     {
         return Err(ConstructionError::Contract(
             "observer specimen commit is not accepted".into(),
@@ -1550,23 +1574,26 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
     let mut region_by_object_span: BTreeMap<(String, u64, u64), Vec<usize>> = BTreeMap::new();
     let mut region_index_by_object_address: BTreeMap<(String, String), usize> = BTreeMap::new();
     let mut region_bounds_by_object: RegionBoundsByObject = BTreeMap::new();
-    let mut region_heading_spans_by_object: BTreeMap<
-        String,
-        Vec<(SemanticRegionAddress, Option<SourceSpan>)>,
-    > = BTreeMap::new();
-    let mut unit_bounds_by_object: BTreeMap<String, Vec<(SemanticUnitId, SourceSpan)>> =
+    let mut unit_by_object_block_span: BTreeMap<String, BTreeMap<(u64, u64), Vec<SemanticUnitId>>> =
         BTreeMap::new();
     let mut unit_by_path_block_id: BTreeMap<(String, String), SemanticUnitId> = BTreeMap::new();
     let mut field_names = BTreeSet::new();
     let mut semantic_unit_source_count = 0usize;
-    let mut zero_containing_unit_failures = 0usize;
-    let mut multiple_containing_unit_failures = 0usize;
+    let zero_containing_unit_failures = 0usize;
+    let multiple_containing_unit_failures = 0usize;
     let mut block_fragment_count = 0usize;
     let mut resolved_block_target_count = 0usize;
     let mut unresolved_block_target_count = 0usize;
+    let mut unresolved_heading_target_count = 0usize;
+    let mut ambiguous_heading_target_count = 0usize;
+    let mut non_materialized_hr_count = 0usize;
+    let mut heading_marker_source_count = 0usize;
+    let occurrence_identity_collision_count = 0usize;
     let mut explicit_block_id_count = 0usize;
     let mut region_block_mapping_count = 0usize;
+    let mut observed_block_kind_counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut block_kind_counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut occurrence_ids = HashSet::new();
     // Materialize every region before resolving any cross-object occurrence.
     // Target objects may appear later in authored order than their sources.
     for (_m, oid, path, _title, _aliases, root_region) in &objects {
@@ -1664,10 +1691,6 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                 inherited_identifier_assignment_ids: vec![],
                 retrieval_surface_ids: vec![],
             });
-            region_heading_spans_by_object
-                .entry(oid.to_string())
-                .or_default()
-                .push((address.clone(), heading_span.clone()));
             let parent_index = parent_heading_indices[index]
                 .map(|parent| root_index + 1 + parent)
                 .unwrap_or(root_index);
@@ -1720,20 +1743,20 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         for key in values.keys() {
             field_names.insert(key.clone());
         }
-        let heading_regions = region_heading_spans_by_object
-            .get(&oid.to_string())
-            .cloned()
-            .unwrap_or_default();
         let mut local_units = Vec::new();
         let mut region_ordinals: BTreeMap<String, u32> = BTreeMap::new();
-        for block in array(m, "block_candidates")
+        let block_candidates = array(m, "block_candidates");
+        for block in &block_candidates {
+            let block_kind = text(block, "block_kind_observation");
+            *observed_block_kind_counts.entry(block_kind).or_default() += 1;
+        }
+        for block in block_candidates
             .into_iter()
             .filter(|b| text(b, "block_kind_observation") != "heading")
         {
             let block_kind = text(&block, "block_kind_observation");
             *block_kind_counts.entry(block_kind.clone()).or_default() += 1;
             let raw_block = text(&block, "raw_markdown");
-            let authored_block_type = block_type(&block_kind, &raw_block)?;
             let source_span = span(block.get("source_span").unwrap_or(&Value::Null), path);
             let (parent_region_address, heading_path) = source_span
                 .as_ref()
@@ -1755,11 +1778,15 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                 })
                 .unwrap_or_else(|| (root_region.clone(), Vec::new()));
             let ordinal_key = parent_region_address.authored_structural_address.clone();
-            let block_ordinal = {
-                let next = region_ordinals.entry(ordinal_key).or_insert(0);
-                *next += 1;
-                *next
-            };
+            let block_ordinal = next_region_block_ordinal(&mut region_ordinals, &ordinal_key);
+            if block_kind == "hr" {
+                // A thematic break is factual authored structure. It consumes
+                // the region-local ordinal but is deliberately not a semantic
+                // unit, region, target, or AuthoredBlockType.
+                non_materialized_hr_count += 1;
+                continue;
+            }
+            let authored_block_type = block_type(&block_kind, &raw_block)?;
             let explicit_block_id = array(&block, "explicit_block_ids")
                 .first()
                 .and_then(Value::as_str)
@@ -1779,10 +1806,14 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                 "unit identity",
             )?;
             if let Some(source_span) = source_span.clone() {
-                unit_bounds_by_object
-                    .entry(oid.to_string())
-                    .or_default()
-                    .push((unit_id.clone(), source_span));
+                if let (Some(start), Some(end)) = (source_span.start_byte, source_span.end_byte) {
+                    unit_by_object_block_span
+                        .entry(oid.to_string())
+                        .or_default()
+                        .entry((start, end))
+                        .or_default()
+                        .push(unit_id.clone());
+                }
             }
             local_units.push(unit_id.clone());
             for block_id in array(&block, "explicit_block_ids") {
@@ -1910,48 +1941,82 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                 ),
                 "occurrence identity",
             )?;
+            if !occurrence_ids.insert(occurrence_id.clone()) {
+                return Err(ConstructionError::Contract(format!(
+                    "occurrence identity collision for {path}"
+                )));
+            }
             let source_surface = text(&link, "source_surface");
             let source = if source_surface == "frontmatter" {
+                let field_path = text(&link, "frontmatter_key_path");
+                if field_path.is_empty()
+                    || link
+                        .get("source_occurrence_ordinal")
+                        .and_then(Value::as_u64)
+                        .is_none()
+                {
+                    return Err(ConstructionError::Contract(format!(
+                        "frontmatter occurrence lacks field-local provenance for {path}"
+                    )));
+                }
                 OccurrenceSource::ObjectField {
                     object_id: oid.clone(),
-                    field_path: text(&link, "frontmatter_key_path"),
-                }
-            } else if let Some((region_address, _)) =
-                heading_regions.iter().find(|(_, marker_span)| {
-                    marker_span.as_ref().zip(source_span.as_ref()).is_some_and(
-                        |(marker, occurrence)| {
-                            marker.start_byte <= occurrence.start_byte
-                                && marker.end_byte >= occurrence.end_byte
-                        },
-                    )
-                })
-            {
-                OccurrenceSource::SemanticRegion {
-                    region_address: region_address.clone(),
+                    field_path,
                 }
             } else {
-                let occurrence_span = source_span.as_ref().ok_or_else(|| {
-                    ConstructionError::Contract(format!(
-                        "ordinary body occurrence lacks source span for {path}"
-                    ))
-                })?;
-                let unit_id = containing_unit_for_span(
-                    unit_bounds_by_object
-                        .get(&oid.to_string())
-                        .map(Vec::as_slice)
-                        .unwrap_or(&[]),
-                    occurrence_span,
-                )
-                .map_err(|error| {
-                    if error.to_string().contains("zero") {
-                        zero_containing_unit_failures += 1;
-                    } else {
-                        multiple_containing_unit_failures += 1;
+                let block_span = span(link.get("source_block_span").unwrap_or(&Value::Null), path)
+                    .ok_or_else(|| {
+                        ConstructionError::Contract(format!(
+                            "ordinary body occurrence lacks exact source block span for {path}"
+                        ))
+                    })?;
+                let (block_start, block_end) = match (block_span.start_byte, block_span.end_byte) {
+                    (Some(start), Some(end)) => (start, end),
+                    _ => {
+                        return Err(ConstructionError::Contract(format!(
+                            "ordinary body occurrence has unavailable source block bounds for {path}"
+                        )));
                     }
-                    ConstructionError::Contract(format!("{error} for {path}"))
-                })?;
-                semantic_unit_source_count += 1;
-                OccurrenceSource::SemanticUnit { unit_id }
+                };
+                let region_indices = region_by_object_span
+                    .get(&(oid.to_string(), block_start, block_end))
+                    .cloned()
+                    .unwrap_or_default();
+                if !region_indices.is_empty() {
+                    let region_index = match region_indices.as_slice() {
+                        [region_index] => *region_index,
+                        _ => {
+                            return Err(ConstructionError::Contract(format!(
+                                "heading-marker source block maps to multiple semantic regions for {path}"
+                            )));
+                        }
+                    };
+                    heading_marker_source_count += 1;
+                    OccurrenceSource::SemanticRegion {
+                        region_address: regions[region_index].address.clone(),
+                    }
+                } else {
+                    let unit_ids = unit_by_object_block_span
+                        .get(&oid.to_string())
+                        .and_then(|blocks| blocks.get(&(block_start, block_end)))
+                        .cloned()
+                        .unwrap_or_default();
+                    let unit_id = match unit_ids.as_slice() {
+                        [unit_id] => unit_id.clone(),
+                        [] => {
+                            return Err(ConstructionError::Contract(format!(
+                                "ordinary body source block maps to zero semantic units for {path}"
+                            )));
+                        }
+                        _ => {
+                            return Err(ConstructionError::Contract(format!(
+                                "ordinary body source block maps to multiple semantic units for {path}"
+                            )));
+                        }
+                    };
+                    semantic_unit_source_count += 1;
+                    OccurrenceSource::SemanticUnit { unit_id }
+                }
             };
             let target = if let Some(target_object) = target_object {
                 if link
@@ -1960,43 +2025,41 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                     .is_some()
                 {
                     let matches = array(&link, "heading_target_matches");
-                    let matched_span = match matches.as_slice() {
-                        [matched_heading] => {
-                            span_bounds(matched_heading.get("source_span").unwrap_or(&Value::Null))
-                                .ok_or_else(|| {
-                                    ConstructionError::Contract(
-                                        "heading target match lacks an exact source span".into(),
-                                    )
-                                })?
-                        }
+                    match matches.as_slice() {
                         [] => {
-                            return Err(ConstructionError::Contract(
-                                "heading target has no accepted heading match".into(),
-                            ));
+                            unresolved_heading_target_count += 1;
+                            None
                         }
-                        _ => {
-                            return Err(ConstructionError::Contract(
-                                "heading target has multiple accepted heading matches".into(),
-                            ));
+                        [_, _, ..] => {
+                            ambiguous_heading_target_count += 1;
+                            None
                         }
-                    };
-                    let key = (target_object.to_string(), matched_span.0, matched_span.1);
-                    let region_indices = region_by_object_span.get(&key).ok_or_else(|| {
-                        ConstructionError::Contract(
-                            "heading target span matched zero materialized semantic regions".into(),
-                        )
-                    })?;
-                    let region_index = match region_indices.as_slice() {
-                        [region_index] => *region_index,
-                        _ => {
-                            return Err(ConstructionError::Contract(
-                                "heading target span matched multiple materialized semantic regions".into(),
-                            ));
+                        [matched_heading] => {
+                            let matched_span = span_bounds(
+                                matched_heading.get("source_span").unwrap_or(&Value::Null),
+                            )
+                            .ok_or_else(|| {
+                                ConstructionError::Contract(
+                                    "heading target match lacks an exact source span".into(),
+                                )
+                            })?;
+                            let key = (target_object.to_string(), matched_span.0, matched_span.1);
+                            let region_indices = region_by_object_span.get(&key).ok_or_else(|| {
+                                ConstructionError::Contract(
+                                    "heading target span matched zero materialized semantic regions".into(),
+                                )
+                            })?;
+                            match region_indices.as_slice() {
+                                [region_index] => Some(SemanticAddress::Region(
+                                    regions[*region_index].address.clone(),
+                                )),
+                                _ => {
+                                    ambiguous_heading_target_count += 1;
+                                    None
+                                }
+                            }
                         }
-                    };
-                    Some(SemanticAddress::Region(
-                        regions[region_index].address.clone(),
-                    ))
+                    }
                 } else if let Some(fragment) = link.get("block_fragment").and_then(Value::as_str) {
                     block_fragment_count += 1;
                     let mapping = match candidate_source_paths.as_slice() {
@@ -2273,7 +2336,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
     }
     let mut projection = SemanticSpaceProjection {
         projection_snapshot_id: format!("projection:phase5:v2:{snapshot}"),
-        ingest_identity: "observer:502bc8d83a3681a21f4ab2f2cafb9598074aa24c".to_string(),
+        ingest_identity: format!("observation:vault-observation/v3:{input_artifact_sha256}"),
         schema_version: "semantic-space-projection/v2".into(),
         logical_hash: String::new(),
         corpus_snapshot_identity: snapshot.clone(),
@@ -2436,8 +2499,8 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
     let report = serde_json::json!({
         "report_title": "PHASE 5 CONSTRUCTION EVIDENCE",
         "input_identity": {
-            "observer_repository": "duck-lint/semantic-traversal",
-            "observer_commit": "502bc8d83a3681a21f4ab2f2cafb9598074aa24c",
+            "observer_repository": "CLEANROOM",
+            "observer_commit": ACCEPTED_OBSERVER_COMMIT,
             "observer_schema": "vault-observation/v3",
             "corpus_snapshot_identity": snapshot,
             "specimen_identity": snapshot,
@@ -2486,15 +2549,23 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
             "ambiguous_count": projection.occurrences.iter().filter(|o| matches!(o.resolution_state, OccurrenceResolutionState::Ambiguous { .. })).count(),
             "semantic_unit_source_attribution_failures": zero_containing_unit_failures + multiple_containing_unit_failures,
             "correct_containing_unit_attributions": semantic_unit_source_count,
+            "correct_source_block_unit_attributions": semantic_unit_source_count,
+            "heading_marker_source_attributions": heading_marker_source_count,
             "zero_containing_unit_failures": zero_containing_unit_failures,
             "multiple_containing_unit_failures": multiple_containing_unit_failures,
+            "unresolved_heading_target_count": unresolved_heading_target_count,
+            "ambiguous_heading_target_count": ambiguous_heading_target_count,
+            "occurrence_identity_collisions": occurrence_identity_collision_count,
             "block_fragment_count": block_fragment_count,
             "resolved_block_target_count": resolved_block_target_count,
             "unresolved_block_target_count": unresolved_block_target_count,
             "object_fallback_degradations": closure.unresolved_block_target_degradations
         },
         "authored_block_kinds": {
+            "observed_distribution": observed_block_kind_counts,
             "distribution": block_kind_counts,
+            "non_materialized_block_counts": {"hr": non_materialized_hr_count},
+            "non_materialized_hr_count": non_materialized_hr_count,
             "explicit_block_ids": explicit_block_id_count,
             "region_block_target_mappings": region_block_mapping_count,
             "unsupported_block_kinds": 0,
@@ -2507,6 +2578,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
             "identifier_descriptor_assignment_conformance_failures": closure.identifier_descriptor_assignment_failures,
             "inherited_assignment_reference_failures": closure.inherited_assignment_reference_failures,
             "unit_identity_duplicates": closure.unit_identity_duplicates,
+            "occurrence_identity_collisions": occurrence_identity_collision_count,
             "region_source_incidence_failures": closure.region_source_incidence_failures,
             "target_incidence_failures": closure.target_incidence_failures,
             "unit_parent_failures": closure.unit_parent_failures,
@@ -2545,6 +2617,7 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
         "contract_contact_failures": 0,
         "projection": {
             "schema_version": projection.schema_version,
+            "ingest_identity": projection.ingest_identity,
             "logical_hash": projection.logical_hash,
             "validation_status": "unvalidated",
             "retrieval_surface_count": projection.retrieval_surfaces.len(),
@@ -2580,6 +2653,24 @@ mod tests {
             AuthoredBlockType::Callout
         );
         assert!(block_type("unknown_kind", "body").is_err());
+        assert!(block_type("hr", "---").is_err());
+    }
+
+    #[test]
+    fn thematic_break_consumes_an_authored_ordinal_without_materializing() {
+        let mut ordinals = BTreeMap::new();
+        assert_eq!(next_region_block_ordinal(&mut ordinals, "root"), 1);
+        assert_eq!(next_region_block_ordinal(&mut ordinals, "root"), 2);
+        assert_eq!(next_region_block_ordinal(&mut ordinals, "root"), 3);
+        assert!(block_type("hr", "---").is_err());
+    }
+
+    #[test]
+    fn unresolved_heading_target_remains_unresolved_with_one_parent_candidate() {
+        let paths = vec!["target.md".to_owned()];
+        let (target, state) = finalize_occurrence_resolution(1, &paths, None).unwrap();
+        assert!(target.is_none());
+        assert!(matches!(state, OccurrenceResolutionState::Unresolved));
     }
 
     #[test]
