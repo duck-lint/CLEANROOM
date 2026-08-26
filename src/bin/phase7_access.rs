@@ -1,7 +1,7 @@
 use semantic_traversal_core::{
     access::{
-        AccessOperand, OllamaEmbeddingProvider, ProjectionAccessProbe, TemporalPrecision,
-        TemporalQuery, build_projection_access_artifacts,
+        AccessError, AccessOperand, OllamaEmbeddingProvider, ProjectionAccessProbe,
+        TemporalPrecision, TemporalQuery, build_projection_access_artifacts,
     },
     model::{Direction, RetrievalSurfaceKind, SemanticAddress},
     projection::{SemanticSpaceProjection, SurfaceMatchMode, TemporalValue},
@@ -62,6 +62,13 @@ fn run(
         .first()
         .ok_or("projection has no temporal anchors")?;
     let (precision, value) = temporal_value(&first_anchor.value);
+    let vector_query = artifacts
+        .vector
+        .segments
+        .first()
+        .ok_or("provider-backed vector index contains no segments")?
+        .embedding
+        .clone();
     let probes = vec![
         ProjectionAccessProbe {
             probe_id: "phase7-real-exact".into(),
@@ -89,7 +96,10 @@ fn run(
             surface_id: "surface:vector".into(),
             surface_kind: RetrievalSurfaceKind::Vector,
             match_mode: SurfaceMatchMode::NearestNeighbours,
-            operand: AccessOperand::Vector(vec![0.0; 1024]),
+            // A zero-norm operand is not a defined cosine nearest-neighbour
+            // query.  Use a corpus-derived provider embedding for the real
+            // probe; the invalid zero-vector case is checked explicitly below.
+            operand: AccessOperand::Vector(vector_query),
             page_size: 5,
             cursor: None,
         },
@@ -132,6 +142,23 @@ fn run(
     println!("graph_edges={}", artifacts.graph.edges.len());
     println!("temporal_records={}", artifacts.temporal.entries.len());
     println!("vector_segments={}", artifacts.vector.segments.len());
+    let zero_vector_probe = ProjectionAccessProbe {
+        probe_id: "phase7-zero-vector".into(),
+        projection_snapshot_id: projection.projection_snapshot_id.clone(),
+        surface_id: "surface:vector".into(),
+        surface_kind: RetrievalSurfaceKind::Vector,
+        match_mode: SurfaceMatchMode::NearestNeighbours,
+        operand: AccessOperand::Vector(vec![0.0; 1024]),
+        page_size: 5,
+        cursor: None,
+    };
+    match artifacts.probe(&projection, &zero_vector_probe) {
+        Err(AccessError::Probe(message)) => {
+            println!("zero_vector_probe=invalid_operand:{message}");
+        }
+        Err(error) => return Err(format!("unexpected zero-vector failure: {error}").into()),
+        Ok(_) => return Err("zero vector unexpectedly executed".into()),
+    }
     println!("probes=");
     for probe in probes {
         println!(

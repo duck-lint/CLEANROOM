@@ -1,8 +1,8 @@
 # Phase 7 Real Projection Access Report
 
-Status: **read-only access artifacts and typed probes implemented; exact,
-lexical, graph, and temporal real-corpus access passed; vector provider was
-unavailable in this environment and failed closed.**
+Status: **provider-backed read-only access artifacts and typed probes passed
+against the accepted current-corpus projection; all five real-corpus surfaces
+returned projection-bound results.**
 
 Phase 8 activation revalidation, semantic-access inference, conformance,
 execution, packet assembly, synthesis, UAT, and `semantic-traversal` remain
@@ -49,14 +49,14 @@ one concrete probe for every declared real-corpus surface/match-mode pair.
 
 ## Access artifacts
 
-The private serialized artifact was written to ignored `target/phase7` only.
-It is not committed.
+The provider-backed serialized artifact was retained in ignored
+`target/phase7` only. It is not committed.
 
 - Access schema: `projection-access-artifacts/v1`
 - Artifact identity:
-  `sha256:fe36db76ae089b9c2cc4e92f45f32d5535415d90d94d1b933641fb8d516c22a7`
+  `sha256:d8ce6fd667df120d4ed6d55300a22f181131f944833570f28de795900d6c26fc`
 - Serialized artifact SHA-256:
-  `b5ef172c571d9087ee41ded5e361007e24c8e22f4cc94eb1256952ec34e68403`
+  `25caede3004a7620f35cbf7ed7c02388e8cb8bd5baff70f1be455e50880088e2`
 - Exact index identity:
   `sha256:e6140fde825d3ef814ab057eca22db790b0124cce3905f56443f1d34bbe4feed`
 - Lexical index identity:
@@ -66,7 +66,7 @@ It is not committed.
 - Temporal index identity:
   `sha256:495b71903a67ed21992478ef6c123ad787079e8f49a98ae3ea451c4bb32145a9`
 - Vector index identity:
-  `sha256:474456a9ad2b81f2abf98a597c0c272b62f34857734c34f0421f6889f8f6086d`
+  `sha256:e2d9cbd2159798ecab3def854be6f5fd6729b11fb1b74799002e2f04c5191bb2`
 
 | Surface | Indexed records | Result identity |
 |---|---:|---|
@@ -74,7 +74,7 @@ It is not committed.
 | lexical | 1,238,121 postings | semantic unit |
 | graph | 161,662 edges | projected edge target |
 | temporal | 549 anchors | temporal anchor |
-| vector | 0 segments | unavailable in this run |
+| vector | 14,111 segments | semantic unit (technical segments subordinate) |
 
 The lexical manifest records the deterministic Unicode-alphanumeric-run
 tokenizer, Unicode lowercase folding, no stop words, and punctuation as
@@ -91,9 +91,14 @@ FTS5 identity.
   the projected root region and its projected unit.
 - Temporal exact probe over the first projected anchor: three same-value
   temporal-anchor candidates returned.
-- Vector nearest-neighbour probe: zero candidates, no total, and retryable
-  `provider_connect_failed` telemetry because `localhost:11434` refused the
-  connection.
+- Vector nearest-neighbour probe using the first provider-produced corpus
+  embedding as a nonzero mechanical operand: five candidates returned, total
+  14,108, truncated with a deterministic continuation cursor. Returned
+  identities were semantic units and were checked against the frozen
+  projection.
+- The former zero-vector probe is an invalid cosine operand, not a valid
+  zero-result search. It fails closed with `zero vector operand is not
+  searchable`; zero-result behavior remains covered by the exact surface.
 - Zero-result exact probes are represented as valid results with total zero.
 
 ## Vector provider state
@@ -112,29 +117,44 @@ truncation: disabled
 
 The native adapter uses Ollama `POST /api/embed`, resolves model identity from
 the local model listing, and records the immutable model digest when available.
-No model digest or vector output was claimed because the local service was
-offline. A later provider-enabled build must regenerate the vector derivative;
-it must not mutate the projection snapshot or reuse this unavailable vector
-index as if it were ready.
+The provider-backed artifact resolved:
+
+```text
+endpoint: http://127.0.0.1:11434
+resolved model: qwen3-embedding:0.6b
+model digest: ac6da0dfba84a81fdbfbaf330198c33cd77c4cdfc53e8bc50eb581914a15621d
+max input chars: provider-reported value unavailable; capacity is observed by
+  explicit provider rejection and activates the recorded transport policy
+```
+
+The vector index contains nonzero corpus-derived segments. Segment identities
+remain subordinate to their canonical parent units; they do not become
+semantic-unit identities.
 
 ## Validation
 
-- `cargo test` — passed: all repository unit, integration, schema, and doc
-  tests; 165 Rust tests passed and doc-tests had zero tests.
-- Current-corpus access test with the private accepted inputs — passed; all
-  five declared probes executed, returned identities were checked against the
-  frozen projection, and input bytes were unchanged.
+- `cargo test --test access` — passed: 10 tests, including the provider-backed
+  artifact validation, projection/hash fail-closed binding, all five probes,
+  and zero-vector rejection.
+- Provider-backed artifact validation — passed; the existing provider-backed
+  current-corpus artifact deserialized, self-validated, matched the accepted
+  projection snapshot/logical hash/corpus identity, and all returned
+  identities were checked against the frozen projection.
 - Repeated synthetic builds — byte-identical artifacts.
 - Synthetic vector-provider build — passed; provider segments remained
   subordinate to canonical unit identities.
+- Repeated provider-backed artifact validation — passed against the same
+  deterministic artifact identity and serialized SHA-256.
 - `cargo check --bin phase7_access` — passed.
 - `git diff --check` — passed.
 
 ## Technical limitations
 
-1. Ollama was unavailable, so this run does not establish provider-backed
-   vector embeddings, vector segment counts, model digest, or nearest-neighbor
-   candidates.
+1. The private observation source is not currently exposed as a working-tree
+   path, so this validation revalidated the surviving provider-backed artifact
+   from the accepted Phase-7 build rather than publishing or reconstructing
+   private corpus input. The artifact itself passed exact projection binding
+   and self-integrity validation.
 2. Lexical access is a deterministic Rust full-text inverted index with its
    declared tokenizer contract, not SQLite FTS5. A future SQLite-specific
    requirement would be a separate technical change, not a semantic change.

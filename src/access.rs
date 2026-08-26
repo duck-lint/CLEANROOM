@@ -277,7 +277,7 @@ impl std::error::Error for AccessError {}
 
 /// The provider seam is intentionally tiny.  It may be replaced by a test
 /// double without changing access or projection contracts.
-pub trait EmbeddingProvider {
+pub trait EmbeddingProvider: Sync {
     fn identity(&self) -> Result<VectorProviderIdentity, AccessFailure>;
     fn embed(&self, inputs: &[String]) -> Result<Vec<Vec<f32>>, AccessFailure>;
 }
@@ -1350,105 +1350,78 @@ fn build_vector_index(
     hydrated: &[HydratedUnitText],
     provider: Option<&dyn EmbeddingProvider>,
 ) -> VectorIndex {
-    let unavailable = |failure: AccessFailure| {
-        let state = VectorProviderState::Unavailable {
-            contract: VectorProviderContract::default(),
-            failure,
-        };
-        VectorIndex {
-            index_identity: vector_index_identity(&state, &[])
-                .unwrap_or_else(|_| "vector-index:unavailable".into()),
-            provider: state,
-            segments: Vec::new(),
-        }
-    };
     let Some(provider) = provider else {
-        return unavailable(AccessFailure::new(
-            "provider_not_configured",
-            "Ollama provider was not configured",
-            false,
-        ));
+        return unavailable_vector_index(
+            VectorProviderContract::default(),
+            AccessFailure::new(
+                "provider_not_configured",
+                "Ollama provider was not configured",
+                false,
+            ),
+        );
     };
     let identity = match provider.identity() {
         Ok(identity) => identity,
-        Err(failure) => return unavailable(failure),
+        Err(failure) => {
+            return unavailable_vector_index(VectorProviderContract::default(), failure);
+        }
     };
     if identity.contract.dimension == 0 {
-        return unavailable(AccessFailure::new(
-            "invalid_provider_dimension",
-            "provider dimension must be positive",
-            false,
-        ));
-    }
-    let mut segment_inputs = Vec::new();
-    let mut segment_meta = Vec::new();
-    for text in hydrated {
-        let chunks = split_for_provider(&text.raw, identity.max_input_chars);
-        let total = chunks.len() as u32;
-        for (ordinal, chunk) in chunks.into_iter().enumerate() {
-            segment_inputs.push(chunk);
-            segment_meta.push((text.unit_id.clone(), ordinal as u32, total));
-        }
-    }
-    let embeddings = match provider.embed(&segment_inputs) {
-        Ok(embeddings) => embeddings,
-        Err(failure) => {
-            return VectorIndex {
-                index_identity: vector_index_identity(
-                    &VectorProviderState::Unavailable {
-                        contract: identity.contract.clone(),
-                        failure: failure.clone(),
-                    },
-                    &[],
-                )
-                .unwrap_or_else(|_| "vector-index:unavailable".into()),
-                provider: VectorProviderState::Unavailable {
-                    contract: identity.contract,
-                    failure,
-                },
-                segments: Vec::new(),
-            };
-        }
-    };
-    if embeddings.len() != segment_meta.len()
-        || embeddings
-            .iter()
-            .any(|embedding| embedding.len() != identity.contract.dimension)
-    {
-        let failure = AccessFailure::new(
-            "provider_shape_mismatch",
-            "embedding count or dimension did not match the provider contract",
-            false,
+        return unavailable_vector_index(
+            identity.contract.clone(),
+            AccessFailure::new(
+                "invalid_provider_dimension",
+                "provider dimension must be positive",
+                false,
+            ),
         );
-        return VectorIndex {
-            index_identity: vector_index_identity(
-                &VectorProviderState::Unavailable {
-                    contract: identity.contract.clone(),
-                    failure: failure.clone(),
-                },
-                &[],
-            )
-            .unwrap_or_else(|_| "vector-index:unavailable".into()),
-            provider: VectorProviderState::Unavailable {
-                contract: identity.contract,
-                failure,
-            },
-            segments: Vec::new(),
-        };
     }
-    let segments = embeddings
-        .into_iter()
-        .zip(segment_meta)
-        .map(
-            |(embedding, (parent_unit_id, segment_ordinal, total_segments))| VectorSegmentRecord {
-                segment_id: format!("vector-segment:v1:{}:{segment_ordinal}", parent_unit_id),
-                parent_unit_id,
-                segment_ordinal,
-                total_segments,
-                embedding,
-            },
-        )
+    let unit_inputs = hydrated
+        .iter()
+        .map(|text| text.raw.clone())
         .collect::<Vec<_>>();
+    let results =
+        match embed_units_concurrently(provider, &unit_inputs, identity.contract.dimension) {
+            Ok(results) => results,
+            Err(failure) => {
+                return unavailable_vector_index(identity.contract.clone(), failure);
+            }
+        };
+    let mut segments = Vec::new();
+    for (unit_index, (result, text)) in results.into_iter().zip(hydrated).enumerate() {
+        let unit_context = format!(
+            "unit_index={unit_index}; parent_unit_id={}; input_bytes={}",
+            text.unit_id,
+            text.raw.len()
+        );
+        let unit_segments = match result {
+            Ok(unit_segments) => unit_segments,
+            Err(mut failure) => {
+                failure.message = format!("{unit_context}; {}", failure.message);
+                return unavailable_vector_index(identity.contract.clone(), failure);
+            }
+        };
+        if unit_segments.is_empty() {
+            return unavailable_vector_index(
+                identity.contract.clone(),
+                AccessFailure::new(
+                    "provider_segmentation_failed",
+                    format!("{unit_context}; provider returned no transport segments"),
+                    false,
+                ),
+            );
+        }
+        let total_segments = unit_segments.len() as u32;
+        for (segment_ordinal, segment) in unit_segments.into_iter().enumerate() {
+            segments.push(VectorSegmentRecord {
+                segment_id: format!("vector-segment:v1:{}:{segment_ordinal}", text.unit_id),
+                parent_unit_id: text.unit_id.clone(),
+                segment_ordinal: segment_ordinal as u32,
+                total_segments,
+                embedding: segment.embedding,
+            });
+        }
+    }
     let state = VectorProviderState::Ready { identity };
     VectorIndex {
         index_identity: vector_index_identity(&state, &segments)
@@ -1458,6 +1431,95 @@ fn build_vector_index(
     }
 }
 
+const VECTOR_PROVIDER_MAX_WORKERS: usize = 8;
+
+#[derive(Clone, Debug)]
+struct ProviderVectorSegment {
+    text: String,
+    embedding: Vec<f32>,
+}
+
+fn unavailable_vector_index(
+    contract: VectorProviderContract,
+    failure: AccessFailure,
+) -> VectorIndex {
+    let state = VectorProviderState::Unavailable { contract, failure };
+    VectorIndex {
+        index_identity: vector_index_identity(&state, &[])
+            .unwrap_or_else(|_| "vector-index:unavailable".into()),
+        provider: state,
+        segments: Vec::new(),
+    }
+}
+
+fn embed_units_concurrently(
+    provider: &dyn EmbeddingProvider,
+    inputs: &[String],
+    dimension: usize,
+) -> Result<Vec<Result<Vec<ProviderVectorSegment>, AccessFailure>>, AccessFailure> {
+    if inputs.is_empty() {
+        return Ok(Vec::new());
+    }
+    let worker_count = VECTOR_PROVIDER_MAX_WORKERS.min(inputs.len());
+    let (job_sender, job_receiver) = std::sync::mpsc::channel::<(usize, String)>();
+    let (result_sender, result_receiver) =
+        std::sync::mpsc::channel::<(usize, Result<Vec<ProviderVectorSegment>, AccessFailure>)>();
+    let job_receiver = std::sync::Arc::new(std::sync::Mutex::new(job_receiver));
+
+    let results = std::thread::scope(|scope| {
+        for _ in 0..worker_count {
+            let job_receiver = std::sync::Arc::clone(&job_receiver);
+            let result_sender = result_sender.clone();
+            scope.spawn(move || {
+                loop {
+                    let job = job_receiver
+                        .lock()
+                        .expect("vector provider job mutex is not poisoned")
+                        .recv();
+                    let Ok((index, input)) = job else {
+                        break;
+                    };
+                    let result = segment_and_embed(provider, &input, dimension);
+                    result_sender
+                        .send((index, result))
+                        .expect("vector provider result receiver remains active");
+                }
+            });
+        }
+        drop(result_sender);
+        for (index, input) in inputs.iter().cloned().enumerate() {
+            job_sender.send((index, input)).map_err(|_| {
+                AccessFailure::new(
+                    "provider_concurrency_failed",
+                    "vector provider worker queue closed",
+                    false,
+                )
+            })?;
+        }
+        drop(job_sender);
+
+        let mut results: Vec<Option<Result<Vec<ProviderVectorSegment>, AccessFailure>>> =
+            (0..inputs.len()).map(|_| None).collect();
+        for _ in 0..inputs.len() {
+            let (index, result) = result_receiver.recv().map_err(|_| {
+                AccessFailure::new(
+                    "provider_concurrency_failed",
+                    "vector provider worker result channel closed",
+                    false,
+                )
+            })?;
+            results[index] = Some(result);
+        }
+        Ok::<_, AccessFailure>(
+            results
+                .into_iter()
+                .map(|result| result.expect("every vector segment has one provider result"))
+                .collect(),
+        )
+    })?;
+    Ok(results)
+}
+
 fn vector_index_identity(
     provider: &VectorProviderState,
     segments: &[VectorSegmentRecord],
@@ -1465,18 +1527,144 @@ fn vector_index_identity(
     hash_json(&(provider, segments))
 }
 
-fn split_for_provider(value: &str, max_input_chars: Option<usize>) -> Vec<String> {
-    let Some(max) = max_input_chars.filter(|max| *max > 0) else {
-        return vec![value.to_owned()];
-    };
-    let chars: Vec<_> = value.chars().collect();
-    if chars.len() <= max {
-        return vec![value.to_owned()];
+fn segment_and_embed(
+    provider: &dyn EmbeddingProvider,
+    text: &str,
+    dimension: usize,
+) -> Result<Vec<ProviderVectorSegment>, AccessFailure> {
+    if text.is_empty() {
+        return Err(AccessFailure::new(
+            "provider_request_shape",
+            "vector input must be a non-empty string",
+            false,
+        ));
     }
-    chars
-        .chunks(max)
-        .map(|chunk| chunk.iter().collect())
-        .collect()
+    let mut accepted = HashMap::<String, Result<Vec<f32>, AccessFailure>>::new();
+    let mut try_input = |input: &str| -> Result<Option<Vec<f32>>, AccessFailure> {
+        if let Some(result) = accepted.get(input) {
+            return match result {
+                Ok(embedding) => Ok(Some(embedding.clone())),
+                Err(failure) => Err(failure.clone()),
+            };
+        }
+        let result = provider.embed(&[input.to_owned()]).and_then(|embeddings| {
+            if embeddings.len() != 1 {
+                return Err(AccessFailure::new(
+                    "provider_shape_mismatch",
+                    format!(
+                        "expected exactly one embedding for one input; \
+                         returned_embeddings={}",
+                        embeddings.len()
+                    ),
+                    false,
+                ));
+            }
+            let embedding = embeddings.into_iter().next().expect("count checked");
+            if embedding.len() != dimension {
+                return Err(AccessFailure::new(
+                    "provider_shape_mismatch",
+                    format!(
+                        "expected_dimension={dimension}; returned_dimension={}",
+                        embedding.len()
+                    ),
+                    false,
+                ));
+            }
+            Ok(embedding)
+        });
+        match result {
+            Ok(embedding) => {
+                accepted.insert(input.to_owned(), Ok(embedding.clone()));
+                Ok(Some(embedding))
+            }
+            Err(failure) if is_provider_capacity_rejection(&failure) => Ok(None),
+            Err(failure) => Err(failure),
+        }
+    };
+
+    if let Some(embedding) = try_input(text)? {
+        return Ok(vec![ProviderVectorSegment {
+            text: text.to_owned(),
+            embedding,
+        }]);
+    }
+
+    let mut segments = Vec::new();
+    let mut remainder = text.to_owned();
+    while !remainder.is_empty() {
+        if let Some(embedding) = try_input(&remainder)? {
+            segments.push(ProviderVectorSegment {
+                text: remainder,
+                embedding,
+            });
+            break;
+        }
+        let mut chosen = None;
+        for boundary in preferred_boundaries(&remainder) {
+            if let Some(embedding) = try_input(&remainder[..boundary])? {
+                chosen = Some((boundary, embedding));
+                break;
+            }
+        }
+        let Some((boundary, embedding)) = chosen else {
+            return Err(AccessFailure::new(
+                "provider_segmentation_failed",
+                format!(
+                    "provider rejected every non-empty prefix of remainder; \
+                     remainder_bytes={}",
+                    remainder.len()
+                ),
+                false,
+            ));
+        };
+        let segment_text = remainder[..boundary].to_owned();
+        segments.push(ProviderVectorSegment {
+            text: segment_text,
+            embedding,
+        });
+        remainder = remainder[boundary..].to_owned();
+    }
+    if segments
+        .iter()
+        .map(|segment| segment.text.as_str())
+        .collect::<String>()
+        != text
+    {
+        return Err(AccessFailure::new(
+            "provider_segmentation_failed",
+            "transport segments do not reconstruct the exact provider input",
+            false,
+        ));
+    }
+    Ok(segments)
+}
+
+fn is_provider_capacity_rejection(failure: &AccessFailure) -> bool {
+    failure.code == "provider_capacity_exceeded"
+}
+
+fn preferred_boundaries(value: &str) -> Vec<usize> {
+    let mut newline = Vec::new();
+    let mut whitespace = Vec::new();
+    let mut code_point = Vec::new();
+    for (byte_index, character) in value.char_indices() {
+        let boundary = byte_index + character.len_utf8();
+        if boundary >= value.len() {
+            continue;
+        }
+        code_point.push(boundary);
+        if character == '\n' {
+            newline.push(boundary);
+        } else if character.is_whitespace() {
+            whitespace.push(boundary);
+        }
+    }
+    newline.sort_unstable_by(|left, right| right.cmp(left));
+    whitespace.sort_unstable_by(|left, right| right.cmp(left));
+    code_point.sort_unstable_by(|left, right| right.cmp(left));
+    newline.extend(whitespace);
+    newline.extend(code_point);
+    newline
 }
 
 fn vector_candidates(
@@ -1653,7 +1841,7 @@ pub struct OllamaEmbeddingProvider {
 impl Default for OllamaEmbeddingProvider {
     fn default() -> Self {
         Self {
-            endpoint: "http://localhost:11434".into(),
+            endpoint: "http://127.0.0.1:11434".into(),
             requested_model: VECTOR_MODEL.into(),
             dimension: VECTOR_DIMENSION,
         }
@@ -1675,6 +1863,15 @@ impl OllamaEmbeddingProvider {
         path: &str,
         body: Option<&Value>,
     ) -> Result<Value, AccessFailure> {
+        let body_bytes = body
+            .map(|body| {
+                serde_json::to_vec(body).map_err(|error| {
+                    AccessFailure::new("request_serialization_failed", error.to_string(), false)
+                })
+            })
+            .transpose()?
+            .unwrap_or_default();
+        let request_bytes = body_bytes.len();
         let target = self.endpoint.strip_prefix("http://").ok_or_else(|| {
             AccessFailure::new(
                 "unsupported_endpoint",
@@ -1692,72 +1889,326 @@ impl OllamaEmbeddingProvider {
         let address = (host, port)
             .to_socket_addrs()
             .map_err(|error| {
-                AccessFailure::new("provider_connect_failed", error.to_string(), true)
+                provider_transport_failure(
+                    "provider_connect_failed",
+                    &error.to_string(),
+                    request_bytes,
+                )
             })?
             .next()
             .ok_or_else(|| {
-                AccessFailure::new("provider_connect_failed", "endpoint did not resolve", true)
+                provider_transport_failure(
+                    "provider_connect_failed",
+                    "endpoint did not resolve",
+                    request_bytes,
+                )
             })?;
         let mut stream =
             TcpStream::connect_timeout(&address, Duration::from_secs(3)).map_err(|error| {
-                AccessFailure::new("provider_connect_failed", error.to_string(), true)
+                provider_transport_failure(
+                    "provider_connect_failed",
+                    &error.to_string(),
+                    request_bytes,
+                )
             })?;
         stream.set_read_timeout(Some(Duration::from_secs(30))).ok();
         stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
-        let body_bytes = body
-            .map(|body| {
-                serde_json::to_vec(body).map_err(|error| {
-                    AccessFailure::new("request_serialization_failed", error.to_string(), false)
-                })
-            })
-            .transpose()?
-            .unwrap_or_default();
         let request = format!(
             "{method} {path} HTTP/1.1\r\nHost: {host}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
             body_bytes.len()
         );
         stream.write_all(request.as_bytes()).map_err(|error| {
-            AccessFailure::new("provider_write_failed", error.to_string(), true)
+            provider_transport_failure("provider_write_failed", &error.to_string(), request_bytes)
         })?;
         stream.write_all(&body_bytes).map_err(|error| {
-            AccessFailure::new("provider_write_failed", error.to_string(), true)
+            provider_transport_failure("provider_write_failed", &error.to_string(), request_bytes)
         })?;
         let mut response = Vec::new();
-        stream
-            .read_to_end(&mut response)
-            .map_err(|error| AccessFailure::new("provider_read_failed", error.to_string(), true))?;
-        let header_end = response
-            .windows(4)
-            .position(|window| window == b"\r\n\r\n")
-            .ok_or_else(|| {
-                AccessFailure::new(
-                    "provider_invalid_response",
-                    "response has no HTTP header terminator",
-                    false,
+        stream.read_to_end(&mut response).map_err(|error| {
+            if response.is_empty() {
+                provider_transport_failure(
+                    "provider_read_failed",
+                    &error.to_string(),
+                    request_bytes,
                 )
-            })?;
-        let headers = std::str::from_utf8(&response[..header_end]).map_err(|error| {
-            AccessFailure::new("provider_invalid_response", error.to_string(), false)
+            } else {
+                provider_response_failure(
+                    "provider_read_failed",
+                    None,
+                    None,
+                    &response,
+                    &[],
+                    request_bytes,
+                    &format!("partial response; transport_error={}", error),
+                    true,
+                )
+            }
         })?;
+        let Some(header_end) = response.windows(4).position(|window| window == b"\r\n\r\n") else {
+            return Err(provider_response_failure(
+                "provider_invalid_response",
+                None,
+                None,
+                &response,
+                &[],
+                request_bytes,
+                "response has no HTTP header terminator",
+                false,
+            ));
+        };
+        let headers = match std::str::from_utf8(&response[..header_end]) {
+            Ok(headers) => headers,
+            Err(error) => {
+                return Err(provider_response_failure(
+                    "provider_invalid_response",
+                    None,
+                    None,
+                    &response,
+                    &[],
+                    request_bytes,
+                    &error.to_string(),
+                    false,
+                ));
+            }
+        };
         let status = headers
             .lines()
             .next()
             .and_then(|line| line.split_whitespace().nth(1))
-            .and_then(|value| value.parse::<u16>().ok())
-            .unwrap_or(0);
-        let response_body = &response[header_end + 4..];
-        let value: Value = serde_json::from_slice(response_body).map_err(|error| {
-            AccessFailure::new("provider_invalid_json", error.to_string(), false)
-        })?;
-        if !(200..300).contains(&status) {
-            return Err(AccessFailure::new(
+            .and_then(|value| value.parse::<u16>().ok());
+        let content_type = headers.lines().find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            name.eq_ignore_ascii_case("content-type")
+                .then_some(value.trim())
+        });
+        let wire_body = &response[header_end + 4..];
+        let response_body = match decode_response_body(headers, wire_body) {
+            Ok(body) => body,
+            Err(error) => {
+                return Err(provider_response_failure(
+                    "provider_invalid_chunked_response",
+                    status,
+                    content_type,
+                    wire_body,
+                    &[],
+                    request_bytes,
+                    &error,
+                    false,
+                ));
+            }
+        };
+        if !status.is_some_and(|status| (200..300).contains(&status)) {
+            return Err(provider_response_failure(
                 "provider_http_error",
-                value.to_string(),
-                status >= 500,
+                status,
+                content_type,
+                wire_body,
+                &response_body,
+                request_bytes,
+                "HTTP response status was not successful",
+                status.is_some_and(|status| status >= 500),
             ));
         }
+        let value: Value = serde_json::from_slice(&response_body).map_err(|error| {
+            provider_response_failure(
+                "provider_invalid_json",
+                status,
+                content_type,
+                wire_body,
+                &response_body,
+                request_bytes,
+                &error.to_string(),
+                false,
+            )
+        })?;
         Ok(value)
     }
+}
+
+fn provider_transport_failure(code: &str, error: &str, request_bytes: usize) -> AccessFailure {
+    AccessFailure::new(
+        code,
+        format!(
+            "http_status=none; content_type=none; response_wire_bytes=0; response_entity_bytes=0; body_diagnostic=<none>; wire_body_diagnostic=<none>; request_bytes={request_bytes}; transport_error={}",
+            safe_diagnostic(error.as_bytes())
+        ),
+        true,
+    )
+}
+
+fn provider_response_failure(
+    code: &str,
+    status: Option<u16>,
+    content_type: Option<&str>,
+    wire_body: &[u8],
+    entity_body: &[u8],
+    request_bytes: usize,
+    cause: &str,
+    retryable: bool,
+) -> AccessFailure {
+    AccessFailure::new(
+        code,
+        format!(
+            "http_status={}; content_type={}; response_wire_bytes={}; response_entity_bytes={}; body_diagnostic={}; wire_body_diagnostic={}; request_bytes={request_bytes}; failure={}",
+            status.map_or_else(|| "none".into(), |status| status.to_string()),
+            content_type.map_or_else(|| "none".into(), |value| safe_diagnostic(value.as_bytes())),
+            wire_body.len(),
+            entity_body.len(),
+            safe_diagnostic(entity_body),
+            safe_diagnostic(wire_body),
+            safe_diagnostic(cause.as_bytes())
+        ),
+        retryable,
+    )
+}
+
+fn decode_response_body(headers: &str, wire_body: &[u8]) -> Result<Vec<u8>, String> {
+    if transfer_encoding_is_chunked(headers) {
+        decode_chunked_body(wire_body)
+    } else {
+        Ok(wire_body.to_vec())
+    }
+}
+
+fn transfer_encoding_is_chunked(headers: &str) -> bool {
+    headers
+        .lines()
+        .skip(1)
+        .filter_map(|line| line.split_once(':'))
+        .any(|(name, value)| {
+            name.eq_ignore_ascii_case("transfer-encoding")
+                && value
+                    .split(',')
+                    .any(|encoding| encoding.trim().eq_ignore_ascii_case("chunked"))
+        })
+}
+
+fn decode_chunked_body(wire_body: &[u8]) -> Result<Vec<u8>, String> {
+    let mut cursor = 0usize;
+    let mut entity_body = Vec::new();
+
+    loop {
+        let size_line_end =
+            find_crlf(wire_body, cursor).ok_or_else(|| "truncated chunk-size line".to_string())?;
+        let size_line = &wire_body[cursor..size_line_end];
+        cursor = size_line_end + 2;
+        let size_token = size_line
+            .split(|byte| *byte == b';')
+            .next()
+            .unwrap_or_default();
+        let chunk_size = parse_hex_chunk_size(size_token)?;
+
+        if chunk_size == 0 {
+            loop {
+                let trailer_end = find_crlf(wire_body, cursor)
+                    .ok_or_else(|| "truncated chunk trailer section".to_string())?;
+                let trailer = &wire_body[cursor..trailer_end];
+                cursor = trailer_end + 2;
+                if trailer.is_empty() {
+                    if cursor != wire_body.len() {
+                        return Err("bytes follow the terminating chunk trailers".into());
+                    }
+                    return Ok(entity_body);
+                }
+                validate_trailer_field(trailer)?;
+            }
+        }
+
+        let chunk_end = cursor
+            .checked_add(chunk_size)
+            .ok_or_else(|| "chunk size overflows response bounds".to_string())?;
+        if chunk_end > wire_body.len() {
+            return Err("truncated chunk data".into());
+        }
+        entity_body.extend_from_slice(&wire_body[cursor..chunk_end]);
+        cursor = chunk_end;
+        if wire_body.get(cursor..cursor + 2) != Some(b"\r\n") {
+            return Err("chunk data is not followed by CRLF".into());
+        }
+        cursor += 2;
+    }
+}
+
+fn find_crlf(bytes: &[u8], start: usize) -> Option<usize> {
+    bytes
+        .get(start..)?
+        .windows(2)
+        .position(|window| window == b"\r\n")
+        .map(|offset| start + offset)
+}
+
+fn parse_hex_chunk_size(bytes: &[u8]) -> Result<usize, String> {
+    if bytes.is_empty() {
+        return Err("empty chunk size".into());
+    }
+    let mut size = 0usize;
+    for byte in bytes {
+        let digit = match byte {
+            b'0'..=b'9' => byte - b'0',
+            b'a'..=b'f' => byte - b'a' + 10,
+            b'A'..=b'F' => byte - b'A' + 10,
+            _ => return Err("malformed hexadecimal chunk size".into()),
+        } as usize;
+        size = size
+            .checked_mul(16)
+            .and_then(|size| size.checked_add(digit))
+            .ok_or_else(|| "chunk size overflows usize".to_string())?;
+    }
+    Ok(size)
+}
+
+fn validate_trailer_field(trailer: &[u8]) -> Result<(), String> {
+    let Some(colon) = trailer.iter().position(|byte| *byte == b':') else {
+        return Err("malformed chunk trailer field".into());
+    };
+    if colon == 0 || !trailer[..colon].iter().copied().all(is_http_token_byte) {
+        return Err("malformed chunk trailer field name".into());
+    }
+    Ok(())
+}
+
+fn is_http_token_byte(byte: u8) -> bool {
+    matches!(
+        byte,
+        b'0'..=b'9'
+            | b'a'..=b'z'
+            | b'A'..=b'Z'
+            | b'!'
+            | b'#'
+            | b'$'
+            | b'%'
+            | b'&'
+            | b'\''
+            | b'*'
+            | b'+'
+            | b'-'
+            | b'.'
+            | b'^'
+            | b'_'
+            | b'`'
+            | b'|'
+            | b'~'
+    )
+}
+
+fn safe_diagnostic(bytes: &[u8]) -> String {
+    const MAX_DIAGNOSTIC_BYTES: usize = 512;
+    let mut diagnostic = String::new();
+    for byte in bytes.iter().copied().take(MAX_DIAGNOSTIC_BYTES) {
+        match byte {
+            b'\r' => diagnostic.push_str("\\r"),
+            b'\n' => diagnostic.push_str("\\n"),
+            b'\t' => diagnostic.push_str("\\t"),
+            0x20..=0x7e => diagnostic.push(byte as char),
+            byte => diagnostic.push_str(&format!("\\x{byte:02x}")),
+        }
+    }
+    if bytes.is_empty() {
+        diagnostic.push_str("<empty>");
+    } else if bytes.len() > MAX_DIAGNOSTIC_BYTES {
+        diagnostic.push_str("...(truncated)");
+    }
+    diagnostic
 }
 
 impl EmbeddingProvider for OllamaEmbeddingProvider {
@@ -1804,7 +2255,42 @@ impl EmbeddingProvider for OllamaEmbeddingProvider {
     }
 
     fn embed(&self, inputs: &[String]) -> Result<Vec<Vec<f32>>, AccessFailure> {
-        let response = self.request("POST", "/api/embed", Some(&serde_json::json!({ "model": self.requested_model, "input": inputs, "truncate": false })))?;
+        if inputs.len() != 1 {
+            return Err(AccessFailure::new(
+                "provider_request_shape",
+                format!(
+                    "Ollama /api/embed requires exactly one input per request; \
+                     received_inputs={}",
+                    inputs.len()
+                ),
+                false,
+            ));
+        }
+        let request_body = serde_json::json!({
+            "model": self.requested_model,
+            "input": &inputs[0],
+            "truncate": false
+        });
+        let input_count = inputs.len();
+        let total_input_bytes = inputs.iter().map(String::len).sum::<usize>();
+        let max_input_bytes = inputs.iter().map(String::len).max().unwrap_or(0);
+        let response = self
+            .request("POST", "/api/embed", Some(&request_body))
+            .map_err(|mut failure| {
+                if failure.code == "provider_http_error"
+                    && failure
+                        .message
+                        .to_ascii_lowercase()
+                        .contains("the input length exceeds the context length")
+                {
+                    failure.code = "provider_capacity_exceeded".into();
+                }
+                failure.message = format!(
+                    "{}; input_count={input_count}; total_input_bytes={total_input_bytes}; max_input_bytes={max_input_bytes}",
+                    failure.message
+                );
+                failure
+            })?;
         let embeddings = response
             .get("embeddings")
             .and_then(Value::as_array)
@@ -1815,6 +2301,16 @@ impl EmbeddingProvider for OllamaEmbeddingProvider {
                     false,
                 )
             })?;
+        if embeddings.len() != 1 {
+            return Err(AccessFailure::new(
+                "provider_response_shape",
+                format!(
+                    "Ollama /api/embed returned {} embeddings for one input",
+                    embeddings.len()
+                ),
+                false,
+            ));
+        }
         embeddings
             .iter()
             .map(|embedding| {
@@ -1823,5 +2319,364 @@ impl EmbeddingProvider for OllamaEmbeddingProvider {
                 })
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod transport_tests {
+    use super::{EmbeddingProvider, OllamaEmbeddingProvider, VECTOR_MODEL, decode_response_body};
+    use serde_json::Value;
+    use std::{
+        io::{Read, Write},
+        net::TcpListener,
+        thread,
+    };
+
+    const CHUNKED_HEADERS: &str =
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Type: application/json\r\n";
+
+    #[test]
+    fn decodes_valid_single_chunk_json_and_detects_headers_case_insensitively() {
+        let wire = b"7\r\n{\"a\":1}\r\n0\r\n\r\n";
+        assert_eq!(
+            decode_response_body("HTTP/1.1 200 OK\r\ntRaNsFeR-EnCoDiNg: ChUnKeD\r\n", wire)
+                .unwrap(),
+            br#"{"a":1}"#
+        );
+    }
+
+    #[test]
+    fn decodes_multi_chunk_json_split_inside_json_token() {
+        let wire = b"3\r\n{\"a\r\n4\r\n\":1}\r\n0\r\n\r\n";
+        assert_eq!(
+            decode_response_body(CHUNKED_HEADERS, wire).unwrap(),
+            br#"{"a":1}"#
+        );
+    }
+
+    #[test]
+    fn accepts_uppercase_and_lowercase_hexadecimal_chunk_sizes() {
+        let uppercase = b"A\r\n0123456789\r\n0\r\n\r\n";
+        let lowercase = b"a\r\n0123456789\r\n0\r\n\r\n";
+        assert_eq!(
+            decode_response_body(CHUNKED_HEADERS, uppercase).unwrap(),
+            b"0123456789"
+        );
+        assert_eq!(
+            decode_response_body(CHUNKED_HEADERS, lowercase).unwrap(),
+            b"0123456789"
+        );
+    }
+
+    #[test]
+    fn ignores_chunk_extensions() {
+        let wire = b"7;foo=bar\r\n{\"a\":1}\r\n0;done=yes\r\n\r\n";
+        assert_eq!(
+            decode_response_body(CHUNKED_HEADERS, wire).unwrap(),
+            br#"{"a":1}"#
+        );
+    }
+
+    #[test]
+    fn consumes_legal_trailers_after_terminal_chunk() {
+        let wire = b"3\r\nabc\r\n0\r\nX-Trace: yes\r\nAnother: value\r\n\r\n";
+        assert_eq!(decode_response_body(CHUNKED_HEADERS, wire).unwrap(), b"abc");
+    }
+
+    #[test]
+    fn rejects_malformed_chunk_size() {
+        let wire = b"g\r\nabc\r\n0\r\n\r\n";
+        let error = decode_response_body(CHUNKED_HEADERS, wire).unwrap_err();
+        assert!(error.contains("hexadecimal chunk size"));
+    }
+
+    #[test]
+    fn rejects_truncated_chunk_data() {
+        let wire = b"5\r\nabc";
+        let error = decode_response_body(CHUNKED_HEADERS, wire).unwrap_err();
+        assert!(error.contains("truncated chunk data"));
+    }
+
+    #[test]
+    fn rejects_missing_terminal_zero_chunk() {
+        let wire = b"3\r\nabc\r\n";
+        let error = decode_response_body(CHUNKED_HEADERS, wire).unwrap_err();
+        assert!(error.contains("chunk-size line"));
+    }
+
+    #[test]
+    fn preserves_non_chunked_content_length_body() {
+        let wire = br#"{"a":1}"#;
+        assert_eq!(
+            decode_response_body(
+                "HTTP/1.1 200 OK\r\nContent-Length: 7\r\nContent-Type: application/json\r\n",
+                wire
+            )
+            .unwrap(),
+            wire
+        );
+    }
+
+    #[test]
+    fn ollama_embed_uses_one_scalar_input_and_keeps_truncation_disabled() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("test listener binds");
+        let address = listener.local_addr().expect("test listener has address");
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("provider request arrives");
+            let mut request = Vec::new();
+            let header_end = loop {
+                let mut buffer = [0u8; 4096];
+                let count = stream.read(&mut buffer).expect("request reads");
+                assert!(count > 0, "request ended before headers");
+                request.extend_from_slice(&buffer[..count]);
+                if let Some(end) = request.windows(4).position(|window| window == b"\r\n\r\n") {
+                    break end;
+                }
+            };
+            let headers = std::str::from_utf8(&request[..header_end]).expect("headers are UTF-8");
+            let content_length = headers
+                .lines()
+                .find_map(|line| {
+                    let (name, value) = line.split_once(':')?;
+                    name.eq_ignore_ascii_case("content-length").then(|| {
+                        value
+                            .trim()
+                            .parse::<usize>()
+                            .expect("content length parses")
+                    })
+                })
+                .expect("content length is present");
+            let body_start = header_end + 4;
+            while request.len() < body_start + content_length {
+                let mut buffer = [0u8; 4096];
+                let count = stream.read(&mut buffer).expect("request body reads");
+                assert!(count > 0, "request ended before body");
+                request.extend_from_slice(&buffer[..count]);
+            }
+            let body: Value =
+                serde_json::from_slice(&request[body_start..body_start + content_length])
+                    .expect("request body is JSON");
+            assert_eq!(body["model"], VECTOR_MODEL);
+            assert_eq!(body["input"], "transport test input");
+            assert_eq!(body["truncate"], false);
+            let response = br#"{"embeddings":[[1.0,0.0]]}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                response.len()
+            )
+            .expect("response headers write");
+            stream.write_all(response).expect("response body write");
+        });
+
+        let provider = OllamaEmbeddingProvider {
+            endpoint: format!("http://{}", address),
+            requested_model: VECTOR_MODEL.into(),
+            dimension: 2,
+        };
+        let embeddings = provider
+            .embed(&["transport test input".into()])
+            .expect("one-input embedding succeeds");
+        assert_eq!(embeddings, vec![vec![1.0, 0.0]]);
+        server.join().expect("test provider exits");
+    }
+}
+
+#[cfg(test)]
+mod vector_segmentation_tests {
+    use super::{
+        AccessFailure, EmbeddingProvider, HydratedUnitText, ProviderVectorSegment,
+        VectorProviderContract, VectorProviderIdentity, build_vector_index, segment_and_embed,
+    };
+    use std::sync::{Arc, Mutex};
+
+    struct CapacityProvider {
+        max_bytes: usize,
+        non_capacity_failure: bool,
+        calls: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl CapacityProvider {
+        fn new(max_bytes: usize) -> Self {
+            Self {
+                max_bytes,
+                non_capacity_failure: false,
+                calls: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+
+        fn with_non_capacity_failure() -> Self {
+            Self {
+                max_bytes: usize::MAX,
+                non_capacity_failure: true,
+                calls: Arc::new(Mutex::new(Vec::new())),
+            }
+        }
+
+        fn identity_value(&self) -> VectorProviderIdentity {
+            VectorProviderIdentity {
+                contract: VectorProviderContract {
+                    provider: "test".into(),
+                    requested_model: "test-model".into(),
+                    dimension: 2,
+                    dtype: "float32".into(),
+                    normalization: "L2".into(),
+                    similarity: "cosine".into(),
+                    truncation: "disabled".into(),
+                },
+                endpoint: "test://capacity".into(),
+                resolved_model: "test-model@fixed".into(),
+                model_digest: "sha256:capacity".into(),
+                max_input_chars: None,
+            }
+        }
+    }
+
+    impl EmbeddingProvider for CapacityProvider {
+        fn identity(&self) -> Result<VectorProviderIdentity, AccessFailure> {
+            Ok(self.identity_value())
+        }
+
+        fn embed(&self, inputs: &[String]) -> Result<Vec<Vec<f32>>, AccessFailure> {
+            assert_eq!(inputs.len(), 1);
+            let input = inputs[0].clone();
+            self.calls
+                .lock()
+                .expect("capacity calls are not poisoned")
+                .push(input.clone());
+            if self.non_capacity_failure {
+                return Err(AccessFailure {
+                    code: "provider_http_error".into(),
+                    message: "HTTP 500 provider failure".into(),
+                    retryable: true,
+                });
+            }
+            if input.len() > self.max_bytes {
+                return Err(AccessFailure {
+                    code: "provider_capacity_exceeded".into(),
+                    message: "the input length exceeds the context length".into(),
+                    retryable: false,
+                });
+            }
+            Ok(vec![vec![input.len() as f32, 1.0]])
+        }
+    }
+
+    fn texts(segments: &[ProviderVectorSegment]) -> Vec<&str> {
+        segments
+            .iter()
+            .map(|segment| segment.text.as_str())
+            .collect()
+    }
+
+    #[test]
+    fn whole_input_acceptance_uses_one_provider_request() {
+        let provider = CapacityProvider::new(100);
+        let segments = segment_and_embed(&provider, "whole unit", 2).expect("whole input accepts");
+        assert_eq!(texts(&segments), vec!["whole unit"]);
+        assert_eq!(
+            provider
+                .calls
+                .lock()
+                .expect("calls are not poisoned")
+                .as_slice(),
+            ["whole unit"]
+        );
+    }
+
+    #[test]
+    fn capacity_rejection_activates_newline_preference() {
+        let provider = CapacityProvider::new(8);
+        let segments = segment_and_embed(&provider, "aa\nbbbb cc", 2).expect("splits");
+        assert_eq!(texts(&segments), vec!["aa\n", "bbbb cc"]);
+    }
+
+    #[test]
+    fn whitespace_is_used_when_no_newline_boundary_exists() {
+        let provider = CapacityProvider::new(5);
+        let segments = segment_and_embed(&provider, "aaaa bbbb", 2).expect("splits");
+        assert_eq!(texts(&segments), vec!["aaaa ", "bbbb"]);
+    }
+
+    #[test]
+    fn unicode_code_point_fallback_is_used_without_whitespace() {
+        let provider = CapacityProvider::new(3);
+        let segments = segment_and_embed(&provider, "abcdef", 2).expect("splits");
+        assert_eq!(texts(&segments), vec!["abc", "def"]);
+    }
+
+    #[test]
+    fn segmentation_reconstructs_exact_input_without_overlap() {
+        let provider = CapacityProvider::new(5);
+        let input = "one two three";
+        let segments = segment_and_embed(&provider, input, 2).expect("splits");
+        assert_eq!(
+            segments
+                .iter()
+                .map(|segment| segment.text.as_str())
+                .collect::<String>(),
+            input
+        );
+    }
+
+    #[test]
+    fn non_capacity_provider_failure_does_not_activate_segmentation() {
+        let provider = CapacityProvider::with_non_capacity_failure();
+        let error = segment_and_embed(&provider, "provider failure", 2).unwrap_err();
+        assert_eq!(error.code, "provider_http_error");
+        assert_eq!(
+            provider.calls.lock().expect("calls are not poisoned").len(),
+            1
+        );
+    }
+
+    #[test]
+    fn oversized_real_shaped_unit_splits_at_provider_capacity() {
+        let provider = CapacityProvider::new(24_000);
+        let input = format!("{}\n{}", "a".repeat(23_999), "b".repeat(767));
+        assert_eq!(input.len(), 24_767);
+        let segments = segment_and_embed(&provider, &input, 2).expect("oversized input splits");
+        assert_eq!(
+            segments
+                .iter()
+                .map(|segment| segment.text.len())
+                .collect::<Vec<_>>(),
+            vec![24_000, 767]
+        );
+        assert_eq!(
+            segments
+                .iter()
+                .map(|segment| segment.text.as_str())
+                .collect::<String>(),
+            input
+        );
+    }
+
+    #[test]
+    fn segment_ordinals_are_dense_and_parented_to_one_unit() {
+        let provider = CapacityProvider::new(5);
+        let unit_id =
+            crate::model::SemanticUnitId::parse("unit:test:oversized").expect("unit identity");
+        let vector = build_vector_index(
+            &[HydratedUnitText {
+                unit_id: unit_id.clone(),
+                raw: "aaaa bbbb".into(),
+                lexical: "aaaa bbbb".into(),
+            }],
+            Some(&provider),
+        );
+        assert_eq!(
+            vector
+                .segments
+                .iter()
+                .map(|segment| segment.segment_ordinal)
+                .collect::<Vec<_>>(),
+            vec![0, 1]
+        );
+        assert!(
+            vector.segments.iter().all(|segment| {
+                segment.parent_unit_id == unit_id && segment.total_segments == 2
+            })
+        );
     }
 }
