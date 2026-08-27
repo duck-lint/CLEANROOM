@@ -7,6 +7,7 @@
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::{error::Error, fmt};
 
 use crate::{
     model::{
@@ -694,3 +695,11 @@ pub enum ProjectionActivationViolation {
     },
     CountOverflow,
 }
+
+impl fmt::Display for ProjectionActivationViolation {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "projection activation violation: {self:?}")
+    }
+}
+
+impl Error for ProjectionActivationViolation {}

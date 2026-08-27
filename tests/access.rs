@@ -287,13 +287,15 @@ enum ProviderResponseMode {
 }
 
 struct RecordingEmbeddingProvider {
-    calls: Arc<Mutex<Vec<(usize, Vec<String>)>>>,
+    calls: Arc<Mutex<ProviderCalls>>,
     completions: Arc<Mutex<Vec<String>>>,
     call_number: AtomicUsize,
     completion_barrier: Option<Arc<Barrier>>,
     max_input_chars: Option<usize>,
     response_mode: ProviderResponseMode,
 }
+
+type ProviderCalls = Vec<(usize, Vec<String>)>;
 
 impl RecordingEmbeddingProvider {
     fn new(
@@ -342,12 +344,12 @@ impl EmbeddingProvider for RecordingEmbeddingProvider {
             .expect("call log is not poisoned")
             .push((call_number, inputs.to_vec()));
         let input = inputs.first().cloned().unwrap_or_default();
-        if let Some(barrier) = &self.completion_barrier {
-            if call_number < 2 {
-                barrier.wait();
-                if call_number == 0 {
-                    thread::sleep(Duration::from_millis(30));
-                }
+        if let Some(barrier) = &self.completion_barrier
+            && call_number < 2
+        {
+            barrier.wait();
+            if call_number == 0 {
+                thread::sleep(Duration::from_millis(30));
             }
         }
         self.completions

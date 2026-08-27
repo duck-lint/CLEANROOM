@@ -193,7 +193,7 @@ pub fn sha256(bytes: &[u8]) -> String {
         data.push(0);
     }
     data.extend_from_slice(&bit_len.to_be_bytes());
-    for chunk in data.chunks_exact(64) {
+    for chunk in data.as_chunks::<64>().0 {
         let mut w = [0u32; 64];
         for (i, word) in w[..16].iter_mut().enumerate() {
             *word = u32::from_be_bytes(chunk[i * 4..i * 4 + 4].try_into().unwrap());
@@ -1805,15 +1805,15 @@ pub fn construct(observation_path: &Path, output_path: &Path) -> Result<Value, C
                 .to_string(),
                 "unit identity",
             )?;
-            if let Some(source_span) = source_span.clone() {
-                if let (Some(start), Some(end)) = (source_span.start_byte, source_span.end_byte) {
-                    unit_by_object_block_span
-                        .entry(oid.to_string())
-                        .or_default()
-                        .entry((start, end))
-                        .or_default()
-                        .push(unit_id.clone());
-                }
+            if let Some(source_span) = source_span.clone()
+                && let (Some(start), Some(end)) = (source_span.start_byte, source_span.end_byte)
+            {
+                unit_by_object_block_span
+                    .entry(oid.to_string())
+                    .or_default()
+                    .entry((start, end))
+                    .or_default()
+                    .push(unit_id.clone());
             }
             local_units.push(unit_id.clone());
             for block_id in array(&block, "explicit_block_ids") {
