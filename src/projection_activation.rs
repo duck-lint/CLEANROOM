@@ -1855,10 +1855,10 @@ fn add_visible_context_edges(
                 target: graph_edge.target.clone(),
             },
             Direction::Incoming => EdgeTuple {
-                source: graph_edge.target.clone(),
+                source: graph_edge.source.clone(),
                 transition_id: graph_edge.transition_id.clone(),
                 direction: Direction::Incoming,
-                target: graph_edge.source.clone(),
+                target: graph_edge.target.clone(),
             },
         };
         if edge.source.kind() == AddressKind::RetrievalSurface
@@ -2171,10 +2171,8 @@ fn validate_probe_result(
             let edge_exists = access.artifacts.graph.edges.iter().any(|edge| {
                 edge.direction == *direction
                     && edge.transition_id == *transition_id
-                    && ((edge.source == *seed && edge.target == candidate.identity)
-                        || (*direction == Direction::Incoming
-                            && edge.target == *seed
-                            && edge.source == candidate.identity))
+                    && edge.source == *seed
+                    && edge.target == candidate.identity
             });
             if !edge_exists {
                 return Err(fail(

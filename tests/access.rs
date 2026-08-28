@@ -22,7 +22,9 @@ use semantic_traversal_core::{
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use support::synthetic_projection::{JOURNAL_ONE_OBJECT, object, tiny_projection};
+use support::synthetic_projection::{
+    JOURNAL_ONE_OBJECT, MARX_OBJECT, object, region, tiny_projection,
+};
 
 fn bind_logical_hash(mut projection: SemanticSpaceProjection) -> SemanticSpaceProjection {
     projection.logical_hash.clear();
@@ -201,6 +203,61 @@ fn synthetic_access_builds_and_executes_all_five_surfaces() {
         vector.failure.as_ref().map(|failure| failure.code.as_str()),
         Some("provider_not_configured")
     );
+}
+
+#[test]
+fn graph_incidence_preserves_directional_reverse_records() {
+    let projection = bind_logical_hash(tiny_projection());
+    let artifacts =
+        build_projection_access_artifacts(&projection, None, None).expect("access builds");
+    let marx = object(MARX_OBJECT);
+    let marx_address = SemanticAddress::Object(marx.clone());
+    let marx_region_address = region(&marx, "heading:Chapter 2");
+    let graph_probe = |seed, direction| {
+        artifacts
+            .probe(
+                &projection,
+                &probe(
+                    &projection,
+                    "surface:graph",
+                    semantic_traversal_core::model::RetrievalSurfaceKind::Graph,
+                    semantic_traversal_core::projection::SurfaceMatchMode::Incidence,
+                    AccessOperand::Graph {
+                        seed,
+                        direction,
+                        transition_ids: vec!["transition:object-region".into()],
+                    },
+                    10,
+                ),
+            )
+            .expect("graph probe executes")
+    };
+
+    let outgoing = graph_probe(marx_address.clone(), Direction::Outgoing);
+    assert_eq!(
+        outgoing
+            .candidates
+            .iter()
+            .map(|candidate| candidate.identity.clone())
+            .collect::<Vec<_>>(),
+        vec![SemanticAddress::Region(marx_region_address.clone())]
+    );
+
+    let incoming = graph_probe(
+        SemanticAddress::Region(marx_region_address.clone()),
+        Direction::Incoming,
+    );
+    assert_eq!(
+        incoming
+            .candidates
+            .iter()
+            .map(|candidate| candidate.identity.clone())
+            .collect::<Vec<_>>(),
+        vec![marx_address.clone()]
+    );
+
+    let opposite_endpoint = graph_probe(marx_address, Direction::Incoming);
+    assert!(opposite_endpoint.candidates.is_empty());
 }
 
 #[test]

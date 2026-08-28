@@ -16,7 +16,7 @@ use semantic_traversal_core::{
         ProjectionActivationConfig, ProjectionActivationSurfaceConfig,
         ProjectionActivationViolation, TruncationState,
     },
-    model::RetrievalSurfaceKind,
+    model::{Direction, RetrievalSurfaceKind, SemanticAddress},
     problem_space::{
         ActivationBand, AttentionLens, ProblemRegion, ProblemSpaceState, RegionPersistenceState,
         SourceTurnRange,
@@ -24,7 +24,7 @@ use semantic_traversal_core::{
     projection::SemanticSpaceProjection,
 };
 use sha2::{Digest, Sha256};
-use support::synthetic_projection::{occurrence, tiny_projection, unit};
+use support::synthetic_projection::{MARX_OBJECT, object, occurrence, tiny_projection, unit};
 
 fn bind_logical_hash(mut projection: SemanticSpaceProjection) -> SemanticSpaceProjection {
     projection.logical_hash.clear();
@@ -366,4 +366,48 @@ fn synthetic_mechanical_activation_applies_structural_preview_bounds() {
             .iter()
             .all(|record| record.visible_unit_ids.len() <= 1)
     );
+}
+
+#[test]
+fn synthetic_mechanical_activation_preserves_incoming_edge_orientation() {
+    let projection = bind_logical_hash(tiny_projection());
+    let artifacts =
+        build_projection_access_artifacts(&projection, None, None).expect("access builds");
+    let access = ProjectionActivationAccess::new(&artifacts);
+
+    let activated = activate_projection(
+        &projection,
+        &problem_space(),
+        &utterance("Capital"),
+        &config(0, 4, 0, 16, 0),
+        &access,
+    )
+    .expect("incoming activation succeeds");
+
+    let marx = SemanticAddress::Object(object(MARX_OBJECT));
+    let capital_occurrence =
+        SemanticAddress::Occurrence(occurrence("occurrence:journal-one:capital-object"));
+    let expected = activated
+        .edges
+        .iter()
+        .find(|edge| {
+            edge.source == marx
+                && edge.target == capital_occurrence
+                && edge.direction == Direction::Incoming
+                && edge.transition_id == "transition:object-occurrence-incoming"
+        })
+        .expect("represented incoming edge is visible in its stored orientation");
+    assert!(
+        expected
+            .activation_provenance
+            .contains(&ActivationProvenance::ConfiguredDefault {
+                configuration_key: "bounded_structural_context".into(),
+            })
+    );
+    assert!(!activated.edges.iter().any(|edge| {
+        edge.source == capital_occurrence
+            && edge.target == marx
+            && edge.direction == Direction::Incoming
+            && edge.transition_id == "transition:object-occurrence-incoming"
+    }));
 }

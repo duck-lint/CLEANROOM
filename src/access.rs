@@ -523,14 +523,12 @@ impl ProjectionAccessArtifacts {
                     && (transition_ids.is_empty() || transition_ids.contains(&edge.transition_id))
                     && match direction {
                         Direction::Outgoing => edge.source == *seed,
-                        Direction::Incoming => edge.source == *seed || edge.target == *seed,
+                        Direction::Incoming => edge.source == *seed,
                     }
             })
             .map(|edge| AccessCandidate {
                 identity: match direction {
-                    Direction::Outgoing => edge.target.clone(),
-                    Direction::Incoming if edge.source == *seed => edge.target.clone(),
-                    Direction::Incoming => edge.source.clone(),
+                    Direction::Outgoing | Direction::Incoming => edge.target.clone(),
                 },
                 order: 0,
                 mechanical_score: None,
