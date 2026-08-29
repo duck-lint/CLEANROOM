@@ -13,7 +13,7 @@ use std::{
 
 use semantic_traversal_core::{
     access::{
-        AccessFailure, AccessOperand, EmbeddingProvider, ProjectionAccessArtifacts,
+        AccessError, AccessFailure, AccessOperand, EmbeddingProvider, ProjectionAccessArtifacts,
         TemporalPrecision, TemporalQuery, VectorProviderContract, VectorProviderIdentity,
         VectorProviderState, build_projection_access_artifacts,
     },
@@ -213,7 +213,7 @@ fn graph_incidence_preserves_directional_reverse_records() {
     let marx = object(MARX_OBJECT);
     let marx_address = SemanticAddress::Object(marx.clone());
     let marx_region_address = region(&marx, "heading:Chapter 2");
-    let graph_probe = |seed, direction| {
+    let graph_probe = |seed, direction, transition_ids| {
         artifacts
             .probe(
                 &projection,
@@ -225,7 +225,7 @@ fn graph_incidence_preserves_directional_reverse_records() {
                     AccessOperand::Graph {
                         seed,
                         direction,
-                        transition_ids: vec!["transition:object-region".into()],
+                        transition_ids,
                     },
                     10,
                 ),
@@ -233,7 +233,11 @@ fn graph_incidence_preserves_directional_reverse_records() {
             .expect("graph probe executes")
     };
 
-    let outgoing = graph_probe(marx_address.clone(), Direction::Outgoing);
+    let outgoing = graph_probe(
+        marx_address.clone(),
+        Direction::Outgoing,
+        vec!["transition:object-region".into()],
+    );
     assert_eq!(
         outgoing
             .candidates
@@ -246,6 +250,7 @@ fn graph_incidence_preserves_directional_reverse_records() {
     let incoming = graph_probe(
         SemanticAddress::Region(marx_region_address.clone()),
         Direction::Incoming,
+        vec!["transition:object-region".into()],
     );
     assert_eq!(
         incoming
@@ -256,8 +261,39 @@ fn graph_incidence_preserves_directional_reverse_records() {
         vec![marx_address.clone()]
     );
 
-    let opposite_endpoint = graph_probe(marx_address, Direction::Incoming);
+    let opposite_endpoint = graph_probe(
+        marx_address.clone(),
+        Direction::Incoming,
+        vec!["transition:object-region".into()],
+    );
     assert!(opposite_endpoint.candidates.is_empty());
+
+    assert!(!artifacts.graph.edges.iter().any(|edge| {
+        edge.direction == Direction::Incoming
+            && edge.source == SemanticAddress::Region(marx_region_address.clone())
+            && edge.target == marx_address
+            && edge.transition_id == "transition:unit-region"
+    }));
+
+    let incoming_edges = artifacts
+        .graph
+        .edges
+        .iter()
+        .filter(|edge| edge.direction == Direction::Incoming)
+        .cloned()
+        .collect::<Vec<_>>();
+    assert!(incoming_edges.len() > 1);
+    for edge in incoming_edges {
+        let result = graph_probe(
+            edge.source.clone(),
+            Direction::Incoming,
+            vec![edge.transition_id.clone()],
+        );
+        assert!(result.candidates.iter().any(|candidate| {
+            candidate.identity == edge.target
+                && candidate.transition_id.as_deref() == Some(edge.transition_id.as_str())
+        }));
+    }
 }
 
 #[test]
@@ -277,12 +313,57 @@ fn lexical_paging_is_deterministic_and_zero_results_are_valid() {
         .probe(&projection, &first_probe)
         .expect("first page executes");
     assert!(first.truncated);
-    let mut second_probe = first_probe.clone();
-    second_probe.cursor = first.continuation.map(|continuation| continuation.cursor);
-    let second = artifacts
-        .probe(&projection, &second_probe)
-        .expect("continuation executes");
-    assert_ne!(first.candidates[0].identity, second.candidates[0].identity);
+    let first_cursor = first
+        .continuation
+        .as_ref()
+        .expect("first page has continuation")
+        .cursor
+        .clone();
+
+    let paginate = |initial: &semantic_traversal_core::access::ProjectionAccessProbe| {
+        let mut request = initial.clone();
+        let mut sequence = Vec::new();
+        let mut seen = Vec::new();
+        let total = loop {
+            let result = artifacts
+                .probe(&projection, &request)
+                .expect("page executes");
+            assert!(result.candidates.iter().all(|candidate| {
+                if seen.contains(&candidate.identity) {
+                    false
+                } else {
+                    seen.push(candidate.identity.clone());
+                    true
+                }
+            }));
+            sequence.extend(
+                result
+                    .candidates
+                    .into_iter()
+                    .map(|candidate| candidate.identity),
+            );
+            let Some(continuation) = result.continuation else {
+                assert!(!result.truncated);
+                break result.total_candidate_count;
+            };
+            assert!(result.truncated);
+            request.cursor = Some(continuation.cursor);
+        };
+        assert_eq!(total, Some(sequence.len()));
+        sequence
+    };
+
+    let first_sequence = paginate(&first_probe);
+    let second_sequence = paginate(&first_probe);
+    assert_eq!(first_sequence, second_sequence);
+
+    let mut changed_probe = first_probe.clone();
+    changed_probe.operand = AccessOperand::LexicalTerms(vec!["capital".into()]);
+    changed_probe.cursor = Some(first_cursor);
+    assert!(matches!(
+        artifacts.probe(&projection, &changed_probe),
+        Err(AccessError::Probe(message)) if message == "continuation cursor belongs to another probe"
+    ));
 
     let zero = artifacts
         .probe(

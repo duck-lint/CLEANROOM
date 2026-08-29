@@ -758,42 +758,44 @@ fn drain_queued_addresses(
                         }
                     }
                     (RetrievalSurfaceKind::Temporal, SurfaceMatchMode::Temporal) => {
-                        let Some(query) = temporal_query_for_address(projection, &item.address)
-                        else {
+                        let queries = temporal_queries_for_address(projection, &item.address);
+                        if queries.is_empty() {
                             continue;
-                        };
+                        }
                         let provenance =
                             with_default(item.provenance.clone(), "automatic_surface_fan_out");
                         let limit = surface_limit(config, &surface.surface_id, &item.band);
-                        if limit == 0 {
-                            record_zero_candidate_probe(
+                        for query in queries {
+                            if limit == 0 {
+                                record_zero_candidate_probe(
+                                    config,
+                                    work,
+                                    surface,
+                                    mode.clone(),
+                                    item.depth,
+                                    provenance.clone(),
+                                )?;
+                                continue;
+                            }
+                            execute_access_probe(
+                                projection,
+                                problem_space,
+                                utterance,
                                 config,
+                                access,
                                 work,
                                 surface,
                                 mode.clone(),
+                                AccessOperand::Temporal(query.clone()),
+                                limit,
                                 item.depth,
-                                provenance,
+                                provenance.clone(),
+                                ProbeOrigin::Temporal { query },
+                                item.band.clone(),
+                                item.region_id.clone(),
+                                None,
                             )?;
-                            continue;
                         }
-                        execute_access_probe(
-                            projection,
-                            problem_space,
-                            utterance,
-                            config,
-                            access,
-                            work,
-                            surface,
-                            mode.clone(),
-                            AccessOperand::Temporal(query),
-                            limit,
-                            item.depth,
-                            provenance,
-                            ProbeOrigin::Temporal,
-                            item.band.clone(),
-                            item.region_id.clone(),
-                            None,
-                        )?;
                     }
                     _ => {}
                 }
@@ -809,7 +811,9 @@ enum ProbeOrigin {
         subject: SemanticAddress,
         direction: Direction,
     },
-    Temporal,
+    Temporal {
+        query: TemporalQuery,
+    },
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -837,7 +841,7 @@ fn execute_access_probe(
         ProbeOrigin::Structural { .. } => {
             band_config(config, &band).maximum_structural_neighbors_per_record
         }
-        ProbeOrigin::Text(_) | ProbeOrigin::Temporal => u32::MAX,
+        ProbeOrigin::Text(_) | ProbeOrigin::Temporal { .. } => u32::MAX,
     };
     let probe_limit = candidate_limit.min(structural_neighbor_limit);
     let high_degree = matches!(&origin, ProbeOrigin::Structural { subject, .. }
@@ -852,16 +856,18 @@ fn execute_access_probe(
         );
     }
     if probe_limit == 0 {
-        push_zero_candidate_telemetry(
-            config,
-            work,
-            surface,
-            match_mode,
-            depth,
-            telemetry_provenance,
-            probe_id,
-            telemetry_id,
-        );
+        if let Some(telemetry_id) = telemetry_id {
+            push_zero_candidate_telemetry(
+                config,
+                work,
+                surface,
+                match_mode,
+                depth,
+                telemetry_provenance,
+                probe_id,
+                telemetry_id,
+            );
+        }
         return Ok(());
     }
     let probe = ProjectionAccessProbe {
@@ -963,32 +969,39 @@ fn execute_access_probe(
     )?;
     let returned_count = u64::try_from(result.returned_count)
         .map_err(|_| ProjectionActivationViolation::CountOverflow)?;
-    work.telemetry.push(ProjectionTelemetry {
-        telemetry_id,
-        probe_id,
-        match_mode,
-        surface_kind: surface.kind.clone(),
-        surface_id: surface.surface_id.clone(),
-        candidate_count: access_candidate_count(&result)?,
-        current_depth: depth,
-        maximum_depth: config.maximum_initial_relation_depth,
-        returned_count,
-        remaining_expansion_budget: config.maximum_expansion_budget,
-        truncation_state: if bounded {
-            TruncationState::Bounded
-        } else {
-            TruncationState::Complete
-        },
-        identifier_type_distribution: identifier_type_distribution(projection, &result.candidates),
-        temporal_anchor_count: result
-            .candidates
-            .iter()
-            .filter(|candidate| matches!(candidate.identity, SemanticAddress::TemporalAnchor(_)))
-            .count() as u64,
-        unresolved_target_count: unresolved_target_count(projection, &result.candidates),
-        continuation_available,
-        activation_provenance: telemetry_provenance,
-    });
+    if let Some(telemetry_id) = telemetry_id {
+        work.telemetry.push(ProjectionTelemetry {
+            telemetry_id,
+            probe_id,
+            match_mode,
+            surface_kind: surface.kind.clone(),
+            surface_id: surface.surface_id.clone(),
+            candidate_count: access_candidate_count(&result)?,
+            current_depth: depth,
+            maximum_depth: config.maximum_initial_relation_depth,
+            returned_count,
+            remaining_expansion_budget: config.maximum_expansion_budget,
+            truncation_state: if bounded {
+                TruncationState::Bounded
+            } else {
+                TruncationState::Complete
+            },
+            identifier_type_distribution: identifier_type_distribution(
+                projection,
+                &result.candidates,
+            ),
+            temporal_anchor_count: result
+                .candidates
+                .iter()
+                .filter(|candidate| {
+                    matches!(candidate.identity, SemanticAddress::TemporalAnchor(_))
+                })
+                .count() as u64,
+            unresolved_target_count: unresolved_target_count(projection, &result.candidates),
+            continuation_available,
+            activation_provenance: telemetry_provenance,
+        });
+    }
     Ok(())
 }
 
@@ -1002,16 +1015,18 @@ fn record_zero_candidate_probe(
 ) -> Result<(), ProjectionActivationViolation> {
     let probe_id = next_id("activation-probe", &mut work.probe_counter)?;
     let telemetry_id = reserve_telemetry(config, work)?;
-    push_zero_candidate_telemetry(
-        config,
-        work,
-        surface,
-        match_mode,
-        depth,
-        provenance,
-        probe_id,
-        telemetry_id,
-    );
+    if let Some(telemetry_id) = telemetry_id {
+        push_zero_candidate_telemetry(
+            config,
+            work,
+            surface,
+            match_mode,
+            depth,
+            provenance,
+            probe_id,
+            telemetry_id,
+        );
+    }
     Ok(())
 }
 
@@ -1187,7 +1202,7 @@ fn enqueue_candidate_followups(
                 },
             );
         }
-        if temporal_query_for_address(projection, &context_address).is_some() {
+        if !temporal_queries_for_address(projection, &context_address).is_empty() {
             push_queued_address(
                 work,
                 QueuedAddress {
@@ -2019,10 +2034,10 @@ fn add_surface_continuation(
                 direction: Some(direction.clone()),
             }
         }
-        ProbeOrigin::Temporal => ContinuationOrigin::TemporalProbe {
-            start: None,
-            end: None,
-        },
+        ProbeOrigin::Temporal { query } => {
+            let (start, end) = temporal_query_bounds(query);
+            ContinuationOrigin::TemporalProbe { start, end }
+        }
     };
     work.handles.push(ContinuationHandle {
         handle_id,
@@ -2252,7 +2267,10 @@ fn unresolved_target_count(
 fn reserve_telemetry(
     config: &ProjectionActivationConfig,
     work: &mut Work,
-) -> Result<String, ProjectionActivationViolation> {
+) -> Result<Option<String>, ProjectionActivationViolation> {
+    if config.maximum_telemetry_records == 0 {
+        return Ok(None);
+    }
     let next = u64::try_from(work.telemetry.len())
         .map_err(|_| ProjectionActivationViolation::CountOverflow)?
         .checked_add(1)
@@ -2264,7 +2282,7 @@ fn reserve_telemetry(
             maximum: config.maximum_telemetry_records,
         });
     }
-    next_id("activation-telemetry", &mut work.telemetry_counter)
+    next_id("activation-telemetry", &mut work.telemetry_counter).map(Some)
 }
 
 fn mark_bounded_telemetry(work: &mut Work) {
@@ -2345,25 +2363,54 @@ fn lexical_terms(text: &str) -> Vec<String> {
     output
 }
 
-fn temporal_query_for_address(
+fn temporal_queries_for_address(
     projection: &SemanticSpaceProjection,
     address: &SemanticAddress,
-) -> Option<TemporalQuery> {
-    let value = match address {
-        SemanticAddress::TemporalAnchor(anchor_id) => projection
-            .temporal_anchors
-            .iter()
-            .find(|anchor| &anchor.anchor_id == anchor_id)
-            .map(|anchor| &anchor.value),
-        SemanticAddress::Object(_) | SemanticAddress::Unit(_) => projection
-            .temporal_anchors
-            .iter()
-            .find(|anchor| &anchor.subject == address)
-            .map(|anchor| &anchor.value),
-        _ => None,
-    }?;
-    let (precision, value) = temporal_value(value);
-    Some(TemporalQuery::Exact { precision, value })
+) -> Vec<TemporalQuery> {
+    projection
+        .temporal_anchors
+        .iter()
+        .filter(|anchor| match address {
+            SemanticAddress::TemporalAnchor(anchor_id) => &anchor.anchor_id == anchor_id,
+            SemanticAddress::Object(_) | SemanticAddress::Unit(_) => &anchor.subject == address,
+            _ => false,
+        })
+        .map(|anchor| {
+            let (precision, value) = temporal_value(&anchor.value);
+            TemporalQuery::Exact { precision, value }
+        })
+        .collect()
+}
+
+fn temporal_query_bounds(query: &TemporalQuery) -> (Option<TemporalValue>, Option<TemporalValue>) {
+    match query {
+        TemporalQuery::Exact { precision, value } => {
+            let value = temporal_value_from_parts(precision, value);
+            (Some(value.clone()), Some(value))
+        }
+        TemporalQuery::Range {
+            precision,
+            start,
+            end,
+        } => (
+            start
+                .as_ref()
+                .map(|value| temporal_value_from_parts(precision, value)),
+            end.as_ref()
+                .map(|value| temporal_value_from_parts(precision, value)),
+        ),
+        TemporalQuery::Ordered { .. } => (None, None),
+    }
+}
+
+fn temporal_value_from_parts(precision: &TemporalPrecision, value: &str) -> TemporalValue {
+    match precision {
+        TemporalPrecision::FullDate => TemporalValue::FullDate(value.into()),
+        TemporalPrecision::DateTime => TemporalValue::DateTime(value.into()),
+        TemporalPrecision::ExactYear => TemporalValue::ExactYear(value.parse().unwrap_or_default()),
+        TemporalPrecision::MonthDay => TemporalValue::MonthDay(value.into()),
+        TemporalPrecision::ApproximateYear => TemporalValue::ApproximateYear(value.into()),
+    }
 }
 
 fn temporal_value(value: &TemporalValue) -> (TemporalPrecision, String) {
