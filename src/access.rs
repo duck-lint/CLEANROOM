@@ -1058,12 +1058,6 @@ fn build_graph_index(projection: &SemanticSpaceProjection) -> Result<GraphIndex,
                 transition_id: "transition:object-region".into(),
                 direction: Direction::Outgoing,
             });
-            edges.push(GraphEdge {
-                source: SemanticAddress::Region(region.clone()),
-                target: object_address.clone(),
-                transition_id: "transition:unit-region".into(),
-                direction: Direction::Incoming,
-            });
         }
         for unit in &object.unit_ids {
             edges.push(GraphEdge {

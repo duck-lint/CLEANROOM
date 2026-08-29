@@ -21,11 +21,11 @@ use semantic_traversal_core::{
         ActivationBand, AttentionLens, ProblemRegion, ProblemSpaceState, RegionPersistenceState,
         SourceTurnRange,
     },
-    projection::SemanticSpaceProjection,
+    projection::{SemanticSpaceProjection, TemporalValue},
 };
 use sha2::{Digest, Sha256};
 use support::synthetic_projection::{
-    MARX_OBJECT, object, occurrence, region, tiny_projection, unit,
+    MARX_OBJECT, anchor, object, occurrence, region, tiny_projection, unit,
 };
 
 fn bind_logical_hash(mut projection: SemanticSpaceProjection) -> SemanticSpaceProjection {
@@ -177,6 +177,27 @@ fn utterance(text: &str) -> ActivationUtterance {
     }
 }
 
+fn projection_with_second_journal_anchor(value: TemporalValue) -> SemanticSpaceProjection {
+    let mut projection = tiny_projection();
+    let mut extra = projection.temporal_anchors[0].clone();
+    extra.anchor_id = anchor("anchor:journal-one:second");
+    extra.value = value;
+    let subject = extra.subject.clone();
+    let extra_id = extra.anchor_id.clone();
+    projection.temporal_anchors.push(extra);
+    let SemanticAddress::Object(object_id) = subject else {
+        panic!("fixture journal anchor has object subject");
+    };
+    projection
+        .objects
+        .iter_mut()
+        .find(|object| object.object_id == object_id)
+        .expect("fixture journal object exists")
+        .temporal_anchor_ids
+        .push(extra_id);
+    bind_logical_hash(projection)
+}
+
 #[test]
 fn synthetic_mechanical_activation_consumes_current_phase7_access() {
     let projection = bind_logical_hash(tiny_projection());
@@ -284,6 +305,87 @@ fn synthetic_mechanical_activation_omits_atomic_bundle_when_bound_fails() {
             .any(|telemetry| telemetry.surface_id == "surface:exact"
                 && telemetry.truncation_state == TruncationState::Bounded)
     );
+}
+
+#[test]
+fn synthetic_mechanical_activation_accepts_zero_telemetry_bound() {
+    let projection = bind_logical_hash(tiny_projection());
+    let artifacts =
+        build_projection_access_artifacts(&projection, None, None).expect("access builds");
+    let access = ProjectionActivationAccess::new(&artifacts);
+    let mut config = config(1, 0, 0, 0, 0);
+    config.maximum_telemetry_records = 0;
+
+    let activated = activate_projection(
+        &projection,
+        &problem_space(),
+        &utterance("unit:journal:2026-07-02:1"),
+        &config,
+        &access,
+    )
+    .expect("zero telemetry suppresses records without suppressing activation");
+
+    assert!(!activated.activated_units.is_empty());
+    assert!(activated.telemetry.is_empty());
+}
+
+#[test]
+fn synthetic_mechanical_activation_fans_out_all_temporal_anchors_in_projection_order() {
+    let projection =
+        projection_with_second_journal_anchor(TemporalValue::FullDate("2026-07-03".into()));
+    let artifacts =
+        build_projection_access_artifacts(&projection, None, None).expect("access builds");
+    let access = ProjectionActivationAccess::new(&artifacts);
+
+    let activated = activate_projection(
+        &projection,
+        &problem_space(),
+        &utterance("unit:journal:2026-07-02:1"),
+        &config(1, 0, 0, 0, 1),
+        &access,
+    )
+    .expect("all materially projected anchors activate");
+
+    let anchor_ids = activated
+        .activated_temporal_anchors
+        .iter()
+        .map(|record| record.anchor_id.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        anchor_ids,
+        vec![
+            anchor("anchor:journal-one:2026-07-02"),
+            anchor("anchor:journal-one:second"),
+        ]
+    );
+}
+
+#[test]
+fn synthetic_mechanical_activation_preserves_truncated_temporal_origin() {
+    let projection =
+        projection_with_second_journal_anchor(TemporalValue::FullDate("2026-07-02".into()));
+    let artifacts =
+        build_projection_access_artifacts(&projection, None, None).expect("access builds");
+    let access = ProjectionActivationAccess::new(&artifacts);
+
+    let activated = activate_projection(
+        &projection,
+        &problem_space(),
+        &utterance("unit:journal:2026-07-02:1"),
+        &config(1, 0, 0, 0, 1),
+        &access,
+    )
+    .expect("truncated temporal activation succeeds");
+
+    assert!(activated.continuation_handles.iter().any(|handle| {
+        matches!(
+            &handle.origin,
+            semantic_traversal_core::activation::ContinuationOrigin::TemporalProbe {
+                start: Some(TemporalValue::FullDate(start)),
+                end: Some(TemporalValue::FullDate(end)),
+            } if start == "2026-07-02" && end == "2026-07-02"
+        )
+    }));
 }
 
 #[test]
