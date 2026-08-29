@@ -1,23 +1,20 @@
 . (Join-Path $PSScriptRoot 'Cleanroom-Control.Common.ps1')
 
+Add-Type -AssemblyName System.Windows.Forms
+$choice = [System.Windows.Forms.MessageBox]::Show(
+    "Emergency stop will terminate CLEANROOM Symphony immediately.`r`n`r`nActive work may remain incomplete and the current issue may remain open.`r`n`r`nStop CLEANROOM now?",
+    'Emergency stop CLEANROOM',
+    [System.Windows.Forms.MessageBoxButtons]::YesNo,
+    [System.Windows.Forms.MessageBoxIcon]::Warning,
+    [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
+if ($choice -ne [System.Windows.Forms.DialogResult]::Yes) {
+    exit 0
+}
+
 try {
-    $display = Get-CleanroomDisplayState
-    if (-not $display.Safe) {
-        Add-Type -AssemblyName System.Windows.Forms
-        $answer = [System.Windows.Forms.MessageBox]::Show(
-            "Emergency stop will interrupt active CLEANROOM work. The issue may remain open or incomplete.`n`n$($display.Text)`n`nStop immediately?",
-            'STOP CLEANROOM NOW', 'YesNo', [System.Windows.Forms.MessageBoxIcon]::Warning)
-        if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) { exit 0 }
-    }
-    $state = Read-ControlState
-    Stop-Symphony -Force | Out-Null
-    if ($null -ne $state) {
-        Stop-ChildProcess $state.symphony_pid
-        Stop-ChildProcess $state.monitor_pid
-        Stop-ChildProcess $state.keep_awake_pid
-    }
-    Remove-ControlState
-    Show-CleanroomNotification -Title 'CLEANROOM emergency stop' -Message 'CLEANROOM was stopped immediately. Work may be incomplete; this was not the normal Finish path.'
+    $output = @(Invoke-PilotAction -Action 'stop-now')
+    $message = ($output | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ }) -join "`n"
+    Show-CleanroomMessage -Title 'CLEANROOM emergency stop' -Message $message -Kind Warning
 } catch {
     Invoke-ControlFailure $_.Exception.Message
 }
