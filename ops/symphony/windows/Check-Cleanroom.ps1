@@ -1,9 +1,10 @@
 . (Join-Path $PSScriptRoot 'Cleanroom-Control.Common.ps1')
 
 try {
-    $display = Get-CleanroomDisplayState
+    $output = @(Invoke-PilotAction -Action 'status')
     Open-CleanroomDashboard
-    Show-CleanroomMessage -Title 'CLEANROOM status' -Message $display.Text -Kind $(if ($display.Safe) { 'Information' } else { 'Warning' })
+    $message = ($output | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ }) -join "`n"
+    Show-CleanroomMessage -Title 'CLEANROOM status' -Message $message
 } catch {
     Invoke-ControlFailure $_.Exception.Message
 }
