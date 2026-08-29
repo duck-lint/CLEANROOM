@@ -157,7 +157,7 @@ creator
 book_read_today
 layer
 unity_level
-vector_direction
+analysis_orientation
 register
 register_mode
 pillar
@@ -183,12 +183,12 @@ A clean projection should describe at least the following roles:
 | Object class | `note_type`, `entity_type`, `format` | Declared type or represented content class |
 | Organon position | `layer`, `pillar`, `unity_level` | Framework placement and level of unity |
 | Register typing | `register`, `register_mode` | Public/indexical target and descriptive/experiential mode |
-| Analysis orientation | `vector_direction` | Constitutive or critical direction |
+| Analysis orientation | `analysis_orientation` | Constitutive or critical direction |
 | Canonical naming | `title`, `canonical_name`, `creator`, `aliases` | Address and attribution surfaces |
 | Temporal anchoring | `journal_entry_date`, `first_met`, `birthday`, publication year | Time-bearing object facts or anchors |
 | Contextual relation | `book_read_today`, `dream_motif`, bridge source/target fields | One object’s participation in relation to another |
 | Grouping | `tags` | Non-individuating grouping surface |
-| Indexical telemetry | `temporal_pace`, `reactivity`, dream fields, etc. | First-person report identifiers on journal objects |
+| Indexical telemetry | `headspace`, `reactivity`, dream fields, etc. | First-person report identifiers on journal objects |
 
 A field descriptor must state its role and applicability. Treating every field as an interchangeable searchable scalar would erase the Organon’s typing discipline.
 
@@ -197,27 +197,27 @@ A field descriptor must state its role and applicability. Treating every field a
 The whole-corpus admitted-field registry records **accepted operator classifications**
 for the current v3 observation:
 
-- observer repository/commit: `duck-lint/semantic-traversal@e9bb2d95c14b1beb334dc2b8d83420f5998b9a53`;
+- observer repository/commit: `duck-lint/semantic-traversal@502bc8d83a3681a21f4ab2f2cafb9598074aa24c`;
 - observer schema: `vault-observation/v3`;
-- accepted authored-vault specimen: `f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4`;
+- accepted authored-vault specimen: `eb9447aa14e07995b86beb2c92d3c97c725fbdb23f1c210650b029fecd1d2d3d`;
 - observed field universe: **60 frontmatter keys**.
 
 The current repository-safe corpus census is:
 
 ```text
-resident source records: 1060
-resident Markdown: 1060
-admission-eligible Markdown: 1052
+resident source records: 1085
+resident Markdown: 1085
+admission-eligible Markdown: 1077
 excluded Markdown: 8
-frontmatter valid: 1057
+frontmatter valid: 1082
 frontmatter absent: 3
 frontmatter malformed: 0
-parseable UUID: 1057
-UUIDv7: 1057
+parseable UUID: 1082
+UUIDv7: 1082
 duplicate UUID groups: 0
-authored links: 5008
-one-candidate authored targets: 4907
-zero-candidate authored targets: 101
+authored links: 4929
+one-candidate authored targets: 4924
+zero-candidate authored targets: 5
 multiple-candidate authored targets: 0
 ```
 
@@ -230,8 +230,10 @@ The historical v2 predecessor remains immutable evidence: observer
 `duck-lint/semantic-traversal@99d0d4556684000f0ed585e47158a5f7fe9ce7e1`, schema
 `vault-observation/v2`, specimen
 `25fb8f13dd17efb62abbb52c48f526bc0aedd887b29001c1e60f1642d322b688`. Reconciliation
-established historical fields 60, current fields 60, added 0, removed 0, and
-unchanged 60. The registry therefore carries forward unchanged: 55 admitted,
+established a historical field universe of 60. The current observation is also
+60 fields, with explicit operator replacements `temporal_pace` -> `headspace`
+and historical `vector_direction` -> `analysis_orientation`; the latter is
+absent from the fresh observation. The current registry remains 55 admitted,
 5 excluded, and 0 unresolved. `transition_attempted` is not a registry field.
 
 The registry is exhaustive for that accepted specimen. `note_version`,
@@ -265,7 +267,7 @@ sensitive evidence remain outside this repository.
 | `note_type` | admitted; object/content class | carrying object; visible on materialized units with parent-field provenance | no canonical occurrence or independent temporal anchor |
 | `layer`, `pillar`, `unity_level` | admitted; Organon position | carrying object and inherited unit context with provenance | no canonical occurrence or independent temporal anchor |
 | `register`, `register_mode` | admitted; register typing | carrying object and inherited unit context with provenance | no canonical occurrence or independent temporal anchor |
-| `vector_direction` | admitted; analysis orientation | carrying object and inherited unit context with provenance | no canonical occurrence or independent temporal anchor |
+| `analysis_orientation` | admitted; analysis orientation | carrying object and inherited unit context with provenance | no canonical occurrence or independent temporal anchor |
 | `aliases` | admitted; alternate authored names/shorthand/address surfaces; non-individuating | carrying object and inherited address context; does not create identity | no canonical occurrence |
 | `tags` | admitted; grouping/categorization surface; non-individuating | carrying object and inherited grouping context; not an alias substitute | no canonical occurrence |
 
@@ -308,7 +310,7 @@ changing field roles or null/absence semantics:
 
 - canonical list-valued fields: `creator`, `register_mode`, `from_mode`,
   `to_mode`, `unity_level`;
-- canonical scalar-valued fields: `format`, `layer`, `vector_direction`,
+- canonical scalar-valued fields: `format`, `layer`, `analysis_orientation`,
   `register`, `pillar`, `hypnagogic_resonance`, `reactivity`, `relationship`.
 
 Single semantic values remain one-item authored lists for list-valued fields;
@@ -318,11 +320,13 @@ metadata, `register_mode` remains register typing, `unity_level` remains
 Organon-position metadata, and `relationship` remains relational entity-profile
 metadata without creating a canonical graph occurrence merely by presence.
 
-#### Explicit authored-representation operator decision — 2026-08-09
+#### Explicit authored-representation operator decisions
 
-The 60-field registry classification carries forward from historical R001
-because exact v3 field-universe reconciliation found 60 historical fields,
-60 current fields, 0 added, 0 removed, and 60 unchanged. Separately, during
+The historical 60-field registry classification was revised for the current
+observation by explicit operator decision: `headspace` replaces
+`temporal_pace`, and `analysis_orientation` replaces historical
+`vector_direction`. The fresh observation contains neither historical field.
+Separately, during
 authored-substrate repair, the operator explicitly fixed the canonical
 authored cardinalities above and the temporal representation categories and
 field applicability recorded in this section. Those authored-representation
@@ -363,7 +367,7 @@ The following seven fields retain the contract-defined `indexical telemetry`
 role from §4:
 
 `dream_location`, `dream_lucidity`, `dream_motif_valence`,
-`hypnagogic_resonance`, `reactivity`, `recall_ability`, `temporal_pace`.
+`hypnagogic_resonance`, `reactivity`, `recall_ability`, `headspace`.
 
 They are admitted as contextual metadata on journal-entry objects carrying the
 field, inherited by contained units with parent-field provenance, and preserved
@@ -539,6 +543,24 @@ Quote-plus-commentary adjacency does not create a special fused semantic unit. T
 ```
 
 The page heading defines one semantic region. Within that region, the block quote and the following commentary retain their authored Markdown block boundaries. Adjacency supplies local structural context but does not merge the quote and commentary into one canonical unit. A contiguous Markdown list remains one authored list block unless the authored structure itself establishes additional block boundaries.
+
+### 6.3.1 Block-owned occurrence provenance and thematic breaks
+
+The parser-owned Markdown block is the canonical body-occurrence source. The
+factual observation records its exact `source_block_span` and a deterministic
+`source_occurrence_ordinal`; an inline `source_span` is retained only as
+finer-grained evidence and may be explicitly unavailable. Phase 5 therefore
+requires one and only one semantic unit for an ordinary body source block,
+and one and only one canonical region for a heading-marker source block.
+Frontmatter occurrences remain sourced by their object field and retain a
+field-local occurrence ordinal. Repeated identical authored markup must not
+collapse occurrence identity.
+
+The observed `hr` block is an authored thematic separator. It consumes the
+region-local authored block ordinal but materializes as no semantic unit,
+region, retrieval target, or new `AuthoredBlockType`. The resulting semantic
+unit ordinals may contain gaps, and repository-safe Phase-5 evidence reports
+the number of observed non-materialized `hr` blocks.
 
 This preserves both requirements:
 

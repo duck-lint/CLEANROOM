@@ -31,16 +31,20 @@ use crate::{
     region_identity::{AuthoredRegionHeading, canonical_region_identities},
 };
 
-const OBSERVATION_SHA256: &str = "d3a340a1b203a64b2455f71a8d4f17003d5bfdba8be0583cbec1529692320bb9";
-// This is the byte identity recorded by the original pre-archive PR #23 v2
-// construction. The current recovery does not possess or reconstruct that
-// private artifact; this pin lets a later private validation run fail closed
-// unless it supplies the exact corrected representation.
-const PROJECTION_SHA256: &str = "f7423f494d905799e44b2c98f470429ae960ae682b43158f90d8b8f6fa9e39d2";
-const CORPUS: &str = "f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4";
-const OBSERVER_COMMIT: &str = "e9bb2d95c14b1beb334dc2b8d83420f5998b9a53";
+const OBSERVATION_SHA256: &str = "cc179d31f4035f84742312bab363a1504173f034e11625022a2142294c6eb000";
+// This is the byte identity of the current private Phase 5 v2 construction.
+// The validator remains fail-closed against any other projection bytes.
+const PROJECTION_SHA256: &str = "925e9437696a4728df4db2be26a0c8aeafbb2304421de007998731bd579b1cea";
+const PHASE5_LOGICAL_HASH: &str =
+    "sha256:91352761f4403343de3c293ef78bc9c087011cbdd39f957d789ae7200ad720f0";
+const CORPUS: &str = "8db3ab329d1890890a1fa7eeaec42d700b29420fb71ed052383dbb9ed3b0e8cc";
+const OBSERVER_REPOSITORY: &str = "CLEANROOM";
+const OBSERVER_COMMIT: &str = "32957a3ff467ee57d7a76d4c4321753ac018d054";
+const OBSERVER_VERSION: &str = "cleanroom-parser-observer/v2";
+const PARSER_SALVAGE_COMMIT: &str = "72ef99219fd260ba71365005273f6d9f68cab939";
 const EXCLUDED_FIELDS: [&str; 5] = ["address", "email", "phone", "likes", "dislikes"];
 const IDENTIFIER_FIELDS: [&str; 55] = [
+    "analysis_orientation",
     "aliases",
     "architect_or_operator",
     "birthday",
@@ -89,13 +93,12 @@ const IDENTIFIER_FIELDS: [&str; 55] = [
     "speculation_quarantine",
     "stop_rule",
     "tags",
-    "temporal_pace",
+    "headspace",
     "title",
     "to_mode",
     "to_register",
     "unity_level",
     "uuid",
-    "vector_direction",
 ];
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -212,6 +215,12 @@ fn expected_block_type(kind: &str, raw: &str) -> Option<AuthoredBlockType> {
         "embedded_media" => AuthoredBlockType::EmbeddedMedia,
         _ => return None,
     })
+}
+
+fn next_block_ordinal(ordinals: &mut BTreeMap<String, u32>, region: &str) -> u32 {
+    let next = ordinals.entry(region.to_owned()).or_insert(0);
+    *next += 1;
+    *next
 }
 
 #[derive(Clone)]
@@ -358,6 +367,7 @@ fn expected_units(
         .into_iter()
         .filter(|block| text(block, "block_kind_observation").as_deref() != Some("heading"))
     {
+        let block_kind = text(&block, "block_kind_observation").unwrap_or_default();
         let raw = text(&block, "raw_markdown").unwrap_or_default();
         let source_span = span(block.get("source_span").unwrap_or(&Value::Null), path);
         let start = source_span.as_ref().and_then(|s| s.start_byte).unwrap_or(0);
@@ -368,25 +378,22 @@ fn expected_units(
             .map(|(r, _, _)| *r)
             .unwrap_or(&regions[0]);
         let key = selected.address.authored_structural_address.clone();
-        let ordinal = ordinals
-            .entry(key.clone())
-            .and_modify(|v| *v += 1)
-            .or_insert(1);
+        let ordinal = next_block_ordinal(&mut ordinals, &key);
+        if block_kind == "hr" {
+            // Thematic breaks remain observed structure and consume the
+            // authored ordinal, but do not materialize as semantic units.
+            continue;
+        }
         let explicit = array(&block, "explicit_block_ids")
             .first()
             .and_then(Value::as_str)
             .map(str::to_owned);
-        let kind = expected_block_type(
-            text(&block, "block_kind_observation")
-                .as_deref()
-                .unwrap_or(""),
-            &raw,
-        )
-        .ok_or_else(|| "unsupported authored block kind".to_owned())?;
+        let kind = expected_block_type(&block_kind, &raw)
+            .ok_or_else(|| "unsupported authored block kind".to_owned())?;
         let id = independent_unit_id(
             object,
             &selected.address.authored_structural_address,
-            *ordinal,
+            ordinal,
             explicit.as_deref(),
         );
         output.push(ExpectedUnit {
@@ -394,7 +401,7 @@ fn expected_units(
             object_id: object.clone(),
             region: selected.address.clone(),
             heading_path: selected.heading_path.clone(),
-            ordinal: *ordinal,
+            ordinal,
             explicit,
             kind,
             path: path.to_owned(),
@@ -404,6 +411,57 @@ fn expected_units(
     }
     let _ = root;
     Ok(output)
+}
+
+fn exact_block_source(
+    link: &Value,
+    path: &str,
+    regions: &[ExpectedRegion],
+    units: &[ExpectedUnit],
+    occurrence_id: &str,
+) -> Result<OccurrenceSource, String> {
+    let block_span =
+        span(link.get("source_block_span").unwrap_or(&Value::Null), path).ok_or_else(|| {
+            format!("ordinary body occurrence lacks source_block_span: {occurrence_id}")
+        })?;
+    let matching_regions: Vec<_> = regions
+        .iter()
+        .filter(|region| region.span.as_ref() == Some(&block_span))
+        .collect();
+    if matching_regions.len() > 1 {
+        return Err(format!(
+            "ordinary body occurrence source block maps to multiple regions: {occurrence_id}"
+        ));
+    }
+    if let Some(region) = matching_regions.first() {
+        return Ok(OccurrenceSource::SemanticRegion {
+            region_address: region.address.clone(),
+        });
+    }
+    let matching_units: Vec<_> = units
+        .iter()
+        .filter(|unit| unit.span.as_ref() == Some(&block_span))
+        .collect();
+    match matching_units.as_slice() {
+        [unit] => Ok(OccurrenceSource::SemanticUnit {
+            unit_id: SemanticUnitId::parse(unit.id.clone()).expect("unit identity"),
+        }),
+        [] => Err(format!(
+            "ordinary body occurrence source block maps to zero semantic units or regions: {occurrence_id}"
+        )),
+        _ => Err(format!(
+            "ordinary body occurrence source block maps to multiple semantic units: {occurrence_id}"
+        )),
+    }
+}
+
+fn occurrence_ordinal(link: &Value, occurrence_id: &str) -> Result<u64, String> {
+    link.get("source_occurrence_ordinal")
+        .and_then(Value::as_u64)
+        .filter(|ordinal| *ordinal > 0)
+        .ok_or_else(|| {
+            format!("authored occurrence ordinal unavailable or invalid: {occurrence_id}")
+        })
 }
 
 fn expected_occurrences(admitted_notes: &[&Value]) -> Result<Vec<ExpectedOccurrence>, String> {
@@ -421,6 +479,7 @@ fn expected_occurrences(admitted_notes: &[&Value]) -> Result<Vec<ExpectedOccurre
         units_by_path.insert(path, units);
     }
     let mut output = Vec::new();
+    let mut occurrence_keys = HashSet::new();
     for note in admitted_notes {
         let object = object_id_from_markdown(note)?;
         let path = text(note.get("source").ok_or("source missing")?, "relative_path")
@@ -430,60 +489,39 @@ fn expected_occurrences(admitted_notes: &[&Value]) -> Result<Vec<ExpectedOccurre
         for link in array(note, "authored_links") {
             let id = occurrence_id(&object, &link);
             let source_span = span(link.get("source_span").unwrap_or(&Value::Null), &path);
-            let start = source_span.as_ref().and_then(|value| value.start_byte);
-            let source = if text(&link, "source_surface").as_deref() == Some("frontmatter") {
+            let source_surface = text(&link, "source_surface");
+            let ordinal = occurrence_ordinal(&link, &id)?;
+            let source = if source_surface.as_deref() == Some("frontmatter") {
+                let field_path = text(&link, "frontmatter_key_path")
+                    .filter(|field_path| !field_path.is_empty())
+                    .ok_or_else(|| format!("frontmatter occurrence lacks field path: {id}"))?;
+                if link
+                    .get("source_block_span")
+                    .is_some_and(|value| !value.is_null())
+                {
+                    return Err(format!(
+                        "frontmatter occurrence carries a non-null source block span: {id}"
+                    ));
+                }
+                if !occurrence_keys.insert(format!("frontmatter:{object}:{field_path}:{ordinal}")) {
+                    return Err(format!("duplicate frontmatter occurrence ordinal: {id}"));
+                }
                 OccurrenceSource::ObjectField {
                     object_id: object.clone(),
-                    field_path: text(&link, "frontmatter_key_path").unwrap_or_default(),
+                    field_path,
                 }
-            } else if let Some(start) = start {
-                array(note, "headings")
-                    .iter()
-                    .enumerate()
-                    .find(|(_, heading)| {
-                        heading
-                            .get("source_span")
-                            .and_then(Value::as_array)
-                            .is_some_and(|span| {
-                                span.first().and_then(Value::as_u64).unwrap_or(0) <= start
-                                    && start
-                                        < span.get(1).and_then(Value::as_u64).unwrap_or(u64::MAX)
-                            })
-                    })
-                    .and_then(|(index, _)| regions.get(index + 1))
-                    .map(|region| OccurrenceSource::SemanticRegion {
-                        region_address: region.address.clone(),
-                    })
-                    .or_else(|| {
-                        units
-                            .iter()
-                            .find(|unit| {
-                                unit.span.as_ref().is_some_and(|span| {
-                                    span.start_byte.unwrap_or(0) <= start
-                                        && start < span.end_byte.unwrap_or(u64::MAX)
-                                })
-                            })
-                            .map(|unit| OccurrenceSource::SemanticUnit {
-                                unit_id: SemanticUnitId::parse(unit.id.clone())
-                                    .expect("unit identity"),
-                            })
-                    })
-                    .or_else(|| {
-                        regions
-                            .iter()
-                            .find(|region| {
-                                region.span.as_ref().is_some_and(|span| {
-                                    span.start_byte.unwrap_or(0) <= start
-                                        && start < span.end_byte.unwrap_or(u64::MAX)
-                                })
-                            })
-                            .map(|region| OccurrenceSource::SemanticRegion {
-                                region_address: region.address.clone(),
-                            })
-                    })
-                    .ok_or_else(|| format!("cannot derive occurrence source: {id}"))?
+            } else if source_surface.as_deref() == Some("body") {
+                if !occurrence_keys.insert(format!(
+                    "body:{path}:{ordinal}:{}",
+                    link.get("source_block_span").unwrap_or(&Value::Null)
+                )) {
+                    return Err(format!("duplicate body occurrence ordinal: {id}"));
+                }
+                exact_block_source(&link, &path, regions, units, &id)?
             } else {
-                return Err(format!("occurrence source span missing: {id}"));
+                return Err(format!(
+                    "unsupported authored occurrence source surface: {id}"
+                ));
             };
             let candidates: Vec<String> = link
                 .get("target_candidates")
@@ -501,22 +539,26 @@ fn expected_occurrences(admitted_notes: &[&Value]) -> Result<Vec<ExpectedOccurre
             let heading = text(&link, "heading_fragment");
             let block = text(&link, "block_fragment");
             let target = if let Some(fragment) = heading {
-                candidates.first().and_then(|candidate| {
-                    let target_regions = regions_by_path.get(candidate)?;
-                    let match_span = array(&link, "heading_target_matches")
-                        .first()
-                        .and_then(|matched| matched.get("source_span"))
-                        .and_then(|value| span(value, candidate));
-                    let region = target_regions
-                        .iter()
-                        .find(|region| region.span == match_span)?;
-                    let _ = fragment;
-                    Some(SemanticAddress::Region(region.address.clone()))
-                })
+                (candidates.len() == 1 && array(&link, "heading_target_matches").len() == 1)
+                    .then(|| candidates.first())
+                    .flatten()
+                    .and_then(|candidate| {
+                        let target_regions = regions_by_path.get(candidate)?;
+                        let match_span = array(&link, "heading_target_matches")
+                            .first()
+                            .and_then(|matched| matched.get("source_span"))
+                            .and_then(|value| span(value, candidate));
+                        let region = target_regions
+                            .iter()
+                            .find(|region| region.span == match_span)?;
+                        let _ = fragment;
+                        Some(SemanticAddress::Region(region.address.clone()))
+                    })
             } else if let Some(fragment) = block {
                 let fragment = fragment.trim_start_matches('^');
-                candidates
-                    .first()
+                (candidates.len() == 1)
+                    .then(|| candidates.first())
+                    .flatten()
                     .and_then(|candidate| units_by_path.get(candidate))
                     .and_then(|units| {
                         units
@@ -529,8 +571,9 @@ fn expected_occurrences(admitted_notes: &[&Value]) -> Result<Vec<ExpectedOccurre
                             })
                     })
             } else {
-                candidates
-                    .first()
+                (candidates.len() == 1)
+                    .then(|| candidates.first())
+                    .flatten()
                     .and_then(|candidate| object_by_path.get(candidate))
                     .map(|object| SemanticAddress::Object(object.clone()))
             };
@@ -728,7 +771,7 @@ fn independent_role(name: &str) -> IdentifierRole {
         "note_type" | "entity_type" | "format" => IdentifierRole::ObjectClass,
         "layer" | "pillar" | "unity_level" => IdentifierRole::FrameworkPosition,
         "register" | "register_mode" => IdentifierRole::RegisterTyping,
-        "vector_direction" => IdentifierRole::AnalysisOrientation,
+        "analysis_orientation" => IdentifierRole::AnalysisOrientation,
         "title" | "canonical_name" | "creator" | "aliases" => IdentifierRole::CanonicalNaming,
         "journal_entry_date" | "birthday" | "first_met" | "original_year_published" => {
             IdentifierRole::TemporalAnchoring
@@ -741,7 +784,7 @@ fn independent_role(name: &str) -> IdentifierRole {
         | "hypnagogic_resonance"
         | "reactivity"
         | "recall_ability"
-        | "temporal_pace" => IdentifierRole::IndexicalTelemetry,
+        | "headspace" => IdentifierRole::IndexicalTelemetry,
         "architect_or_operator" => IdentifierRole::JournalStateClassification,
         "occupation" => IdentifierRole::EntityMetadata,
         "origin" | "publish_studio" => IdentifierRole::SourceMetadata,
@@ -820,7 +863,7 @@ fn independent_descriptor(
         }
         "format"
         | "layer"
-        | "vector_direction"
+        | "analysis_orientation"
         | "register"
         | "pillar"
         | "hypnagogic_resonance"
@@ -885,7 +928,7 @@ fn independent_class_fields(class_name: &str) -> BTreeSet<String> {
         "tags",
         "layer",
         "unity_level",
-        "vector_direction",
+        "analysis_orientation",
         "register",
         "register_mode",
         "pillar",
@@ -920,7 +963,7 @@ fn independent_class_fields(class_name: &str) -> BTreeSet<String> {
             "hypnagogic_resonance",
             "reactivity",
             "recall_ability",
-            "temporal_pace",
+            "headspace",
             "architect_or_operator",
         ],
         "inferential_bridge" => &[
@@ -2489,6 +2532,78 @@ fn compare_observation(
         "excluded_markdown".into(),
         markdown.len() - admitted_notes.len(),
     );
+    let expected_fields: BTreeSet<String> = IDENTIFIER_FIELDS
+        .iter()
+        .chain(EXCLUDED_FIELDS.iter())
+        .map(|field| (*field).to_owned())
+        .collect();
+    let observed_fields: BTreeSet<String> = markdown
+        .iter()
+        .flat_map(|note| {
+            note.get("frontmatter")
+                .and_then(|frontmatter| frontmatter.get("values"))
+                .and_then(Value::as_object)
+                .into_iter()
+                .flat_map(|values| values.keys().cloned())
+        })
+        .collect();
+    counts.insert("observed_frontmatter_fields".into(), observed_fields.len());
+    counts.insert(
+        "admitted_frontmatter_fields".into(),
+        IDENTIFIER_FIELDS.len(),
+    );
+    counts.insert("excluded_frontmatter_fields".into(), EXCLUDED_FIELDS.len());
+    if observed_fields != expected_fields {
+        bump(
+            "identifier",
+            format!(
+                "observed frontmatter field universe mismatch: expected {:?}, observed {:?}",
+                expected_fields, observed_fields
+            ),
+        );
+    }
+    if observed_fields.contains("vector_direction")
+        || observed_fields.contains("temporal_pace")
+        || !observed_fields.contains("analysis_orientation")
+        || !observed_fields.contains("headspace")
+    {
+        bump(
+            "identifier",
+            "current identifier successor field boundary mismatch".into(),
+        );
+    }
+    let mut observed_block_kinds = BTreeMap::<String, usize>::new();
+    let mut admitted_block_kinds = BTreeMap::<String, usize>::new();
+    for note in &markdown {
+        for block in array(note, "block_candidates") {
+            let kind = text(&block, "block_kind_observation").unwrap_or_default();
+            *observed_block_kinds.entry(kind).or_default() += 1;
+        }
+    }
+    for note in &admitted_notes {
+        for block in array(note, "block_candidates") {
+            let kind = text(&block, "block_kind_observation").unwrap_or_default();
+            *admitted_block_kinds.entry(kind).or_default() += 1;
+        }
+    }
+    for (kind, count) in &observed_block_kinds {
+        counts.insert(format!("observed_block_kind:{kind}"), *count);
+    }
+    for (kind, count) in &admitted_block_kinds {
+        counts.insert(format!("admitted_block_kind:{kind}"), *count);
+    }
+    let observed_hr = observed_block_kinds.get("hr").copied().unwrap_or_default();
+    let admitted_hr = admitted_block_kinds.get("hr").copied().unwrap_or_default();
+    counts.insert("observed_hr_blocks".into(), observed_hr);
+    counts.insert("non_materialized_hr_blocks".into(), admitted_hr);
+    if observed_hr != 350 || admitted_hr != 323 {
+        bump(
+            "unit",
+            format!(
+                "thematic-break accounting mismatch: observed {observed_hr}, admitted {admitted_hr}"
+            ),
+        );
+    }
     counts.insert("objects".into(), projection.objects.len());
     counts.insert("regions".into(), projection.regions.len());
     counts.insert("semantic_units".into(), projection.units.len());
@@ -2754,62 +2869,22 @@ fn compare_observation(
                     format!("occurrence authored surface mismatch: {oid}"),
                 );
             }
-            let link_start = expected_span
-                .as_ref()
-                .and_then(|source_span| source_span.start_byte);
             let expected_source = if text(&link, "source_surface").as_deref() == Some("frontmatter")
             {
-                Some(OccurrenceSource::ObjectField {
-                    object_id: id.clone(),
-                    field_path: text(&link, "frontmatter_key_path").unwrap_or_default(),
+                text(&link, "frontmatter_key_path").map(|field_path| {
+                    OccurrenceSource::ObjectField {
+                        object_id: id.clone(),
+                        field_path,
+                    }
                 })
-            } else if let Some(start) = link_start {
-                array(note, "headings")
-                    .iter()
-                    .enumerate()
-                    .find(|(_, heading)| {
-                        heading
-                            .get("source_span")
-                            .and_then(Value::as_array)
-                            .is_some_and(|span| {
-                                span.first().and_then(Value::as_u64).unwrap_or(0) <= start
-                                    && start
-                                        < span.get(1).and_then(Value::as_u64).unwrap_or(u64::MAX)
-                            })
-                    })
-                    .and_then(|(index, _)| expected_regions.get(index + 1))
-                    .map(|region| OccurrenceSource::SemanticRegion {
-                        region_address: region.address.clone(),
-                    })
-                    .or_else(|| {
-                        expected_units
-                            .iter()
-                            .find(|unit| {
-                                unit.span.as_ref().is_some_and(|source_span| {
-                                    source_span.start_byte.unwrap_or(0) <= start
-                                        && start < source_span.end_byte.unwrap_or(u64::MAX)
-                                })
-                            })
-                            .map(|unit| OccurrenceSource::SemanticUnit {
-                                unit_id: SemanticUnitId::parse(unit.id.clone())
-                                    .expect("expected unit identity"),
-                            })
-                            .or_else(|| {
-                                expected_regions
-                                    .iter()
-                                    .find(|region| {
-                                        region.span.as_ref().is_some_and(|source_span| {
-                                            source_span.start_byte.unwrap_or(0) <= start
-                                                && start < source_span.end_byte.unwrap_or(u64::MAX)
-                                        })
-                                    })
-                                    .map(|region| OccurrenceSource::SemanticRegion {
-                                        region_address: region.address.clone(),
-                                    })
-                            })
-                    })
             } else {
-                None
+                match exact_block_source(&link, &path, &expected_regions, &expected_units, &oid) {
+                    Ok(source) => Some(source),
+                    Err(error) => {
+                        bump("provenance", error);
+                        None
+                    }
+                }
             };
             if expected_source.is_some_and(|source| observed.source != source) {
                 bump(
@@ -3049,12 +3124,13 @@ pub fn validate(
     let root: Value = serde_json::from_slice(&observation_bytes)?;
     let projection_value: Value = serde_json::from_slice(&projection_bytes)?;
     let projection: SemanticSpaceProjection = serde_json::from_value(projection_value.clone())?;
+    let observer = root.get("observer_provenance").unwrap_or(&Value::Null);
+    let salvage = observer.get("parser_salvage").unwrap_or(&Value::Null);
     if text(&root, "observation_schema_version").as_deref() != Some("vault-observation/v3")
-        || root
-            .get("observer_provenance")
-            .and_then(|p| text(p, "commit"))
-            .as_deref()
-            != Some(OBSERVER_COMMIT)
+        || text(observer, "implementation_version").as_deref() != Some(OBSERVER_VERSION)
+        || text(observer, "repository").as_deref() != Some(OBSERVER_REPOSITORY)
+        || text(observer, "commit").as_deref() != Some(OBSERVER_COMMIT)
+        || text(salvage, "commit").as_deref() != Some(PARSER_SALVAGE_COMMIT)
         || text(&root, "vault_resident_snapshot_identity").as_deref() != Some(CORPUS)
     {
         return Err(ValidationError::Input(
@@ -3069,6 +3145,9 @@ pub fn validate(
     if projection.schema_version != "semantic-space-projection/v2"
         || projection.corpus_snapshot_identity != CORPUS
         || projection.projection_snapshot_id != format!("projection:phase5:v2:{CORPUS}")
+        || projection.logical_hash != PHASE5_LOGICAL_HASH
+        || projection.ingest_identity
+            != format!("observation:vault-observation/v3:{OBSERVATION_SHA256}")
     {
         return Err(ValidationError::Input(
             "pinned Phase 5 projection identity mismatch".into(),
@@ -3421,6 +3500,102 @@ mod tests {
     }
 
     #[test]
+    fn independent_units_skip_hr_but_preserve_authored_ordinal_gaps() {
+        let object = SemanticObjectId::parse("019dcf5c-ded1-70df-ab68-c25bbc4e8eb1").unwrap();
+        let note = serde_json::json!({
+            "raw_markdown": "a\n\n---\n\nb",
+            "headings": [],
+            "block_candidates": [
+                {"block_kind_observation": "paragraph", "raw_markdown": "a", "source_span": [0, 1]},
+                {"block_kind_observation": "hr", "raw_markdown": "---", "source_span": [3, 6]},
+                {"block_kind_observation": "paragraph", "raw_markdown": "b", "source_span": [8, 9]}
+            ]
+        });
+        let regions = expected_regions(&object, &note, "note.md").unwrap();
+        let units = expected_units(&object, &note, "note.md", &regions).unwrap();
+        assert_eq!(units.len(), 2);
+        assert_eq!(
+            units.iter().map(|unit| unit.ordinal).collect::<Vec<_>>(),
+            [1, 3]
+        );
+        assert_eq!(units[0].kind, AuthoredBlockType::Paragraph);
+        assert_eq!(units[1].kind, AuthoredBlockType::Paragraph);
+    }
+
+    #[test]
+    fn occurrence_identity_uses_source_block_and_local_ordinal_without_inline_span() {
+        let note = serde_json::json!({
+            "source": {"relative_path": "note.md", "basename": "note.md"},
+            "uuid": {"parsed_value": "019dcf5c-ded1-70df-ab68-c25bbc4e8eb1"},
+            "frontmatter": {"values": {"title": "note"}, "value_shapes": {}},
+            "raw_markdown": "body text",
+            "headings": [],
+            "block_candidates": [{"block_kind_observation": "paragraph", "raw_markdown": "body text", "source_span": [0, 9]}],
+            "authored_links": [
+                {"source_surface": "body", "source_span": null, "source_block_span": [0, 9], "source_occurrence_ordinal": 1, "raw_target": "Target", "display_alias": null, "embedded": false, "heading_fragment": null, "block_fragment": null, "target_candidates": {"candidate_source_paths": []}, "heading_target_matches": [], "block_target_evaluation": "not_applicable"},
+                {"source_surface": "body", "source_span": null, "source_block_span": [0, 9], "source_occurrence_ordinal": 2, "raw_target": "Target", "display_alias": null, "embedded": false, "heading_fragment": null, "block_fragment": null, "target_candidates": {"candidate_source_paths": []}, "heading_target_matches": [], "block_target_evaluation": "not_applicable"},
+                {"source_surface": "frontmatter", "source_span": null, "source_block_span": null, "source_occurrence_ordinal": 1, "frontmatter_key_path": "title", "raw_target": "Target", "display_alias": null, "embedded": false, "heading_fragment": null, "block_fragment": null, "target_candidates": {"candidate_source_paths": []}, "heading_target_matches": [], "block_target_evaluation": "not_applicable"},
+                {"source_surface": "frontmatter", "source_span": null, "source_block_span": null, "source_occurrence_ordinal": 2, "frontmatter_key_path": "title", "raw_target": "Target", "display_alias": null, "embedded": false, "heading_fragment": null, "block_fragment": null, "target_candidates": {"candidate_source_paths": []}, "heading_target_matches": [], "block_target_evaluation": "not_applicable"}
+            ]
+        });
+        let notes = vec![&note];
+        let expected = expected_occurrences(&notes).unwrap();
+        assert_eq!(expected.len(), 4);
+        assert_ne!(expected[0].id, expected[1].id);
+        assert_ne!(expected[2].id, expected[3].id);
+        assert!(matches!(
+            expected[0].source,
+            OccurrenceSource::SemanticUnit { .. }
+        ));
+        assert!(matches!(
+            expected[2].source,
+            OccurrenceSource::ObjectField { .. }
+        ));
+        assert!(
+            expected
+                .iter()
+                .all(|occurrence| occurrence.source_span.is_none())
+        );
+    }
+
+    #[test]
+    fn absent_heading_match_remains_unresolved_and_ambiguous_candidates_remain_explicit() {
+        let source = serde_json::json!({
+            "source": {"relative_path": "source.md", "basename": "source.md"},
+            "uuid": {"parsed_value": "019dcf5c-ded1-70df-ab68-c25bbc4e8eb1"},
+            "frontmatter": {"values": {}, "value_shapes": {}},
+            "raw_markdown": "body",
+            "headings": [],
+            "block_candidates": [{"block_kind_observation": "paragraph", "raw_markdown": "body", "source_span": [0, 4]}],
+            "authored_links": [
+                {"source_surface": "body", "source_span": [0, 1], "source_block_span": [0, 4], "source_occurrence_ordinal": 1, "raw_target": "target#Missing", "display_alias": null, "embedded": false, "heading_fragment": "Missing", "block_fragment": null, "target_candidates": {"candidate_source_paths": ["target.md"]}, "heading_target_matches": [], "block_target_evaluation": "not_applicable"},
+                {"source_surface": "body", "source_span": [2, 3], "source_block_span": [0, 4], "source_occurrence_ordinal": 2, "raw_target": "Target", "display_alias": null, "embedded": false, "heading_fragment": null, "block_fragment": null, "target_candidates": {"candidate_source_paths": ["target.md", "target-2.md"]}, "heading_target_matches": [], "block_target_evaluation": "not_applicable"}
+            ]
+        });
+        let target = serde_json::json!({
+            "source": {"relative_path": "target.md", "basename": "target.md"},
+            "uuid": {"parsed_value": "019dcf5c-ded1-70df-ab68-c25bbc4e8eb2"},
+            "frontmatter": {"values": {}, "value_shapes": {}}, "raw_markdown": "# Present", "headings": [{"level": 1, "address_key": "present", "source_span": [0, 9]}], "block_candidates": [], "authored_links": []
+        });
+        let target_2 = serde_json::json!({
+            "source": {"relative_path": "target-2.md", "basename": "target-2.md"},
+            "uuid": {"parsed_value": "019dcf5c-ded1-70df-ab68-c25bbc4e8eb3"},
+            "frontmatter": {"values": {}, "value_shapes": {}}, "raw_markdown": "target", "headings": [], "block_candidates": [], "authored_links": []
+        });
+        let notes = vec![&source, &target, &target_2];
+        let expected = expected_occurrences(&notes).unwrap();
+        assert!(expected[0].resolved_target.is_none());
+        assert_eq!(
+            expected[0].resolution_state,
+            OccurrenceResolutionState::Unresolved
+        );
+        assert!(matches!(
+            expected[1].resolution_state,
+            OccurrenceResolutionState::Ambiguous { .. }
+        ));
+    }
+
+    #[test]
     fn correspondence_rejects_invented_region_and_unit() {
         let observation = minimal_observation(Value::Object(serde_json::Map::new()));
         let mut base = base_projection();
@@ -3534,7 +3709,7 @@ mod tests {
     fn heading_fragment_target_mutation_fails_factual_correspondence() {
         let observation = serde_json::json!({
             "markdown_observations": [
-                {"source": {"relative_path": "source.md", "basename": "source.md"}, "uuid": {"parsed_value": "019dcf5c-ded1-70df-ab68-c25bbc4e8eb1"}, "frontmatter": {"values": {}, "value_shapes": {}}, "headings": [{"level": 1, "address_key": "source", "source_span": [0, 10]}], "block_candidates": [], "authored_links": [{"source_surface": "body", "source_span": [2, 4], "raw_target": "target#Target", "display_alias": null, "embedded": false, "heading_fragment": "Target", "block_fragment": null, "target_candidates": {"candidate_source_paths": ["target.md"]}, "heading_target_matches": [{"source_span": [10, 20]}], "block_target_evaluation": "not_applicable"}]},
+                {"source": {"relative_path": "source.md", "basename": "source.md"}, "uuid": {"parsed_value": "019dcf5c-ded1-70df-ab68-c25bbc4e8eb1"}, "frontmatter": {"values": {}, "value_shapes": {}}, "headings": [{"level": 1, "address_key": "source", "source_span": [0, 10]}], "block_candidates": [], "authored_links": [{"source_surface": "body", "source_span": [2, 4], "source_block_span": [0, 10], "source_occurrence_ordinal": 1, "raw_target": "target#Target", "display_alias": null, "embedded": false, "heading_fragment": "Target", "block_fragment": null, "target_candidates": {"candidate_source_paths": ["target.md"]}, "heading_target_matches": [{"source_span": [10, 20]}], "block_target_evaluation": "not_applicable"}]},
                 {"source": {"relative_path": "target.md", "basename": "target.md"}, "uuid": {"parsed_value": "019dcf5c-ded1-70df-ab68-c25bbc4e8eb2"}, "frontmatter": {"values": {}, "value_shapes": {}}, "headings": [{"level": 1, "address_key": "target", "source_span": [10, 20]}, {"level": 1, "address_key": "other", "source_span": [30, 40]}], "block_candidates": [], "authored_links": []}
             ]
         });
@@ -3573,7 +3748,7 @@ mod tests {
     fn block_fragment_target_uses_explicit_unit_mapping() {
         let observation = serde_json::json!({
             "markdown_observations": [
-                {"source": {"relative_path": "source.md", "basename": "source.md"}, "uuid": {"parsed_value": "019dcf5c-ded1-70df-ab68-c25bbc4e8eb1"}, "frontmatter": {"values": {}, "value_shapes": {}}, "headings": [{"level": 1, "address_key": "source", "source_span": [0, 10]}], "block_candidates": [], "authored_links": [{"source_surface": "body", "source_span": [2, 4], "raw_target": "target#^b1", "display_alias": null, "embedded": false, "heading_fragment": null, "block_fragment": "^b1", "target_candidates": {"candidate_source_paths": ["target.md"]}, "heading_target_matches": [], "block_target_evaluation": "observed"}]},
+                {"source": {"relative_path": "source.md", "basename": "source.md"}, "uuid": {"parsed_value": "019dcf5c-ded1-70df-ab68-c25bbc4e8eb1"}, "frontmatter": {"values": {}, "value_shapes": {}}, "headings": [{"level": 1, "address_key": "source", "source_span": [0, 10]}], "block_candidates": [], "authored_links": [{"source_surface": "body", "source_span": [2, 4], "source_block_span": [0, 10], "source_occurrence_ordinal": 1, "raw_target": "target#^b1", "display_alias": null, "embedded": false, "heading_fragment": null, "block_fragment": "^b1", "target_candidates": {"candidate_source_paths": ["target.md"]}, "heading_target_matches": [], "block_target_evaluation": "observed"}]},
                 {"source": {"relative_path": "target.md", "basename": "target.md"}, "uuid": {"parsed_value": "019dcf5c-ded1-70df-ab68-c25bbc4e8eb2"}, "frontmatter": {"values": {}, "value_shapes": {}}, "headings": [], "block_candidates": [{"block_kind_observation": "paragraph", "raw_markdown": "one", "source_span": [10, 20], "explicit_block_ids": ["b1"]}, {"block_kind_observation": "paragraph", "raw_markdown": "two", "source_span": [20, 30], "explicit_block_ids": ["b2"]}], "authored_links": []}
             ]
         });

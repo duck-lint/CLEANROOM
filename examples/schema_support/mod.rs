@@ -6,6 +6,7 @@ use semantic_traversal_core::{
     ContinuationHandle, ExecutionLimits, OpenTension, ProblemRegion, ProblemRelation,
     ProblemSpaceState, ProjectionActivationConfig, ProjectionActivationViolation, RetrievalResult,
     SemanticAccessPlan, SemanticSpaceProjection, SynthesisInput,
+    access::{ProjectionAccessArtifacts, ProjectionAccessProbe, ProjectionAccessProbeResult},
 };
 use serde::Serialize;
 
@@ -50,6 +51,18 @@ pub fn generated_schemas() -> Vec<(&'static str, String)> {
         (
             "semantic-space-projection.schema.json",
             render_schema::<SemanticSpaceProjection>(),
+        ),
+        (
+            "projection-access-artifacts.schema.json",
+            render_schema::<ProjectionAccessArtifacts>(),
+        ),
+        (
+            "projection-access-probe.schema.json",
+            render_schema::<ProjectionAccessProbe>(),
+        ),
+        (
+            "projection-access-probe-result.schema.json",
+            render_schema::<ProjectionAccessProbeResult>(),
         ),
         (
             "activated-projection.schema.json",

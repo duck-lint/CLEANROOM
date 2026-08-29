@@ -22,39 +22,41 @@ corpus-validated CLEANROOM contracts.
 
 | Item | Repository-safe value |
 |---|---|
-| Observer repository | `duck-lint/semantic-traversal` |
-| Observer commit | `e9bb2d95c14b1beb334dc2b8d83420f5998b9a53` |
+| Observer repository | `CLEANROOM` |
+| Observer commit | `32957a3ff467ee57d7a76d4c4321753ac018d054` |
+| Parser salvage commit | `duck-lint/semantic-traversal@72ef99219fd260ba71365005273f6d9f68cab939` |
 | Observer schema identifier/version | `vault-observation/v3` |
-| Authored-vault specimen identity | `f6e3e4672560d294b0c303f21a063c2943f6ead0cb365ea93a66d0d9526c9ce4` |
-| Pinned run-1 artifact byte SHA-256 | `d3a340a1b203a64b2455f71a8d4f17003d5bfdba8be0583cbec1529692320bb9` |
-| Resident source records | `1060` |
-| Resident Markdown count | `1060` |
-| Admission-eligible Markdown count | `1052` |
+| Authored-vault specimen identity | `8db3ab329d1890890a1fa7eeaec42d700b29420fb71ed052383dbb9ed3b0e8cc` |
+| Pinned run-1 artifact byte SHA-256 | `cc179d31f4035f84742312bab363a1504173f034e11625022a2142294c6eb000` |
+| Resident source records | `1085` |
+| Resident Markdown count | `1085` |
+| Admission-eligible Markdown count | `1077` |
 | Excluded Markdown count | `8` |
-| Valid frontmatter count | `1057` |
+| Valid frontmatter count | `1082` |
 | Absent frontmatter count | `3` |
 | Malformed-frontmatter count | `0` |
-| Parseable UUID count | `1057` |
-| UUIDv7 count | `1057` |
+| Parseable UUID count | `1082` |
+| UUIDv7 count | `1082` |
 | Duplicate UUID groups | `0` |
-| Whole-resident total authored-link occurrences | `5008` |
-| Whole-resident one-candidate occurrences | `4907` |
-| Whole-resident zero-candidate occurrences | `101` |
+| Whole-resident total authored-link occurrences | `4925` |
+| Whole-resident one-candidate occurrences | `4920` |
+| Whole-resident zero-candidate occurrences | `5` |
 | Whole-resident multiple-candidate occurrences | `0` |
 | Observed frontmatter field count | `60` |
-| Operator resolution identity/status | 60 field classifications accepted; 55 admitted; 5 excluded; 0 quarantined; 0 unresolved; private decision-matrix resolution `R001`: accepted |
+| Operator resolution identity/status | 60 field classifications accepted; 55 admitted; 5 excluded; 0 quarantined; 0 unresolved; current replacements: `temporal_pace` -> `headspace`, historical `vector_direction` -> `analysis_orientation` |
 
 The observer repository/commit is recorded as evidence identity only. CLEANROOM
 does not import, imitate, or infer architectural authority from that
 implementation.
 
-The v3 observation was run twice. Both runs reproduced the same specimen
-identity, and their serialized summary bytes were reported identical. Complete
-serialized observation bytes are not expected to be identical because
-`generated_at` is an intentional run timestamp. The pinned run-1 digest above
-is an artifact-byte identity only; it is not a logical observation identity or
-a specimen/source identity. No unrecoverable vault-manifest or logical
-observation digest is used as current v3 audit authority.
+The current v3 observation was produced once from the current authored vault.
+The pinned digest above is an artifact-byte identity only, while the specimen
+identity is the observer-defined source identity. Wikilinks inside fenced code
+are retained as raw Markdown but excluded from authored-link occurrences by the
+CLEANROOM observer. CommonMark line reconstruction and block-owned occurrence
+provenance are implemented in observer commit
+`32957a3ff467ee57d7a76d4c4321753ac018d054`; parser mechanics were salvaged
+from semantic-traversal commit `72ef99219fd260ba71365005273f6d9f68cab939`.
 
 ### 1.1 Historical v2 predecessor boundary
 
@@ -70,7 +72,7 @@ observation:
 | **HISTORICAL** private decision-matrix SHA-256 | `1adb15b094fef29a23aebd7308b476e4d3d4489a57d7e1993fc83ca6a963b36d` |
 | **HISTORICAL** generator artifact SHA-256 | `11e23f64cbd7004d8ae3f2d4f9dcfb1627987069f13c181c3eaedf75dadfbc0f` |
 
-Exact field-universe reconciliation against v3 established:
+Historical field-universe reconciliation against v3 established:
 
 ```text
 historical fields: 60
@@ -82,9 +84,11 @@ unchanged: 60
 
 The v2 boundary remains historical provenance; it is not the current corpus
 actuality boundary. The three historical digests above identify the original
-R001 evidence bundle and are not v3 artifact identities. Because the universe
-is unchanged, the existing semantic classifications carry forward without a
-new field-admission decision.
+R001 evidence bundle and are not current v3 artifact identities. The current
+operator decisions explicitly replace `temporal_pace` with `headspace` and
+historical `vector_direction` with `analysis_orientation`; no dual current
+field is created because both historical fields are absent from the fresh
+observation.
 
 The historical v2 specimen identity uses the observer-defined source identity
 over resident directory observations and the same six restricted resident
@@ -97,7 +101,7 @@ observer, schema, and specimen above.
 
 The authored-vault specimen identity is the observer-defined
 `vault_resident_snapshot_identity`. At observer commit
-`e9bb2d95c14b1beb334dc2b8d83420f5998b9a53`, its input is:
+`32957a3ff467ee57d7a76d4c4321753ac018d054`, its input is:
 
 ```text
 {
@@ -162,7 +166,7 @@ significance.
 
 | Canonical list-valued fields | Canonical scalar-valued fields |
 |---|---|
-| `creator`, `register_mode`, `from_mode`, `to_mode`, `unity_level` | `format`, `layer`, `vector_direction`, `register`, `pillar`, `hypnagogic_resonance`, `reactivity`, `relationship` |
+| `creator`, `register_mode`, `from_mode`, `to_mode`, `unity_level` | `format`, `layer`, `analysis_orientation`, `register`, `pillar`, `hypnagogic_resonance`, `reactivity`, `relationship` |
 
 The current temporal field rows preserve the distinction between parser-native
 shape and semantic representation:
@@ -174,13 +178,32 @@ shape and semantic representation:
 | `original_year_published` | number or string, as applicable | `ExactYear`, `ApproximateYear` |
 | `journal_entry_date` | date | `FullDate` only |
 
-### 3.1 Current v3 repository-safe per-field audit export
+### 3.1 Current v3 baseline delta
 
-The following complete table contains one row for each current v3 field,
-exactly once. Counts are repository-safe structural evidence. Shapes are
-mechanical observation; temporal representation is governed by `docs/10`;
-wikilink counts do not create canonical relation classifications. No private
-values or paths are exposed.
+The fresh current observation has exactly 60 observed fields. The explicit
+replacement delta is mechanically verified below; neither historical field is
+present in the fresh observation. `analysis_orientation` retains the accepted
+analysis-orientation role, carrying-object applicability, inherited unit
+provenance, and no occurrence or temporal semantics.
+
+| Field | Whole-resident presence | Admission-eligible presence | Value shapes | Current status |
+|---|---:|---:|---|---|
+| `analysis_orientation` | 1063 | 1058 | null=489, string=574 | admitted successor |
+| `headspace` | 211 | 211 | null=37, string=174 | admitted current field |
+| `vector_direction` | 0 | 0 | — | historical terminology only |
+| `temporal_pace` | 0 | 0 | — | historical terminology only |
+
+The detailed table below is retained as historical pre-archive v3 audit
+context; its counts are not current-baseline evidence.
+
+### 3.2 Historical pre-archive v3 repository-safe per-field audit export
+
+The following complete table is retained as the historical pre-archive v3
+field export, exactly once per historical field. Its counts are historical
+repository-safe evidence, not current-baseline evidence. Shapes are mechanical
+observation; temporal representation is governed by `docs/10`; wikilink counts
+do not create canonical relation classifications. No private values or paths
+are exposed.
 
 | Field | Whole-resident presence | Admission-eligible presence | Value shapes | Null count | Wikilink occurrence count | Temporal observation | Admission status |
 |---|---:|---:|---|---:|---:|---|---|
@@ -245,7 +268,7 @@ values or paths are exposed.
 | `uuid` | 1057 | 1052 | string=1057 | 0 | 0 | — | admitted |
 | `vector_direction` | 1038 | 1033 | null=467, string=571 | 467 | 0 | — | admitted |
 
-### 3.2 Historical v2 repository-safe per-field audit export
+### 3.3 Historical v2 repository-safe per-field audit export
 
 The following table contains one row for every observed field, exactly once.
 Counts distinguish whole-resident presence from admission-eligible presence;

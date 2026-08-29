@@ -1,93 +1,120 @@
 # Phase 6 Complete-Vault Projection Validation Report
 
-Status: **validator reconciled; private Phase 6 validation pending**.
+Status: **current Phase 6 validation passed twice; promoted outputs and
+validation reports are byte-identical.**
 
-This report records the mechanical reconciliation of the existing Phase 6
-validator and evidence contract after merged PR #23. It does not claim current
-whole-corpus validation. Phase 7 has not begun.
+This is the current private-evidence baseline. It records complete-vault
+correspondence validation only; it does not begin Phase 7.
 
-## Corrected Phase 5 input contract
+## Current evidence tuple
 
-The validator now requires the corrected projection representation:
+- CLEANROOM validator source commit: `005f75fecbf319d94b78382722f1e83ecff0dd52`
+- Observation schema: `vault-observation/v3`
+- Observer version: `cleanroom-parser-observer/v2`
+- Observer repository: `CLEANROOM`
+- Observer commit: `32957a3ff467ee57d7a76d4c4321753ac018d054`
+- Parser salvage commit: `72ef99219fd260ba71365005273f6d9f68cab939`
+- Corpus snapshot identity: `8db3ab329d1890890a1fa7eeaec42d700b29420fb71ed052383dbb9ed3b0e8cc`
+- Observation artifact SHA-256: `cc179d31f4035f84742312bab363a1504173f034e11625022a2142294c6eb000`
+- Phase 5 schema: `semantic-space-projection/v2`
+- Phase 5 snapshot: `projection:phase5:v2:8db3ab329d1890890a1fa7eeaec42d700b29420fb71ed052383dbb9ed3b0e8cc`
+- Phase 5 projection SHA-256: `925e9437696a4728df4db2be26a0c8aeafbb2304421de007998731bd579b1cea`
+- Phase 5 report SHA-256: `a1d4ff78789cdb6f7ad99350760bd003cc478e33bf3112d88691f97d1ec2838c`
+- Phase 5 logical hash: `sha256:91352761f4403343de3c293ef78bc9c087011cbdd39f957d789ae7200ad720f0`
 
-- CLEANROOM base: `0179bf75d34c97f7d1adefbaeee869f57e361b0e` (merged PR #23)
-- projection schema: `semantic-space-projection/v2`
-- projection snapshot: `projection:phase5:v2:<corpus-snapshot>`
-- historical corrected Phase 5 projection byte SHA-256:
-  `f7423f494d905799e44b2c98f470429ae960ae682b43158f90d8b8f6fa9e39d2`
-- projection validation status required before promotion: `Unvalidated`
+The observation, frozen Phase 5 projection, Phase 5 report, and both Phase 6
+outputs/reports remain in a durable private location outside Git and outside
+the authored vault. No private artifact or corpus content is committed.
 
-The validator no longer constructs or validates projection-owned
-`configuration_snapshot_id`, `available`, routine candidate limits,
-`AvailabilityOnly`, or provider/index status text. Its independently derived
-surface descriptors use the five structural families and structural
-`Bounded` coverage. Runtime configuration and access state remain outside the
-projection contract.
+## Snapshot delta audit
 
-The historical byte hash above is retained evidence from the original
-pre-archive PR #23 construction. The 2026-08-22 recovery did not possess or
-reconstruct that private artifact.
+The prior candidate snapshot was
+`8bc26fff58572bc2991f08b216b9974cc1e7c5a45fc9df19e5a7e2703f357293`.
+The current and prior observations contain the same 109 directories and 1129
+files: no path was added or removed. Exactly seven existing Markdown source
+records changed their source hashes. The snapshot function uses resident paths,
+source hashes, and topology; it does not include observer implementation
+identity. The change is therefore a corpus-state/source-hash change only, not
+an observer-induced snapshot identity change.
 
-## Public and synthetic reconciliation
+## Independent validation runs
 
-The following are now checked against the v2 source/schema contracts:
+Both runs consumed the same observation and frozen Phase 5 projection. The
+validator independently derived correspondence and did not call the Phase 5
+constructor or use its closure result as an oracle.
 
-- validator surface descriptors use only v2 fields;
-- Phase 5 identity checks require the v2 schema and version-qualified snapshot;
-- synthetic validator fixtures construct v2 projections without removed
-  projection/runtime fields;
-- v1 Phase 6 input assumptions are absent from the validator implementation;
-- the existing independent correspondence, topology, incidence, provenance,
-  temporal, transport, and deterministic-promotion checks remain in place.
+| Measure | Run 1 | Run 2 |
+|---|---|---|
+| Validator status | `Validated` | `Validated` |
+| Violations | 0 | 0 |
+| Failure counts | empty | empty |
+| Promoted logical hash | `sha256:ce157f412d51e4ec6c9d34c54e6708862836d9bb5f8b58d6ff212335cb6050ec` | same |
+| Promoted projection SHA-256 | `0f60da7b48638f5f494e2691f3be64aaad38b4808bdd53b1a77bad29c000d68a` | same |
+| Validation report SHA-256 | `78df04d63c33e333a2dbb9c6db57c9075aeac47282e549848d6078de167ed794` | same |
+| Promoted output size | 52,948,513 bytes | 52,948,513 bytes |
 
-The validator remains independent from the Phase 5 constructor and does not
-use the constructor's high-level closure result as an oracle.
+The promoted snapshot is
+`projection:phase6:8db3ab329d1890890a1fa7eeaec42d700b29420fb71ed052383dbb9ed3b0e8cc`.
 
-## Historical pre-archive PR #21 evidence
+## Validated census
 
-The former PR #21 evidence described a different input and is retained only as
-historical audit context:
+| Measure | Count |
+|---|---:|
+| Resident Markdown sources | 1085 |
+| Admitted sources / objects | 1077 |
+| Excluded Markdown | 8 |
+| Regions | 4492 |
+| Semantic units | 14108 |
+| Identifier descriptors | 55 |
+| Identifier assignments | 12627 |
+| Occurrences | 4920 |
+| Resolved occurrences | 4907 |
+| Unresolved occurrences | 13 |
+| Ambiguous occurrences | 0 |
+| Temporal anchors | 549 |
+| Retrieval surfaces | 5 |
+| Structural transitions | 22 |
+| Transport segments | 0 |
 
-- old base: `eda0f76d14c1385cee112a3298ed66c0a1411dc4`
-- old schema/input representation: `semantic-space-projection/v1`
-- old Phase 5 projection byte SHA-256:
-  `4870244e512f996aff1280e7d2690a9053bcbb4c4be4df7b8b9f33eab58eea5a`
-- old Phase 5 logical hash:
-  `sha256:b21a96fdf2951dd8777c72a3acff3ac0ffa16ffb04d697aa6e7ee6855993c7a8`
-- old Phase 6 output byte SHA-256:
-  `f0f5c0b56895952aeb402b8eaea2a6f73f2124c5584d00942da928dd92b80ef1`
-- old Phase 6 logical hash:
-  `sha256:ae2ef75756cf4c60e65e1d73da5a20a5e38561b5f1042a50b568eb443de1bf71`
+## Contract-contact accounting
 
-Those values are not evidence that the corrected v2 projection has passed
-Phase 6. No current corpus counts, validation status, or promoted output are
-asserted here.
+- Observed frontmatter fields: 60; admitted: 55; excluded: 5.
+- `analysis_orientation` and `headspace` are present; `vector_direction` and
+  `temporal_pace` are absent.
+- Observed block kinds/counts: paragraph 12727, heading 3482, list 1158,
+  `hr` 350, blockquote/callout 237, table 20, code fence 41.
+- Admitted block kinds/counts: paragraph 12705, heading 3415, list 1115,
+  `hr` 323, blockquote/callout 231, table 19, code fence 38.
+- `hr` is observed and non-materialized; all 323 admitted `hr` blocks consume
+  authored ordinal positions and are absent from semantic-unit materialization.
+- Occurrence sources: object field 501, semantic region 189, semantic unit
+  4230. Body ownership was independently checked from exact parser-owned
+  `source_block_span`; source occurrence ordinals were checked for deterministic
+  collision-free identity. Exact inline spans were checked when present and
+  unavailable spans remained unavailable.
+- Heading-fragment occurrences: 10; resolved 9; unresolved 1; ambiguous 0.
+- Block-fragment occurrences: 0; resolved 0; unresolved 0.
+- Zero-candidate links remain explicit unresolved occurrences; no target or
+  block-target fallback degradation was observed.
 
-## Current validator provenance
+## Closure results
 
-The reconciled public implementation is composed of:
+The independent validator closed object, region, unit, identifier, occurrence,
+target, reverse-incidence, temporal, retrieval-surface, provenance, transport,
+bounds, deterministic-identity, admitted-fact, and unresolved/ambiguous
+representation domains. Every failure counter is zero and the violation list
+is empty. In particular:
 
-- `src/bin/phase6_validate.rs`
-- `src/construction.rs` for the byte-level SHA-256 primitive
-- `src/validation.rs`
+- projection-closure violations: 0;
+- occurrence source-attribution failures: 0;
+- occurrence identity collisions: 0;
+- target-incidence failures: 0;
+- block-target fallback degradations: 0;
+- transport-segmentation failures: 0;
+- bounds failures: 0;
+- deterministic-identity failures: 0;
+- admitted-fact representation failures: 0;
+- unresolved/ambiguous preservation failures: 0.
 
-The current branch is based on merged PR #23. Exact file-byte hashes and the
-commit containing this reconciliation are established by Git and public local
-validation; they do not establish private corpus validation.
-
-## Completion boundary
-
-Actual Phase 6 completion still requires all of the following private evidence:
-
-1. the exact pinned `vault-observation/v3` artifact;
-2. the exact corrected v2 Phase 5 projection bytes;
-3. two independent validator runs with zero deterministic violations;
-4. byte-identical promoted outputs and corresponding hashes.
-
-That evidence is unavailable in this recovery environment. The validator is
-therefore reconciled and publicly/synthetically testable, but Phase 6 remains
-incomplete. No artifact, hash, corpus count, or validation result has been
-fabricated.
-
-Real projection access remains Phase 7 work. PR #9 remains untouched and
-provisional.
+Historical pre-archive Phase 5/6 identities remain audit context only. They
+were not reused as current evidence. Phase 7 remains out of scope.
