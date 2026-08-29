@@ -24,7 +24,9 @@ use semantic_traversal_core::{
     projection::SemanticSpaceProjection,
 };
 use sha2::{Digest, Sha256};
-use support::synthetic_projection::{MARX_OBJECT, object, occurrence, tiny_projection, unit};
+use support::synthetic_projection::{
+    MARX_OBJECT, object, occurrence, region, tiny_projection, unit,
+};
 
 fn bind_logical_hash(mut projection: SemanticSpaceProjection) -> SemanticSpaceProjection {
     projection.logical_hash.clear();
@@ -401,6 +403,13 @@ fn synthetic_mechanical_activation_preserves_incoming_edge_orientation() {
         expected
             .activation_provenance
             .contains(&ActivationProvenance::ConfiguredDefault {
+                configuration_key: "automatic_surface_fan_out".into(),
+            })
+    );
+    assert!(
+        expected
+            .activation_provenance
+            .contains(&ActivationProvenance::ConfiguredDefault {
                 configuration_key: "bounded_structural_context".into(),
             })
     );
@@ -409,5 +418,57 @@ fn synthetic_mechanical_activation_preserves_incoming_edge_orientation() {
             && edge.target == marx
             && edge.direction == Direction::Incoming
             && edge.transition_id == "transition:object-occurrence-incoming"
+    }));
+}
+
+#[test]
+fn synthetic_mechanical_activation_preserves_incoming_context_orientation() {
+    let projection = bind_logical_hash(tiny_projection());
+    let artifacts =
+        build_projection_access_artifacts(&projection, None, None).expect("access builds");
+    let access = ProjectionActivationAccess::new(&artifacts);
+    let mut config = config(0, 4, 0, 16, 0);
+    config.unbanded.maximum_structural_neighbors_per_record = 0;
+
+    let activated = activate_projection(
+        &projection,
+        &problem_space(),
+        &utterance("Capital"),
+        &config,
+        &access,
+    )
+    .expect("context-only activation succeeds");
+
+    let marx = SemanticAddress::Object(object(MARX_OBJECT));
+    let marx_region = SemanticAddress::Region(region(&object(MARX_OBJECT), "heading:Chapter 2"));
+    let expected = activated
+        .edges
+        .iter()
+        .find(|edge| {
+            edge.source == marx_region
+                && edge.target == marx
+                && edge.direction == Direction::Incoming
+                && edge.transition_id == "transition:object-region"
+        })
+        .expect("represented incoming context edge keeps its stored orientation");
+    assert!(
+        activated
+            .telemetry
+            .iter()
+            .filter(|telemetry| telemetry.surface_kind == RetrievalSurfaceKind::Graph)
+            .all(|telemetry| telemetry.returned_count == 0)
+    );
+    assert!(
+        expected
+            .activation_provenance
+            .contains(&ActivationProvenance::ConfiguredDefault {
+                configuration_key: "bounded_structural_context".into(),
+            })
+    );
+    assert!(!activated.edges.iter().any(|edge| {
+        edge.source == marx
+            && edge.target == marx_region
+            && edge.direction == Direction::Incoming
+            && edge.transition_id == "transition:object-region"
     }));
 }
