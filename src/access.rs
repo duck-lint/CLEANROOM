@@ -523,13 +523,12 @@ impl ProjectionAccessArtifacts {
                     && (transition_ids.is_empty() || transition_ids.contains(&edge.transition_id))
                     && match direction {
                         Direction::Outgoing => edge.source == *seed,
-                        Direction::Incoming => edge.target == *seed,
+                        Direction::Incoming => edge.source == *seed,
                     }
             })
             .map(|edge| AccessCandidate {
                 identity: match direction {
-                    Direction::Outgoing => edge.target.clone(),
-                    Direction::Incoming => edge.source.clone(),
+                    Direction::Outgoing | Direction::Incoming => edge.target.clone(),
                 },
                 order: 0,
                 mechanical_score: None,
@@ -1044,7 +1043,7 @@ fn lexical_candidates(
             transition_id: None,
         })
         .collect();
-    output.sort_by(|left, right| address_key(&left.identity).cmp(&address_key(&right.identity)));
+    output.sort_by_key(|left| address_key(&left.identity));
     Ok(output)
 }
 
@@ -1058,12 +1057,6 @@ fn build_graph_index(projection: &SemanticSpaceProjection) -> Result<GraphIndex,
                 target: SemanticAddress::Region(region.clone()),
                 transition_id: "transition:object-region".into(),
                 direction: Direction::Outgoing,
-            });
-            edges.push(GraphEdge {
-                source: SemanticAddress::Region(region.clone()),
-                target: object_address.clone(),
-                transition_id: "transition:unit-region".into(),
-                direction: Direction::Incoming,
             });
         }
         for unit in &object.unit_ids {
@@ -2036,6 +2029,7 @@ fn provider_transport_failure(code: &str, error: &str, request_bytes: usize) -> 
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn provider_response_failure(
     code: &str,
     status: Option<u16>,

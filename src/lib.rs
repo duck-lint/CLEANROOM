@@ -15,6 +15,7 @@ pub mod packet;
 pub mod problem_space;
 pub mod problem_space_fold;
 pub mod projection;
+pub mod projection_activation;
 pub mod region_identity;
 pub mod semantic_access;
 pub mod synthesis;
@@ -37,6 +38,7 @@ pub use problem_space::{
     OpenTension, ProblemConstraintApplicability, ProblemRegion, ProblemRelation, ProblemSpaceState,
 };
 pub use projection::SemanticSpaceProjection;
+pub use projection_activation::{ProjectionActivationAccess, activate_projection};
 pub use region_identity::{
     AuthoredRegionHeading, CanonicalRegionIdentity, RegionIdentityError,
     canonical_region_identities,
