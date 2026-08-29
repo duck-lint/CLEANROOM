@@ -14,19 +14,20 @@ Desktop and Start-menu shortcuts for:
 - Stop CLEANROOM Now
 - Finish CLEANROOM and Shut Down PC
 
-The adapters invoke `python3 scripts/project.py` from the sibling
-`symphony-pilot` checkout inside `Ubuntu-24.04`, using the deployed CLEANROOM
-profile at `/home/duck-lint/symphony/profile.toml`. They never load
+The adapters invoke the atomically deployed pilot command at
+`/home/duck-lint/symphony/scripts/project.py` inside `Ubuntu-24.04`, using the
+deployed CLEANROOM profile at `/home/duck-lint/symphony/profile.toml`. They never load
 credentials, choose a workflow, or maintain a Windows PID/state system. They
-use the loopback dashboard at `127.0.0.1:4040`; Start and Check open it
-automatically.
+use the loopback dashboard at `127.0.0.1:4040`; Start and Check open it when
+the pilot reports a running service.
 
-Check delegates to pilot `status`. Finish delegates to pilot `stop`, which
-refuses to terminate active work; Stop Now is the explicit emergency action.
-Shutdown delegates to Finish and is invoked only after pilot reports a safe
-stopped result. No Windows startup task is installed, so Symphony remains
-stopped after reboot until Start is explicitly invoked.
+Check delegates to pilot `status`. Finish delegates to pilot `finish`, which
+drains active work before stopping; Stop Now is the explicit emergency action
+after a Windows Yes/No confirmation. Shutdown delegates to Finish and is
+invoked only after pilot reports a safe stopped result. No Windows startup task
+is installed, so Symphony remains stopped after reboot until Start is explicitly
+invoked.
 
-Notifications are convenience only. The GitHub `symphony:human` label and
-Symphony workpad remain authoritative. A blocked notification includes the
-GitHub issue URL.
+Generic pilot notifications are convenience only. The GitHub `symphony:human`
+label and Symphony workpad remain authoritative. A blocked notification
+includes the GitHub issue URL.
